@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDate, formatNumberWithCommas } from "@/lib/utils.jsx"
 import ComponentLoading from "@/components/ComponentLoading"
-import { Button } from "@/Components/ui/button"
+import { Button } from "@/components/ui/button"
 import { SquarePen, Search, AlertCircle } from 'lucide-react'
 import AttachmentList from "@/pages/MyCga/AttachmentList"
 import ApproveForm from "@/pages/ReviewCga/ApproveForm"

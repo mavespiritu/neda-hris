@@ -7,8 +7,8 @@ import {
     DialogClose
 } from "@/components/ui/dialog"
 
-import { Label } from "@/Components/ui/label"
-import { Button } from "@/Components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import { useState, useEffect } from 'react'
 import { useForm } from '@inertiajs/react'
 import SingleComboBox from "@/components/SingleComboBox"

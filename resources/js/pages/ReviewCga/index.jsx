@@ -3,7 +3,7 @@ import Breadcrumbs from "@/components/Breadcrumbs"
 import {
     Card,
     CardContent,
-  } from "@/Components/ui/card"
+  } from "@/components/ui/card"
 
 import PageTitle from "@/components/PageTitle"
 import Evidences from "@/pages/ReviewCga/Evidences"

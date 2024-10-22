@@ -37,7 +37,7 @@ class MyCgaController extends Controller
         ]);
     }
 
-    public function showCompetencies($id, Request $request)
+    /* public function showCompetencies($id, Request $request)
     {
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
@@ -155,7 +155,120 @@ class MyCgaController extends Controller
         }
         
         return response()->json($competencies);
+    } */
+
+    public function showCompetencies($id, Request $request)
+{
+    $conn2 = DB::connection('mysql2');
+    $conn3 = DB::connection('mysql3');
+
+    $position_id = '';
+
+    if ($request->has('position_id')) {
+        $position_id = $request->position_id;
+    } else {
+        $position = $conn3->table('tblemp_emp_item as eei')
+            ->select(['epi.*'])
+            ->leftJoin('tblemp_position_item as epi', 'eei.item_no', '=', 'epi.item_no')
+            ->where('eei.emp_id', $id)
+            ->whereNull('eei.to_date')
+            ->orderBy('eei.from_date', 'desc')
+            ->first();
+
+        $position_id = $position->item_no;
     }
+
+    if ($request->has('all') && $request->all) {
+        $competencies = $conn2->table('competency_indicator as ci')
+            ->select([
+                'c.comp_id as id',
+                'c.competency',
+                'c.description',
+                DB::raw('MAX(ci.proficiency) as proficiency'),
+                DB::raw("CASE 
+                            WHEN c.comp_type = 'org' THEN 'Organizational'
+                            WHEN c.comp_type = 'mnt' THEN 'Managerial'
+                            ELSE 'Technical/Functional'
+                        END as type"),
+                DB::raw("
+                    ROUND(
+                        (
+                            SELECT COUNT(DISTINCT sai.indicator_id)
+                            FROM staff_all_indicator as sai
+                            LEFT JOIN competency_indicator as ci ON ci.id = sai.indicator_id
+                            WHERE sai.emp_id = '" . $id . "'
+                            AND sai.compliance = 1
+                            AND ci.competency_id = c.comp_id
+                        ) / NULLIF(
+                            (
+                                SELECT COUNT(*)
+                                FROM competency_indicator as ci2
+                                WHERE ci2.competency_id = c.comp_id
+                            ), 0
+                        ) * 100, 2
+                    ) AS percentage
+                ")
+            ])
+            ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
+            ->groupBy('c.comp_id', 'c.competency', 'c.description', 'c.comp_type') // Added c.description here
+            ->orderBy('type', 'asc')
+            ->orderBy('c.competency', 'asc')
+            ->get()
+            ->groupBy('type');
+
+    } else {
+        $competencies = $conn2->table('position_competency_indicator as pci')
+            ->select([
+                'c.comp_id as id',
+                'c.competency',
+                'c.description',
+                DB::raw('MAX(ci.proficiency) as proficiency'),
+                DB::raw("CASE 
+                            WHEN c.comp_type = 'org' THEN 'Organizational'
+                            WHEN c.comp_type = 'mnt' THEN 'Managerial'
+                            ELSE 'Technical/Functional'
+                        END as type"),
+                DB::raw("
+                    ROUND(
+                        (
+                            SELECT COUNT(DISTINCT sai.indicator_id)
+                            FROM staff_all_indicator as sai
+                            LEFT JOIN competency_indicator as ci ON ci.id = sai.indicator_id
+                            WHERE sai.emp_id = '" . $id . "'
+                            AND sai.compliance = 1
+                            AND ci.competency_id = c.comp_id
+                            AND ci.proficiency IN (
+                                SELECT DISTINCT(ci3.proficiency)
+                                FROM position_competency_indicator as pci3
+                                LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
+                                WHERE ci3.competency_id = c.comp_id 
+                                AND pci3.position_id = pci.position_id
+                            )
+                        ) / NULLIF( 
+                            (
+                                SELECT COUNT(*)
+                                FROM position_competency_indicator as pci2
+                                LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
+                                WHERE ci2.competency_id = c.comp_id 
+                                AND pci2.position_id = pci.position_id
+                            ), 0
+                        ) * 100, 2
+                    ) AS percentage
+                ")
+            ])
+            ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'pci.indicator_id')
+            ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
+            ->where('pci.position_id', $position_id)
+            ->groupBy('c.comp_id', 'c.competency', 'c.description', 'c.comp_type', 'pci.position_id') // Added c.description here
+            ->orderBy('type', 'asc')
+            ->orderBy('c.competency', 'asc')
+            ->get()
+            ->groupBy('type');
+    }
+
+    return response()->json($competencies);
+}
+
 
     public function showCompetency($id, Request $request)
     {

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { Textarea } from "@/Components/ui/textarea"
+import { Textarea } from "@/components/ui/textarea"
 
 const TextArea = (
   ({ name, value, onChange, invalidMessage, ref}) => {

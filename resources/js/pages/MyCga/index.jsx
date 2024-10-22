@@ -15,7 +15,7 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-  } from "@/Components/ui/card"
+  } from "@/components/ui/card"
 import PageTitle from "@/components/PageTitle"
 
 const MyCga = ({emp_id, position_id}) => {

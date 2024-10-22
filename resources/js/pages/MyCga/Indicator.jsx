@@ -26,7 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
-} from "@/Components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 
 const Indicator = ({ indicator }) => {
 
