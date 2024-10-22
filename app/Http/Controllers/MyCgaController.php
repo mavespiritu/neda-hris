@@ -9,13 +9,17 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class MyCgaController extends Controller
 {
-    public $emp_id = '020593';
-    /**
-     * Display a listing of the resource.
-     */
+    public $emp_id;
+
+    public function __construct()
+    {
+        $this->emp_id = Auth::check() ? Auth::user()->ipms_id : null; 
+    }
+    
     public function index()
     {
         $conn2 = DB::connection('mysql2');

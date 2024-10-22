@@ -12,19 +12,22 @@ const EvidenceDescription = ({ text }) => {
 
     return (
         <div className="flex flex-col justify-start items-start">
-            <div className={`text-xs text-muted-foreground leading-normal mb-2`}>
+            <div className={`text-xs leading-normal mb-2`}>
                 {isExpanded ? (
-                    <>
-                        <span className="text-xs font-medium">Context:</span> {text}
-                    </>
+                    <div className="flex flex-col">
+                        <span className="text-muted-foreground font-medium">Context:</span>
+                        <span className="font-medium">{text}</span> 
+                    </div>
                 ) : (shouldShowReadMore ? (
-                    <>
-                        <span className="text-xs font-medium">Context:</span> {text?.substring(0, charLimit)}...`
-                    </>
+                    <div className="flex flex-col">
+                        <span className="text-muted-foreground font-medium">Context:</span>
+                        <span className="font-medium">{text?.substring(0, charLimit)}...</span> 
+                    </div>
                     ) : (
-                        <>
-                            <span className="text-xs font-medium">Context:</span> {text}
-                        </>
+                        <div className="flex flex-col">
+                            <span className="text-muted-foreground font-medium">Context:</span>
+                            <span className="font-medium">{text}</span> 
+                        </div>
                     )
                 )}
             </div>
@@ -32,7 +35,7 @@ const EvidenceDescription = ({ text }) => {
             {shouldShowReadMore && !isExpanded && (
                 <button 
                     onClick={toggleExpand} 
-                    className="font-medium text-xs my-1"
+                    className="font-bold text-xs my-1"
                 >
                     Read more
                 </button>
@@ -41,7 +44,7 @@ const EvidenceDescription = ({ text }) => {
             {isExpanded && (
                 <button 
                     onClick={toggleExpand} 
-                    className="font-medium text-xs my-1"
+                    className="font-bold text-xs my-1"
                 >
                     Show less
                 </button>
