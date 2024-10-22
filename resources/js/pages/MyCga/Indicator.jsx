@@ -16,6 +16,7 @@ import { formatDate, formatNumberWithCommas } from "@/lib/utils.jsx"
 import useDebounce from "@/hooks/useDebounce"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
 
 import {
   DropdownMenu,
@@ -26,13 +27,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
-} from "@/Components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 
 const Indicator = ({ indicator }) => {
 
   const references = useMemo(() => ["Training", "Award", "Performance", "Others"], [])
   
   const { toast } = useToast()
+
+  const [employees, setEmployees] = useState([])
 
   const [state, setState] = useState({
     evidences: [],
@@ -89,6 +92,31 @@ const Indicator = ({ indicator }) => {
 
     
   }, [])
+
+  const fetchActiveEmployees = async () => {
+    try {
+        const response = await fetch(`/employees/active-employees`)
+        if (!response.ok) {
+            toast({
+                title: "Uh oh! Something went wrong.",
+                description: "Network response was not ok",
+            })
+        }
+        const data = await response.json()
+      
+        setEmployees(data)
+
+    } catch (err) {
+        toast({
+            title: "Uh oh! Something went wrong.",
+            description: "There was a problem with your request",
+        })
+    }
+  }
+
+  useEffect(() => {
+    fetchActiveEmployees()
+}, [])
 
   // Fetch data based on currentPage and selected filters
   useEffect(() => {
@@ -243,7 +271,7 @@ const Indicator = ({ indicator }) => {
                         currentPage: 1, // Reset to the first page when changing filter
                       }))
                     }}
-                    className={`${state.filter === status ? 'font-semibold' : ''}`}
+                    className={`${state.filter === status && 'font-semibold'}`}
                     preserveState
                   >
                     {`${state.evidenceCountLabels[status]} (${formatNumberWithCommas(state.evidenceCounts[status])})`}
@@ -317,38 +345,141 @@ const Indicator = ({ indicator }) => {
         ) : (
             state.filteredEvidences && state.filteredEvidences.length > 0 ? (
                 <div className="h-12">
-                    {state.filteredEvidences.map((evidence) => (
+                    {state.filteredEvidences.map((evidence) => {
+                      
+                      const { status, approver, approvalDate, remarks } = (() => {
+                        let status = 'Pending'
+                        let approver = ''
+                        let approvalDate = ''
+                        let remarks = ''
+
+                        if (evidence.hr_confirmation === 1 && evidence.dc_confirmation === 1) {
+                            status = 'HR and DC Approved'
+                            approver = `${employees.find(emp => emp.value === evidence.hr_confirmed_by)?.label} and ${employees.find(emp => emp.value === evidence.dc_confirmed_by)?.label}`
+                            approvalDate = ` on ${formatDate(evidence.hr_date)} and ${formatDate(evidence.dc_date)} respectively`
+                            remarks = (evidence.dc_remarks || evidence.hr_remarks) && (
+                                <div className="flex flex-col gap-2 text-xs">
+                                    {evidence.hr_remarks && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-muted-foreground">HR Remarks:</span>
+                                            <span className="font-medium">{evidence.hr_remarks}</span>
+                                        </div>
+                                    )}
+                                    {evidence.dc_remarks && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-muted-foreground">DC Remarks:</span>
+                                            <span className="font-medium">{evidence.dc_remarks}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        } else if (evidence.hr_confirmation === 1) {
+                            status = 'HR Approved'
+                            approver = employees.find(emp => emp.value === evidence.hr_confirmed_by)?.label
+                            approvalDate = ` on ${formatDate(evidence.hr_date)}`
+                            remarks = evidence.hr_remarks && (
+                                <div className="flex flex-col gap-2 text-xs">
+                                    {evidence.hr_remarks && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-muted-foreground">HR Remarks:</span>
+                                            <span className="font-medium">{evidence.hr_remarks}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        } else if (evidence.dc_confirmation === 1) {
+                            status = 'DC Approved'
+                            approver = employees.find(emp => emp.value === evidence.dc_confirmed_by)?.label
+                            approvalDate = ` on ${formatDate(evidence.dc_date)}`
+                            remarks = evidence.dc_remarks && (
+                                <div className="flex flex-col gap-2 text-xs">
+                                    {evidence.dc_remarks && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-muted-foreground">DC Remarks:</span>
+                                            <span className="font-medium">{evidence.dc_remarks}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        } else if (evidence.disapproved === 1) {
+                            status = 'Disapproved'
+                            approver = employees.find(emp => emp.value === evidence.disapproved_by)?.label
+                            approvalDate = ` on ${formatDate(evidence.disapproved_date)}`
+                            remarks = evidence.disapproved_remarks && (
+                                <div className="flex flex-col gap-2 text-xs">
+                                    {evidence.disapproved_remarks && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-muted-foreground">Remarks:</span>
+                                            <span className="font-medium">{evidence.disapproved_remarks}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        }
+
+                        return { status, approver, approvalDate, remarks }
+                    })()
+
+                    const employee = employees.find(emp => emp.value === evidence.emp_id)
+
+                      return (
                         <div key={evidence.id} className="flex flex-col w-full items-start gap-2 rounded-lg border p-4 text-left text-sm transition-all hover:bg-accent mb-4">
                             <div className="flex w-full flex-col gap-1">
                                 <div className="flex items-center justify-between">
-                                    <div className="font-bold text-xs">{evidence.title}</div>
+                                    <div className="font-medium text-sm">{evidence.title}</div>
                                     <div className="flex gap-2">
-                                        <Button onClick={() => openModal(evidence.reference, evidence)} type="icon" size="xs" variant="ghost">
-                                            <SquarePen className="h-4 w-4" />
-                                        </Button>
-                                        <DeleteConfirmationDialog onConfirm={() => handleDelete(evidence.id)} type="icon" size="xs" variant="ghost" />
+                                    {['Pending'].includes(status) ? (
+                                        <>
+                                            <Button 
+                                                onClick={() => openModal(evidence.reference, evidence)} 
+                                                type="icon" 
+                                                size="xs" 
+                                                variant="ghost"
+                                            >
+                                                <SquarePen className="h-4 w-4" />
+                                            </Button>
+                                            <DeleteConfirmationDialog 
+                                                onConfirm={() => handleDelete(evidence.id)} 
+                                                type="icon" 
+                                                size="xs" 
+                                                variant="ghost" 
+                                            />
+                                        </>
+                                    ) : (
+                                      <Badge variant={status === 'Disapproved' && 'destructive'}>{status}</Badge>
+                                    )}  
                                     </div>
                                 </div>
-                                <div className="text-xs font-medium">
-                                    {evidence.start_date ? `${formatDate(evidence.start_date)} - ${formatDate(evidence.end_date)}` : ''}
+                                <div className="flex justify-between">
+                                  <div className="flex flex-col gap-1">
+                                    <div className="text-xs font-medium">
+                                        {evidence.start_date && `${formatDate(evidence.start_date)} - ${formatDate(evidence.end_date)}`}
+                                    </div>
+                                    {state.files[evidence.id] && <AttachmentList files={state.files[evidence.id]} evidence={evidence} />}
+                                  </div>
+                                  
+                                  <div className="flex flex-col text-xs text-right">
+                                    <span className="text-muted-foreground font-medium">Type of Evidence:</span>
+                                    <span className="font-medium">{evidence.reference}</span> 
+                                  </div>
                                 </div>
-                                {state.files[evidence.id] && <AttachmentList files={state.files[evidence.id]} evidence={evidence} />}
                             </div>
                             <EvidenceDescription text={evidence.description} />
-                            <div className="flex items-center gap-2">
-                                {references.map((reference) => (
-                                    <div
-                                        key={reference}
-                                        className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent ${
-                                            evidence.reference === reference ? 'bg-primary text-primary-foreground shadow hover:bg-primary/80' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                                        }`}
-                                    >
-                                        {reference.toLowerCase()}
-                                    </div>
-                                ))}
-                            </div>
+                            {['HR Approved', 'DC Approved', 'HR and DC Approved'].includes(status) ? (
+                                <span className="text-xs">
+                                    Approved by <strong>{approver}</strong>{approvalDate}
+                                </span>
+                            ) : status === 'Disapproved' ? (
+                                <span className="text-xs">
+                                    Disapproved by <strong>{approver}</strong>{approvalDate}
+                                </span>
+                            ) : null}
+                            <span>
+                                {['HR Approved', 'DC Approved', 'HR and DC Approved', 'Disapproved'].includes(status) && remarks}
+                            </span>
                         </div>
-                    ))}
+                      )
+                    })}
                 </div>
             ) : (
                 <div className="flex flex-col flex-1 items-center justify-center h-full">

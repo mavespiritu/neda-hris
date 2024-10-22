@@ -2,13 +2,13 @@ import { useState, useEffect } from "react"
 import { addDays, format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/Components/ui/button"
-import { Calendar } from "@/Components/ui/calendar"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/Components/ui/popover"
+} from "@/components/ui/popover"
 
 export function DateRangePicker({ className, startDate, endDate, onDateChange, invalidStartDateMessage, invalidEndDateMessage }) {
   const [date, setDate] = useState({

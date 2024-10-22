@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDate, formatNumberWithCommas } from "@/lib/utils.jsx"
 import ComponentLoading from "@/components/ComponentLoading"
-import { Button } from "@/Components/ui/button"
+import { Button } from "@/components/ui/button"
 import { SquarePen, Search, AlertCircle } from 'lucide-react'
 import AttachmentList from "@/pages/MyCga/AttachmentList"
 import ApproveForm from "@/pages/ReviewCga/ApproveForm"
@@ -21,12 +21,15 @@ import {
     AlertDescription,
     AlertTitle,
   } from "@/components/ui/alert"
+import { usePage } from '@inertiajs/react'
+  
 
 const Evidences = () => {
 
     const { toast } = useToast()
 
-    const [roles, setRoles] = useState([])
+    const user = usePage().props.auth.user
+
     const [employees, setEmployees] = useState([])
     const [competencies, setCompetencies] = useState([])
 
@@ -99,27 +102,6 @@ const Evidences = () => {
             const data = await response.json()
           
             setCompetencies(data)
-
-        } catch (err) {
-            toast({
-                title: "Uh oh! Something went wrong.",
-                description: "There was a problem with your request",
-            })
-        }
-    }
-
-    const fetchRoles = async () => {
-        try {
-            const response = await fetch(`/roles`)
-            if (!response.ok) {
-                toast({
-                    title: "Uh oh! Something went wrong.",
-                    description: "Network response was not ok",
-                })
-            }
-            const data = await response.json()
-          
-            setRoles(data)
 
         } catch (err) {
             toast({
@@ -226,14 +208,12 @@ const Evidences = () => {
     useEffect(() => {
         fetchActiveEmployees()
         fetchCompetencies()
-        fetchRoles()
         console.log("fetch active employees and competencies")
     }, [])
 
     useEffect(() => {
         fetchEvidences()
         console.log("fetch active evidences")
-        console.log(state)
     }, [state.currentPage, state.filters, debouncedSearchValue, fetchEvidences])
 
     useEffect(() => {
@@ -370,22 +350,64 @@ const Evidences = () => {
                                         status = 'HR and DC Approved'
                                         approver = `${employees.find(emp => emp.value === evidence.hr_confirmed_by)?.label} and ${employees.find(emp => emp.value === evidence.dc_confirmed_by)?.label}`
                                         approvalDate = ` on ${formatDate(evidence.hr_date)} and ${formatDate(evidence.dc_date)} respectively`
-                                        remarks = evidence.dc_remarks || evidence.hr_remarks ? `DC Remarks: ${evidence.dc_remarks} and HR Remarks: ${evidence.hr_remarks}` : ""
+                                        remarks = (evidence.dc_remarks || evidence.hr_remarks) && (
+                                            <div className="flex flex-col gap-2 text-xs">
+                                                {evidence.hr_remarks && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground">HR Remarks:</span>
+                                                        <span className="font-medium text-sm">{evidence.hr_remarks}</span>
+                                                    </div>
+                                                )}
+                                                {evidence.dc_remarks && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground">DC Remarks:</span>
+                                                        <span className="font-medium text-sm">{evidence.dc_remarks}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
                                     } else if (evidence.hr_confirmation === 1) {
                                         status = 'HR Approved'
                                         approver = employees.find(emp => emp.value === evidence.hr_confirmed_by)?.label
                                         approvalDate = ` on ${formatDate(evidence.hr_date)}`
-                                        remarks = evidence.hr_remarks ? `HR Remarks: ${evidence.hr_remarks}` : ""
+                                        remarks = evidence.hr_remarks && (
+                                            <div className="flex flex-col gap-2 text-xs">
+                                                {evidence.hr_remarks && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground">HR Remarks:</span>
+                                                        <span className="font-medium text-sm">{evidence.hr_remarks}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
                                     } else if (evidence.dc_confirmation === 1) {
                                         status = 'DC Approved'
                                         approver = employees.find(emp => emp.value === evidence.dc_confirmed_by)?.label
                                         approvalDate = ` on ${formatDate(evidence.dc_date)}`
-                                        remarks = evidence.dc_remarks ? `DC Remarks: ${evidence.dc_remarks}` : ""
+                                        remarks = evidence.dc_remarks && (
+                                            <div className="flex flex-col gap-2 text-xs">
+                                                {evidence.dc_remarks && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground">DC Remarks:</span>
+                                                        <span className="font-medium text-sm">{evidence.dc_remarks}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
                                     } else if (evidence.disapproved === 1) {
                                         status = 'Disapproved'
                                         approver = employees.find(emp => emp.value === evidence.disapproved_by)?.label
                                         approvalDate = ` on ${formatDate(evidence.disapproved_date)}`
-                                        remarks = evidence.disapproved_remarks ? `Remarks: ${evidence.disapproved_remarks}` : ""
+                                        remarks = evidence.disapproved_remarks && (
+                                            <div className="flex flex-col gap-2 text-xs">
+                                                {evidence.disapproved_remarks && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground">Remarks:</span>
+                                                        <span className="font-medium text-sm">{evidence.disapproved_remarks}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
                                     }
 
                                     return { status, approver, approvalDate, remarks }
@@ -443,40 +465,36 @@ const Evidences = () => {
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
-                                                        <div className="flex flex-1 flex-col">
-                                                            <span className="text-xs text-muted-foreground">Approval Status:</span>
-                                                            <span className="font-medium">{status}</span>
+                                                        <div className="flex flex-1 flex-col gap-2">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-xs text-muted-foreground">Approval Status:</span>
+                                                                <div className="inline-flex gap-1 items-center">
+                                                                    <span className="inline-block">
+                                                                        <Badge variant={status === 'Disapproved' && 'destructive'}>{status}</Badge>
+                                                                    </span>
+                                                                    {['HR Approved', 'DC Approved', 'HR and DC Approved'].includes(status) ? (
+                                                                        <span className="text-xs">
+                                                                            Approved by <strong>{approver}</strong>{approvalDate}
+                                                                        </span>
+                                                                    ) : status === 'Disapproved' ? (
+                                                                        <span className="text-xs">
+                                                                            Disapproved by <strong>{approver}</strong>{approvalDate}
+                                                                        </span>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                            <span>
+                                                                {['HR Approved', 'DC Approved', 'HR and DC Approved', 'Disapproved'].includes(status) && remarks}
+                                                            </span>
                                                         </div>
                                                         <div className="flex flex-1 flex-col">
                                                             <span className="text-xs text-muted-foreground">Supporting Documents:</span>
                                                             <span className="font-medium">{state.files[evidence.id] && <AttachmentList files={state.files[evidence.id]} evidence={evidence} />}</span>
                                                         </div>
                                                     </div>
-                                                    {approver && (
-                                                        <Alert variant={status === 'Disapproved' ? 'destructive' : ''}>
-                                                            <AlertCircle className="h-4 w-4" />
-                                                            <AlertTitle className="leading-normal">
-                                                                {['HR Approved', 'DC Approved', 'HR and DC Approved'].includes(status) ? (
-                                                                    <span>
-                                                                        Approved by <strong>{approver}</strong>{approvalDate}
-                                                                    </span>
-                                                                ) : status === 'Disapproved' ? (
-                                                                    <span>
-                                                                        Disapproved by <strong>{approver}</strong>{approvalDate}
-                                                                    </span>
-                                                                ) : null}
-                                                            </AlertTitle>
-                                                            
-                                                            {['HR Approved', 'DC Approved', 'HR and DC Approved', 'Disapproved'].includes(status) ? (
-                                                                <AlertDescription className="text-xs">
-                                                                    {remarks}
-                                                                    </AlertDescription>
-                                                            ) : null}
-                                                        </Alert>
-                                                    )}
                                                     
                                                     <div className="flex gap-2 mt-2">
-                                                        {((evidence.hr_confirmation === null || evidence.dc_confirmation === null) || evidence.disapproved === 1) && (
+                                                        {((evidence.hr_confirmation === null || evidence.dc_confirmation === null) || evidence.disapproved === 1) && user.ipms_id !== evidence.emp_id && (
                                                             <Button 
                                                             onClick={() => openModal('approve', evidence)}
                                                             size="sm" 
@@ -485,13 +503,15 @@ const Evidences = () => {
                                                             Approve
                                                         </Button>
                                                         )}
-                                                        <Button 
+                                                        {evidence.disapproved === null && user.ipms_id !== evidence.emp_id && (
+                                                            <Button 
                                                             onClick={() => openModal('disapprove', evidence)}
                                                             size="sm" 
                                                             variant="outline"
-                                                        >
-                                                            Disapprove
-                                                        </Button>
+                                                            >
+                                                                Disapprove
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,8 +1,8 @@
 import React from 'react'
 import Header from './Header'
-import { Toaster } from "@/Components/ui/toaster"
-import { SidebarProvider , SidebarTrigger } from "@/Components/ui/sidebar"
-import AppSidebar from "@/Layouts/AppSidebar"
+import { Toaster } from "@/components/ui/toaster"
+import { SidebarProvider , SidebarTrigger } from "@/components/ui/sidebar"
+import AppSidebar from "@/layouts/AppSidebar"
 
 const AuthenticatedLayout = ({ children }) => {
   return (

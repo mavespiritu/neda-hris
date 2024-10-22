@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { Input } from "@/Components/ui/input"
+import { Input } from "@/components/ui/input"
 
 const TextInput = (
   ({ name, type, value, onChange, isInvalid, ref }) => {
