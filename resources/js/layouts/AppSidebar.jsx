@@ -71,7 +71,7 @@ const AppSidebar = () => {
       roles: ['HRIS_Staff'],
       submenu: [
         { title: 'My CGA', url: '/my-cga', roles: ['HRIS_Staff'] },
-        { title: 'Staff CGA', url: '/staff-cga', roles: ['HRIS_HR'] },
+        { title: 'Staff CGA', url: '/staff-cga', roles: ['HRIS_HR', 'HRIS_DC'] },
         { title: 'Review CGA', url: '/review-cga', roles: ['HRIS_HR', 'HRIS_DC'] },
         { title: 'Compare CGA', url: '/compare-cga', roles: ['HRIS_HR', 'HRIS_DC'] },
         { title: 'Competencies', url: '/competencies', roles: ['HRIS_HR'] },

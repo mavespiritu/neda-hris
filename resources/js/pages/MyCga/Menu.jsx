@@ -39,10 +39,13 @@ import {
   import { 
     sendEmailForCgaSubmission,
 } from '@/pages/MyCga/api'
+import { useHasRole } from '@/hooks/useAuth'
 
 const Menu = ({emp_id, position_id}) => {
 
     const { toast } = useToast()
+
+    const canSubmitCompetency = useHasRole('HRIS_HR')
 
     const { data, setData, post, processing } =  useForm({
         emp_id: emp_id,
@@ -284,39 +287,40 @@ const Menu = ({emp_id, position_id}) => {
                     <TabsTrigger value="history" className="flex gap-2">Submissions {histories.length > 0 && <Badge className="rounded-lg">{histories.length}</Badge>}</TabsTrigger>
                 </TabsList>
                 <TabsContent value="current-position">
-                    <Card className="w-full h-full flex-grow grid grid-rows-[auto,1fr]">
-                        <CardHeader className="border-b p-2">
-                            <div className="w-auto flex justify-start gap-2 items-center">
-                            <AlertDialog open={isSaveUpdateOpen} onOpenChange={setIsSaveUpdateOpen}>
-                                <AlertDialogTrigger asChild>
-                                    <Button size="sm" className="flex gap-2">
-                                        <Send className="size-4"/>
-                                        Submit for Review 
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Submic Competencies for Review</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                        You are submitting updates on your competencies. Once submitted, an email notification will be sent to your supervisor requesting a review of your submitted competency.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleSaveUpdates} disabled={processing}>
-                                            {processing ? (
-                                                <>
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                    <span>Please wait</span>
-                                                </>
-                                            ) : 'Proceed'}
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                            <span className="text-xs">Note: <br/> Updates on competencies should be submitted for review of your supervisor.</span>
-                            </div>
-                        </CardHeader>
+                    <Card className={`w-full h-full flex-grow grid ${canSubmitCompetency ? 'grid-rows-[auto,1fr]' : 'grid-rows-[1fr]'}`}>
+                        {canSubmitCompetency && (
+                            <CardHeader className="border-b p-2">
+                                <div className="w-auto flex justify-start gap-2 items-center">
+                                <AlertDialog open={isSaveUpdateOpen} onOpenChange={setIsSaveUpdateOpen}>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="sm" className="flex gap-2">
+                                            <Send className="size-4"/>
+                                            Submit for Review 
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Submic Competencies for Review</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                            You are submitting updates on your competencies. Once submitted, an email notification will be sent to your supervisor requesting a review of your submitted competency.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleSaveUpdates} disabled={processing}>
+                                                {processing ? (
+                                                    <>
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                        <span>Please wait</span>
+                                                    </>
+                                                ) : 'Proceed'}
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                </div>
+                            </CardHeader>
+                        )}
                         <CardContent className="flex-grow p-4">
                         { activeTab === 'current-position' && <CurrentPosition emp_id={emp_id} position_id={currentPosition} /> }
                         </CardContent>

@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label"
 import Menu from "@/pages/MyCga/Menu"
 import { useTextSize } from "@/providers/TextSizeProvider"
 import { useToast } from "@/hooks/use-toast"
-import { useHasRole } from '@/hooks/useAuth'
+import { useHasPermission } from '@/hooks/useAuth'
 
 const StaffCga = () => {
 
-    const canViewPage = useHasRole('HRIS_HR')
+    const canViewPage = useHasPermission('HRIS_staff-cga.view-cga')
 
     if (!canViewPage) {
         return <p className="font-semibold flex justify-center items-center h-full">You do not have permission to view this page.</p>
