@@ -131,7 +131,7 @@ class ReviewCgaController extends Controller
             $employee = $conn3->table('tblemployee')
                 ->where('emp_id', $user->ipms_id)
                 ->first();
-    
+
             if ($employee) {
                 $employeeIDs = $conn3->table('tblemployee')
                     ->where('division_id', $employee->division_id)
@@ -139,23 +139,48 @@ class ReviewCgaController extends Controller
             }
         }
 
-        $competencies = $conn2->table('staff_competency_review as scr')
+        // Query for the latest pending submission per employee
+        $pendingCompetencies = $conn2->table('staff_competency_review as scr')
             ->select([
                 DB::raw('COALESCE(scr.status, "Pending") as status'),
-                DB::raw('COUNT(scr.id) as count') 
+                DB::raw('COUNT(scr.id) as count')
             ])
-            ->where('scr.emp_id', '<>', $user->ipms_id);
+            ->whereNull('scr.status') // Only for pending status
+            ->where('scr.emp_id', '<>', $user->ipms_id); // Exclude current user's competencies
         
         if (!$isHRRole && $isDCRole && $employeeIDs->isNotEmpty()) {
-            $competencies->whereIn('scr.emp_id', $employeeIDs);
+            $pendingCompetencies->whereIn('scr.emp_id', $employeeIDs);
         }
 
-        $competencies = $competencies
-            ->groupBy(DB::raw('COALESCE(scr.status, "Pending")'))
+        // Get the latest submission for each staff with pending status
+        $pendingCompetencies->whereIn('scr.id', function ($subquery) use ($user) {
+            $subquery->selectRaw('MAX(id)')
+                ->from('staff_competency_review')
+                ->whereNull('status') 
+                ->groupBy('emp_id');
+        });
+
+        // Query for the approved competencies
+        $approvedCompetencies = $conn2->table('staff_competency_review as scr')
+            ->select([
+                DB::raw('"Approved" as status'),
+                DB::raw('COUNT(scr.id) as count')
+            ])
+            ->where('scr.status', 'Approved')
+            ->where('scr.emp_id', '<>', $user->ipms_id); // Exclude current user's competencies
+        
+        if (!$isHRRole && $isDCRole && $employeeIDs->isNotEmpty()) {
+            $approvedCompetencies->whereIn('scr.emp_id', $employeeIDs);
+        }
+
+        // Union of pending and approved counts
+        $competencies = $pendingCompetencies->union($approvedCompetencies)
+            ->groupBy('status') // Group by status (Pending and Approved)
             ->get();
 
         return response()->json($competencies);
     }
+
 
     public function showCompetencyForReview($id, Request $request)
     {
