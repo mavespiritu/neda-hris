@@ -80,7 +80,12 @@ class ReviewCgaController extends Controller
 
         if ($queryParams['filters']['status']) {
             if ($queryParams['filters']['status'] === 'pending') {
-                $competencies->whereNull('scr.status');
+                $competencies->whereNull('scr.status')
+                    ->whereIn('scr.id', function ($query) {
+                        $query->selectRaw('MAX(id)')
+                            ->from('staff_competency_review')
+                            ->groupBy('emp_id');
+                    });
             } elseif ($queryParams['filters']['status'] === 'approved') {
                 $competencies->where('scr.status', 'Approved');
             }
