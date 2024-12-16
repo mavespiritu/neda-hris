@@ -16,17 +16,17 @@ const EvidenceDescription = ({ text }) => {
                 {isExpanded ? (
                     <div className="flex flex-col">
                         <span className="text-muted-foreground font-medium">Context:</span>
-                        <span className="font-medium">{text}</span> 
+                        <span className="font-medium text-justify">{text}</span> 
                     </div>
                 ) : (shouldShowReadMore ? (
                     <div className="flex flex-col">
                         <span className="text-muted-foreground font-medium">Context:</span>
-                        <span className="font-medium">{text?.substring(0, charLimit)}...</span> 
+                        <span className="font-medium text-justify">{text?.substring(0, charLimit)}...</span> 
                     </div>
                     ) : (
                         <div className="flex flex-col">
                             <span className="text-muted-foreground font-medium">Context:</span>
-                            <span className="font-medium">{text}</span> 
+                            <span className="font-medium text-justify">{text}</span> 
                         </div>
                     )
                 )}

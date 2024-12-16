@@ -7,7 +7,7 @@ const CareerPath = ({ emp_id, selectedCareer, setSelectedCareer, fetchCareers })
         {selectedCareer ? (
             <Competencies emp_id={emp_id} position_id={selectedCareer} setSelectedCareer={setSelectedCareer} custom={true} career={true} fetchCareers={fetchCareers} />
         ) : (
-            <div className="font-semibold text-muted-foreground flex justify-center items-center">
+            <div className="font-semibold text-muted-foreground text-sm flex justify-center items-center">
               Please select a career path to view competencies.
             </div>
         )}

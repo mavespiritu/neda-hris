@@ -1,34 +1,7 @@
 import SingleComboBox from "@/components/SingleComboBox"
 import { useState, useEffect } from "react"
 
-const SelectDesignation = ({setSelectedDesignation}) => {
-
-    const [designations, setDesignations] = useState([])
-
-    const fetchDesignations = async () => {
-        try {
-            const response = await fetch(`/my-cga/designations`);
-            if (!response.ok) {
-                toast({
-                    title: "Uh oh! Something went wrong.",
-                    description: "Network response was not ok",
-                })
-            }
-            const data = await response.json()
-          
-            setDesignations(data)
-
-        } catch (err) {
-            toast({
-                title: "Uh oh! Something went wrong.",
-                description: "There was a problem with your request",
-            })
-        }
-    }
-
-    useEffect(() => {
-        fetchDesignations()
-    }, [])
+const SelectDesignation = ({designations, fetchDesignations, selectedDesignation, setSelectedDesignation}) => {
 
   return (
     <div className="flex justify-between items-end gap-4">

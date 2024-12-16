@@ -1,5 +1,5 @@
 import SingleComboBox from "@/components/SingleComboBox"
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useReducer } from "react"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -9,33 +9,199 @@ import useDebounce from "@/hooks/useDebounce"
 import { useToast } from "@/hooks/use-toast"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { formatDate, formatNumberWithCommas } from "@/lib/utils.jsx"
-import ComponentLoading from "@/components/ComponentLoading"
 import { Button } from "@/components/ui/button"
-import { SquarePen, Search, AlertCircle } from 'lucide-react'
+import { SquarePen, Search, Loader2 } from 'lucide-react'
 import AttachmentList from "@/pages/MyCga/AttachmentList"
 import ApproveForm from "@/pages/ReviewCga/ApproveForm"
 import DisapproveForm from "@/pages/ReviewCga/DisapproveForm"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-  } from "@/components/ui/alert"
 import { usePage } from '@inertiajs/react'
   
+const initialState = {
+    evidences: [],
+    files: [],
+    filters: {
+        staff: null,
+        competency: null,
+        status: "all",
+        selectedTypes: ["Training", "Award", "Performance", "Others"],
+    },
+    searchTerm: "",
+    activeModal: null,
+    loading: true,
+    filteredEvidences: [],
+    currentPage: 1,
+    selectedEvidence: null,
+    evidenceStatusCounts: { all: 0, pending: 0, hrConfirmed: 0, dcConfirmed: 0, disapproved: 0 },
+    evidenceTypeCounts: { training: 0, award: 0, performance: 0, others: 0 },
+}
 
-const Evidences = () => {
+function useFetchCompetencies(state, toast) {
+    const fetchCompetencies = useCallback(async () => {
+        try {
+            const response = await fetch(`/review-cga/competencies`)
+            if (!response.ok) {
+                toast({
+                    title: "Uh oh! Something went wrong.",
+                    description: "Network response was not ok",
+                    variant: "destructive"
+                })
+            }
+
+            const data = await response.json()
+            return data
+        } catch (error) {
+            toast({
+                title: "Uh oh! Something went wrong.",
+                description: "There was a problem with your request",
+                variant: "destructive",
+            })
+            return null
+        }
+    }, [state, toast])
+
+    return fetchCompetencies
+}
+
+function useFetchEvidences(state, dispatch, toast) {
+    const fetchEvidences = useCallback(async () => {
+        try {
+            const params = new URLSearchParams()
+            if (state.currentPage) params.append('page', state.currentPage)
+            if (state.filters.competency) params.append('competency', state.filters.competency)
+            if (state.filters.staff) params.append('emp_id', state.filters.staff)
+            if (state.filters.status) params.append('status', state.filters.status)
+            if (state.filters.selectedTypes) params.append('selectedTypes', state.filters.selectedTypes)
+            if (state.searchTerm) params.append('search', state.searchTerm)
+
+            const response = await fetch(`/review-cga/evidences?${params.toString()}`)
+          
+            if (!response.ok) {
+                toast({
+                    title: "Uh oh! Something went wrong.",
+                    description: "There was a problem with your request",
+                    variant: "destructive",
+                })
+            }
+
+            const data = await response.json()
+
+            dispatch({
+                type: 'SET_EVIDENCES',
+                payload: {
+                    evidences: data.evidences,
+                    files: data.files,
+                }
+            })
+
+            dispatch({ 
+                type: 'SET_EVIDENCE_COUNTS', 
+                payload: {
+                    evidenceStatusCounts: data.evidenceStatusCounts, 
+                    evidenceTypeCounts: data.evidenceTypeCounts 
+                } 
+            })
+
+        } catch (error) {
+            toast({
+                title: "Uh oh! Something went wrong.",
+                description: "There was a problem with your request",
+                variant: "destructive",
+            })
+            dispatch({ type: 'SET_LOADING', payload: false })
+        }
+    }, [state, dispatch])
+
+    return fetchEvidences
+}
+
+function reducer(state, action) {
+    switch (action.type) {
+        case 'SET_EVIDENCES':
+            return { ...state, evidences: action.payload.evidences, files: action.payload.files, loading: false }
+        case 'SET_LOADING':
+            return { ...state, loading: action.payload }
+        case 'SET_FILTER':
+            return {
+                ...state,
+                currentPage: 1,
+                filters: { ...state.filters, [action.field]: action.payload }
+            }
+        case 'SET_SEARCH_TERM':
+            return { ...state, searchTerm: action.payload }
+        case 'SET_CURRENT_PAGE':
+            return { ...state, currentPage: action.payload }
+        case 'OPEN_MODAL':
+            return { ...state, activeModal: action.payload.type, selectedEvidence: action.payload.evidence }
+        case 'CLOSE_MODAL':
+            return { ...state, activeModal: null, selectedEvidence: null }
+        case 'CLEAR_FILTERS':
+            return { ...state, filters: initialState.filters }
+        case 'SET_FILTERED_EVIDENCES':
+            return { ...state, filteredEvidences: action.payload }
+        case 'SET_EVIDENCE_COUNTS':
+            return { ...state, evidenceStatusCounts: action.payload.evidenceStatusCounts, evidenceTypeCounts: action.payload.evidenceTypeCounts }
+        case 'SET_SELECTED_TYPES':
+            return {
+                ...state,
+                filters: {
+                    ...state.filters,
+                    selectedTypes: action.payload,
+                },
+            }
+        default:
+            return state
+    }
+}
+
+const Evidences = ({employees}) => {
 
     const { toast } = useToast()
-
     const user = usePage().props.auth.user
-
-    const [employees, setEmployees] = useState([])
+    const [state, dispatch] = useReducer(reducer, initialState)
     const [competencies, setCompetencies] = useState([])
+    const debouncedSearchValue = useDebounce(state.searchTerm, 500)
 
-    const references = useMemo(() => ["Training", "Award", "Performance", "Others"], [])
+    const fetchCompetencies = useFetchCompetencies(state, toast)
+    const fetchEvidences = useFetchEvidences(state, dispatch, toast)
 
     const itemsPerPage = 20
+    const total = state.evidences?.total || 0
+    const startIndex = (state.currentPage - 1) * itemsPerPage + 1
+    const endIndex = Math.min(startIndex + itemsPerPage - 1, total)
+
+    useEffect(() => {
+        const loadCompetencies = async () => {
+            const data = await fetchCompetencies()
+            if (data) {
+                setCompetencies(data)
+            }
+        }
+        loadCompetencies()
+    }, [])
+
+    useEffect(() => {
+        const loadEvidences = async () => {
+            const data = await fetchEvidences()
+            if (data) {
+                dispatch({ type: 'SET_EVIDENCES', payload: data })
+            }
+        }
+        loadEvidences()
+    }, [
+        state.currentPage, 
+        state.filters.staff, 
+        state.filters.competency, 
+        state.filters.status, 
+        state.filters.selectedTypes, 
+        debouncedSearchValue
+    ])
+
+    useEffect(() => {
+        if (state.evidences.data) {
+            filterEvidences()
+        }
+    }, [state.evidences])
 
     const evidenceStatusLabels = {
         all: 'All',
@@ -45,143 +211,42 @@ const Evidences = () => {
         disapproved: 'Disapproved'
     }
 
-    const [state, setState] = useState({
-        evidences: [],
-        files: [],
-        filters: {
-            staff: null,
-            competency: null,
-            status: "all",
-            selectedTypes: references,
-        },
-        searchTerm: "",
-        activeModal: null,
-        loading: true,
-        filteredEvidences: [],
-        activeModal: null,
-        currentPage: 1,
-        selectedEvidence: null,
-        evidenceStatusCounts: { all: 0, pending: 0, hrConfirmed: 0, dcConfirmed: 0, disapproved: 0 },
-        evidenceTypeCounts: { training: 0, award: 0, performance: 0, others: 0 },
-    })
-
-    const debouncedSearchValue = useDebounce(state.searchTerm, 500)
-
-    const referencesJoined = useMemo(() => state.filters.selectedTypes.join(","), [state.filters.selectedTypes])
-
-    const fetchActiveEmployees = async () => {
-        try {
-            const response = await fetch(`/employees/active-employees`)
-            if (!response.ok) {
-                toast({
-                    title: "Uh oh! Something went wrong.",
-                    description: "Network response was not ok",
-                })
-            }
-            const data = await response.json()
-          
-            setEmployees(data)
-
-        } catch (err) {
-            toast({
-                title: "Uh oh! Something went wrong.",
-                description: "There was a problem with your request",
-            })
-        }
-    }
-
-    const fetchCompetencies = async () => {
-        try {
-            const response = await fetch(`/review-cga/competencies`)
-            if (!response.ok) {
-                toast({
-                    title: "Uh oh! Something went wrong.",
-                    description: "Network response was not ok",
-                })
-            }
-            const data = await response.json()
-          
-            setCompetencies(data)
-
-        } catch (err) {
-            toast({
-                title: "Uh oh! Something went wrong.",
-                description: "There was a problem with your request",
-            })
-        }
-    }
-
-    // Function to fetch evidences and counts
-    const fetchEvidences = useCallback(async () => {
-        setState((prev) => ({ ...prev, loading: true }))
-            try {
-            const evidencesResponse = await fetch(`/review-cga/evidences?page=${state.currentPage}&competency=${state.filters.competency}&emp_id=${state.filters.staff}&status=${state.filters.status}&selectedTypes=${state.filters.selectedTypes}&search=${debouncedSearchValue}`)
-
-            if (!evidencesResponse.ok) {
-                throw new Error("Network response was not ok")
-            }
-
-            const evidences = await evidencesResponse.json()
-
-            setState((prev) => ({
-                ...prev,
-                evidences: evidences.evidences,
-                files: evidences.files,
-                staffs: evidences.staffs,
-                evidenceStatusCounts: evidences.evidenceStatusCounts,
-                evidenceTypeCounts: evidences.evidenceTypeCounts,
-                loading: false,
-            }))
-
-            } catch (error) {
-                console.error(error.message)
-                setState((prev) => ({ ...prev, loading: false }))
-            }
-    }, [state.currentPage, state.filters, debouncedSearchValue])
-
     const handlePaginationClick = useCallback(
         (link, e) => {
           e.preventDefault()
     
-          // Check if the URL exists and extract the page number
           if (link.url) {
             const url = new URL(link.url)
             const params = new URLSearchParams(url.search)
-            const page = params.get('page') // Extract the page number
+            const page = params.get('page')
             
             if (page) {
-              setState((prev) => ({ ...prev, currentPage: parseInt(page, 10) })) 
+                dispatch({ type: 'SET_CURRENT_PAGE', payload: parseInt(page, 10) })
             }
           }
         },
-        []
+        [dispatch]
     )
 
     const handleSearch = useCallback((e) => {
-        setState((prev) => ({
-            ...prev,
-            searchTerm: e.target.value
-        }))
-    }, [])
+        dispatch({ type: 'SET_SEARCH_TERM', payload: e.target.value })
+    }, [dispatch])
 
     const handleFilter = useCallback((value, field) => {
-        setState((prev) => ({
-            ...prev,
-            currentPage: 1,
-            filters: {
-                ...prev.filters,
-                [field]: value
-            }
-        }))
-    }, [])
+        dispatch({ type: 'SET_FILTER', payload: value, field })
+    }, [dispatch])
+
+    const handleClearFilters = useCallback(() => {
+        dispatch({ type: 'CLEAR_FILTERS' })
+    }, [dispatch])
 
     const openModal = useCallback((type, evidence = null) => {
-        setState((prev) => ({ ...prev, activeModal: type, selectedEvidence: evidence }))
-    }, [])
+        dispatch({ type: 'OPEN_MODAL', payload: { type, evidence } })
+    }, [dispatch])
 
     const closeModal = useCallback(() => {
-        setState((prev) => ({ ...prev, activeModal: null, selectedEvidence: null }))
-    }, [])
+        dispatch({ type: 'CLOSE_MODAL' })
+    }, [dispatch])
 
     const handleSuccess = useCallback(() => {
         fetchEvidences()
@@ -202,35 +267,16 @@ const Evidences = () => {
     
           return matchesSearch && matchesStatusFilter
         })
-        setState((prev) => ({ ...prev, filteredEvidences: filtered }))
+        dispatch({ type: 'SET_FILTERED_EVIDENCES', payload: filtered })
       }, [state.evidences, debouncedSearchValue, state.filters.status])
-
-    useEffect(() => {
-        fetchActiveEmployees()
-        fetchCompetencies()
-        console.log("fetch active employees and competencies")
-    }, [])
-
-    useEffect(() => {
-        fetchEvidences()
-        console.log("fetch active evidences")
-    }, [state.currentPage, state.filters, debouncedSearchValue, fetchEvidences])
-
-    useEffect(() => {
-        filterEvidences()
-      }, [state.evidences, debouncedSearchValue, state.filters.status, filterEvidences])
-
-    const total = state.evidences?.total || 0
-    const startIndex = (state.currentPage - 1) * itemsPerPage + 1
-    const endIndex = Math.min(startIndex + itemsPerPage - 1, total)
 
   return (
     <div className="grid grid-cols-[300px,1fr] gap-4 h-full w-full">
         <div className="flex flex-col gap-2 h-full">
             <h4 className="text-normal font-semibold">Filter Evidences</h4>
 
-            <ScrollArea className="pr-2 pb-4 h-full">
-                <div className="h-12 flex flex-col gap-6 p-2">
+            <ScrollArea className="pb-4 h-full">
+                <div className="h-12 flex flex-col gap-6 pr-6">
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="staff">Competency</Label>
                         <SingleComboBox 
@@ -260,7 +306,7 @@ const Evidences = () => {
                     <div className="flex flex-col gap-3">
                         <Label htmlFor="staff">Approval Status</Label>
                         <RadioGroup
-                            defaultValue={state.filters.status}
+                            value={state.filters.status}
                             onValueChange={(value) => handleFilter(value, 'status')}
                             className="flex flex-col gap-2"
                         >
@@ -292,15 +338,14 @@ const Evidences = () => {
                                             id={key} 
                                             checked={isSelected}
                                             onCheckedChange={() => {
-                                                setState((prev) => ({
-                                                    ...prev,
-                                                    filters: {
-                                                        ...prev.filters,
-                                                        selectedTypes: isSelected 
-                                                            ? prev.filters.selectedTypes.filter(type => type !== formattedKey) 
-                                                            : [...prev.filters.selectedTypes, formattedKey]
-                                                    }
-                                                }))
+                                                const newSelectedTypes = isSelected 
+                                                    ? state.filters.selectedTypes.filter(type => type !== formattedKey)
+                                                    : [...state.filters.selectedTypes, formattedKey]
+
+                                                dispatch({
+                                                    type: 'SET_SELECTED_TYPES',
+                                                    payload: newSelectedTypes,
+                                                })
                                             }} 
                                         />
                                         <label
@@ -317,6 +362,9 @@ const Evidences = () => {
                             )
                         })}
                         </div>
+                    </div>
+                    <div className="flex justify-start">
+                        <Button onClick={handleClearFilters} variant="outline" className="w-full">Clear Filters</Button>
                     </div>
                 </div>
             </ScrollArea>
@@ -434,14 +482,14 @@ const Evidences = () => {
                                                             <span className="font-medium">{evidence.competency} (Level {evidence.proficiency})</span>
                                                         </div>
                                                         <div className="flex flex-1 flex-col">
-                                                            <span className="text-xs text-muted-foreground">Title of Evidence:</span>
-                                                            <span className="font-medium">{evidence.title}</span>
+                                                            <span className="text-xs text-muted-foreground">Indicator:</span>
+                                                            <span className="font-medium">{evidence.indicator}</span>
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
                                                         <div className="flex flex-1 flex-col">
-                                                            <span className="text-xs text-muted-foreground">Indicator:</span>
-                                                            <span className="font-medium">{evidence.indicator}</span>
+                                                            <span className="text-xs text-muted-foreground">Title of Evidence:</span>
+                                                            <span className="font-medium">{evidence.title}</span>
                                                         </div>
                                                         <div className="flex flex-1 flex-col">
                                                             <div className="flex flex-col lg:flex-row lg:justify-between gap-2">
@@ -468,9 +516,9 @@ const Evidences = () => {
                                                         <div className="flex flex-1 flex-col gap-2">
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="text-xs text-muted-foreground">Approval Status:</span>
-                                                                <div className="inline-flex gap-1 items-center">
+                                                                <div className="inline-flex gap-4 items-center">
                                                                     <span className="inline-block">
-                                                                        <Badge variant={status === 'Disapproved' && 'destructive'}>{status}</Badge>
+                                                                        <Badge className="rounded-lg" variant={status === 'Disapproved' && 'destructive'}>{status}</Badge>
                                                                     </span>
                                                                     {['HR Approved', 'DC Approved', 'HR and DC Approved'].includes(status) ? (
                                                                         <span className="text-xs">
@@ -499,15 +547,15 @@ const Evidences = () => {
                                                             onClick={() => openModal('approve', evidence)}
                                                             size="sm" 
                                                             className=""
-                                                        >
-                                                            Approve
-                                                        </Button>
+                                                            >
+                                                                Approve
+                                                            </Button>
                                                         )}
                                                         {evidence.disapproved === null && user.ipms_id !== evidence.emp_id && (
                                                             <Button 
                                                             onClick={() => openModal('disapprove', evidence)}
                                                             size="sm" 
-                                                            variant="outline"
+                                                            variant="ghost"
                                                             >
                                                                 Disapprove
                                                             </Button>
@@ -528,7 +576,10 @@ const Evidences = () => {
                         </div>
                     )
                 ) : (
-                    <ComponentLoading />
+                    <div className="flex items-center justify-center w-full h-full text-sm flex-1">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <span>Loading evidences...</span>
+                    </div>
                 )}
             </ScrollArea>
 

@@ -16,7 +16,7 @@ const Breadcrumbs = ({ items }) => {
         <BreadcrumbList>
             {items?.map((item, i) => (
                 <React.Fragment key={i}>
-                    <BreadcrumbItem>
+                    <BreadcrumbItem className="text-xs">
                         <BreadcrumbLink asChild>
                             <Link href={item.href}>{item.label}</Link>
                         </BreadcrumbLink>

@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import FileUpload from "@/components/FileUpload"
 
-const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
+const AwardForm = ({ emp_id, evidence, indicator, open, onClose, onSuccess }) => {
 
     const { toast } = useToast()
 
@@ -28,7 +28,7 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
     const initialValues = {
         award_id: null,
         description: "",
-        files: [],
+        newFiles: [],
         oldFiles: [],
         removedFiles: []
     }
@@ -37,7 +37,7 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
 
     const fetchEvidence = async () => {
         try {
-            const response = await fetch(`/my-cga/evidence/${evidence.id}`);
+            const response = await fetch(`/my-cga/evidence/${emp_id}?evidence_id=${evidence.id}`)
             if (!response.ok) {
                 toast({
                     title: "Uh oh! Something went wrong.",
@@ -45,14 +45,13 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
                 })
             }
             const data = await response.json()
-          
-            setData({
+
+            setData((prevData) => ({
+                ...prevData,
                 award_id: data.evidence.description || null,
                 description: evidence.description || "",
-                files: data.files || [],
                 oldFiles: data.files || [],
-                removedFiles: []
-              })
+            }))
   
         } catch (err) {
             console.log(err)
@@ -65,7 +64,7 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
 
     const fetchAwards = async () => {
         try {
-            const response = await fetch(`/my-cga/awards`);
+            const response = await fetch(`/my-cga/awards/${emp_id}`)
             if (!response.ok) {
                 toast({
                     title: "Uh oh! Something went wrong.",
@@ -84,85 +83,95 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
         }
     }
 
-  useEffect(() => {
-    if (open) {
-        if(evidence) fetchEvidence()
-        fetchAwards()
-        clearErrors()
-    }
-    reset()
-  }, [open])
+    useEffect(() => {
+        if (open) {
+            if(evidence) fetchEvidence()
+            fetchAwards()
+            clearErrors()
+            setFileErrorMessage("")
+        }
+        reset()
+    }, [open])
 
     useEffect(() => {
-        if (data.files) {
-            const hasErrors = data.files.some((_, index) => errors?.[`files.${index}`])
-            
-            if (hasErrors) {
-                setFileErrorMessage("There are issues with the uploaded files. Please check the type and size of uploaded files")
-            } else {
-                setFileErrorMessage("")
-            }
+        if (data.newFiles) {
+            // Initialize an array to collect error messages
+            const errorMessages = []
+
+            // Check each file for errors and add specific messages
+            data.newFiles.forEach((_, index) => {
+                const fileError = errors?.[`newFiles.${index}`]
+
+                if (fileError) {
+                    const message = Array.isArray(fileError) ? fileError.join(', ') : fileError
+                    errorMessages.push(`File ${index + 1}: ${message}`)
+                }
+            })
+
+            setFileErrorMessage(errorMessages.length > 0 ? errorMessages.join('\n') : "")
         }
-    }, [data.files, errors])
+    }, [data.newFiles, errors])
 
     const handleFileSelect = (files) => {
-    
-        setData((prevData) => {
-            return {
-                ...prevData,
-                files: [...prevData.files, ...files],
-            }
-        })
+   
+        setData((prevData) => ({
+            ...prevData,
+            newFiles: [...files],
+        }))
+        
     }
 
     const handleFileRemove = (fileToRemove) => {
 
         setData((prevData) => ({
           ...prevData,
-          files: prevData.files.filter((file) => file.id !== fileToRemove.id),
-          oldFiles: prevData.files.filter((file) => file.id !== fileToRemove.id),
-          removedFiles: [...prevData.removedFiles, fileToRemove],
+          oldFiles: prevData.oldFiles.filter((file) => file.id !== fileToRemove.id),
+          removedFiles: [...(Array.isArray(prevData.removedFiles) ? prevData.removedFiles : []), fileToRemove],
         }))
     }
   
     const handleSubmit = (e) => {
-    e.preventDefault()
-    const isUpdate = evidence !== null
-    const url = isUpdate
-    ? `/my-cga/update-award/${evidence.id}`
-    : `/my-cga/award/${indicator.indicator_id}`
+        e.preventDefault()
+        const isUpdate = evidence !== null
+        const url = isUpdate
+        ? `/my-cga/update-award/${evidence.id}`
+        : `/my-cga/award/${emp_id}?indicator_id=${indicator.indicator_id}`
 
-    const formData = new FormData()
-    formData.append('award_id', data.award_id)
-    formData.append('description', data.description)
-    
-    if (Array.isArray(data.files)) {
-        data.files.forEach((file) => {
-            formData.append("files[]", file)
-        })
-    }
-
-    formData.append("removed_files", JSON.stringify(data.removedFiles))
-
-    post(url, {
-        preserveState: true,
-        forceFormData: true,
-        data: formData,
-        onSuccess: () => {
-            toast({
-                title: "Success!",
-                description: isUpdate
-                ? "The evidence has been updated successfully"
-                : "The evidence has been created successfully",
+        const formData = new FormData()
+        formData.append('award_id', data.award_id)
+        formData.append('description', data.description)
+        
+        if (data.newFiles?.length > 0) {
+            data.newFiles.forEach((file) => {
+                formData.append('newFiles[]', file)
             })
-            reset()
-            clearErrors()
-            onClose()
-            onSuccess()
-        },
-        onError: () => {
         }
-    })
+
+        formData.append("removed_files", JSON.stringify(data.removedFiles))
+
+        post(url, {
+            preserveState: true,
+            forceFormData: true,
+            data: formData,
+            onSuccess: () => {
+                toast({
+                    title: "Success!",
+                    description: isUpdate
+                    ? "The evidence has been updated successfully"
+                    : "The evidence has been created successfully",
+                })
+                reset()
+                clearErrors()
+                onClose()
+                onSuccess()
+            },
+            onError: () => {
+                const fileErrors = Object.entries(errors)
+                .filter(([key]) => key.startsWith('newFiles.'))
+                .map(([key, value]) => `${key}: ${value}`)
+                setFileErrorMessage(fileErrors.join('\n'))
+            }
+        })
     }
 
     return (
@@ -171,7 +180,7 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
                 <DialogHeader>
                     <DialogTitle>Add award as evidence</DialogTitle>
                     <DialogDescription>
-                    Select from your awards as evidence and give context for this indicator: <span className="font-semibold underline">{indicator.indicator}</span>
+                    Select from your awards as evidence and give context for this indicator: <span className="font-medium underline">{indicator.indicator}</span>
                     </DialogDescription>
                 </DialogHeader>
                 <div>
@@ -208,12 +217,12 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
                             </div>
 
                             <div className="flex flex-col gap-2">
-                                <Label htmlFor="picture">Files</Label>
+                                <Label htmlFor="newFiles">Supporting Documents</Label>
                                 <FileUpload 
-                                    name="files[]"
-                                    id="files" 
-                                    invalidMessage={errors.files}
-                                    data={data.files}
+                                    name="newFiles[]"
+                                    id="newFiles" 
+                                    invalidMessage={fileErrorMessage}
+                                    data={data.newFiles}
                                     errors={errors}
                                     onFilesSelect={handleFileSelect}
                                 />
@@ -227,14 +236,21 @@ const AwardForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
                                 </>
                                 )}
 
-                                {errors?.files ? (<span className="text-red-500 text-xs">{errors.files}</span>) : (
+                                {fileErrorMessage ? (
+                                    <div className="text-red-500 text-xs">
+                                        {fileErrorMessage.split('\n').map((msg, index) => (
+                                            <span key={index}>
+                                                {msg}
+                                                <br />
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
                                 <div className="inline-flex justify-between text-xs text-muted-foreground">
                                     <span>max allowed files: 5 (5MB each)</span>
                                     <span>file types: jpg, jpeg, png, pdf</span>
                                 </div>
                                 )}
-
-                                {fileErrorMessage && <span className="text-red-500 text-xs">{fileErrorMessage}</span>}
                                 
                                 <div className="flex flex-col gap-4 my-4">
                                 { evidence !== null && <span className="text-sm font-medium">Choose files to remove:</span> }

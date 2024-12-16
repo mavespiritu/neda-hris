@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast"
 import dayjs from 'dayjs'
 import { Loader2 } from "lucide-react"
 
-const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
+const OtherEvidenceForm = ({ emp_id, evidence, indicator, open, onClose, onSuccess }) => {
 
   const { toast } = useToast()
 
@@ -31,7 +31,7 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
     description: "",
     start_date: "",
     end_date: "",
-    files: [],
+    newFiles: [],
     oldFiles: [],
     removedFiles: []
   }
@@ -40,7 +40,7 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
 
   const fetchEvidence = async () => {
     try {
-        const response = await fetch(`/my-cga/evidence/${evidence.id}`)
+        const response = await fetch(`/my-cga/evidence/${emp_id}?evidence_id=${evidence.id}`)
         if (!response.ok) {
             toast({
                 title: "Uh oh! Something went wrong.",
@@ -54,9 +54,7 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
           description: data.evidence.description || "",
           start_date: data.evidence.start_date || "",
           end_date: data.evidence.end_date || "",
-          files: data.files || [],
           oldFiles: data.files || [],
-          removedFiles: []
         })
 
     } catch (err) {
@@ -72,21 +70,29 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
     if (open) {
         if(evidence) fetchEvidence()
         clearErrors()
+        setFileErrorMessage("")
     }
     reset()
   }, [open])
 
   useEffect(() => {
-    if (data.files) {
-        const hasErrors = data.files.some((_, index) => errors?.[`files.${index}`])
-        
-        if (hasErrors) {
-            setFileErrorMessage("There are issues with the uploaded files. Please check the type and size of uploaded files")
-        } else {
-            setFileErrorMessage("")
-        }
+    if (data.newFiles) {
+        // Initialize an array to collect error messages
+        const errorMessages = []
+
+        // Check each file for errors and add specific messages
+        data.newFiles.forEach((_, index) => {
+            const fileError = errors?.[`newFiles.${index}`]
+
+            if (fileError) {
+                const message = Array.isArray(fileError) ? fileError.join(', ') : fileError
+                errorMessages.push(`File ${index + 1}: ${message}`)
+            }
+        })
+
+        setFileErrorMessage(errorMessages.length > 0 ? errorMessages.join('\n') : "")
     }
-}, [data.files, errors])
+  }, [data.newFiles, errors])
 
   const handleDateRangeChange = (startDate, endDate) => {
     setData({
@@ -97,23 +103,21 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
   }
 
   const handleFileSelect = (files) => {
+   
+    setData((prevData) => ({
+        ...prevData,
+        newFiles: [...files],
+    }))
     
-    setData((prevData) => {
-        return {
-            ...prevData,
-            files: [...prevData.files, ...files],
-        }
-    })
   }
 
   const handleFileRemove = (fileToRemove) => {
 
-    setData((prevData) => ({
-      ...prevData,
-      files: prevData.files.filter((file) => file.id !== fileToRemove.id),
-      oldFiles: prevData.files.filter((file) => file.id !== fileToRemove.id),
-      removedFiles: [...prevData.removedFiles, fileToRemove],
-    }))
+      setData((prevData) => ({
+        ...prevData,
+        oldFiles: prevData.oldFiles.filter((file) => file.id !== fileToRemove.id),
+        removedFiles: [...(Array.isArray(prevData.removedFiles) ? prevData.removedFiles : []), fileToRemove],
+      }))
   }
 
   const handleSubmit = (e) => {
@@ -121,7 +125,7 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
     const isUpdate = evidence !== null
     const url = isUpdate
         ? `/my-cga/update-other-evidence/${evidence.id}`
-        : `/my-cga/other-evidence/${indicator.indicator_id}`
+        : `/my-cga/other-evidence/${emp_id}?indicator_id=${indicator.indicator_id}`
 
     const formData = new FormData()
     formData.append('title', data.title)
@@ -129,9 +133,9 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
     formData.append('start_date', data.start_date)
     formData.append('end_date', data.end_date)
     
-    if (Array.isArray(data.files)) {
-      data.files.forEach((file) => {
-        formData.append("files[]", file)
+    if (data.newFiles?.length > 0) {
+      data.newFiles.forEach((file) => {
+          formData.append('newFiles[]', file)
       })
     }
 
@@ -154,7 +158,10 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
         onSuccess()
       },
       onError: (e) => {
-        console.log(e)
+        const fileErrors = Object.entries(errors)
+        .filter(([key]) => key.startsWith('newFiles.'))
+        .map(([key, value]) => `${key}: ${value}`)
+        setFileErrorMessage(fileErrors.join('\n'))
       }
     })
   }
@@ -165,7 +172,7 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
             <DialogHeader>
                 <DialogTitle>Add other evidence</DialogTitle>
                 <DialogDescription>
-                Add other information as evidence and give context for this indicator.
+                Add other information as evidence and give context for this indicator: <span className="font-medium underline">{indicator.indicator}</span>
                 </DialogDescription>
             </DialogHeader>
             <div>
@@ -211,12 +218,12 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="picture">Files</Label>
+                        <Label htmlFor="newFiles">Supporting Documents</Label>
                         <FileUpload 
-                            name="files[]"
-                            id="files" 
-                            invalidMessage={errors.files}
-                            data={data.files}
+                            name="newFiles[]"
+                            id="newFiles" 
+                            invalidMessage={fileErrorMessage}
+                            data={data.newFiles}
                             errors={errors}
                             onFilesSelect={handleFileSelect}
                          />
@@ -229,14 +236,22 @@ const OtherEvidenceForm = ({ evidence, indicator, open, onClose, onSuccess }) =>
                           </progress>
                           </>
                         )}
-                        {errors?.files ? (<span className="text-red-500 text-xs">{errors.files}</span>) : (
-                          <div className="inline-flex justify-between text-xs text-muted-foreground">
+
+                        {fileErrorMessage ? (
+                            <div className="text-red-500 text-xs">
+                                {fileErrorMessage.split('\n').map((msg, index) => (
+                                    <span key={index}>
+                                        {msg}
+                                        <br />
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                        <div className="inline-flex justify-between text-xs text-muted-foreground">
                             <span>max allowed files: 5 (5MB each)</span>
                             <span>file types: jpg, jpeg, png, pdf</span>
-                          </div>
+                        </div>
                         )}
-
-                        {fileErrorMessage && <span className="text-red-500 text-xs">{fileErrorMessage}</span>}
                         
                         <div className="flex flex-col gap-4 my-4">
                           { evidence !== null && <span className="text-sm font-medium">Choose files to remove:</span> }

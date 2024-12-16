@@ -14,7 +14,6 @@ export default {
     	extend: {
     		fontFamily: {
     			sans: ['Inter', ...defaultTheme.fontFamily.sans]
-    			/* sans: ['Figtree', ...defaultTheme.fontFamily.sans] */
     		},
     		borderRadius: {
     			lg: 'var(--radius)',
@@ -72,7 +71,11 @@ export default {
     				border: 'hsl(var(--sidebar-border))',
     				ring: 'hsl(var(--sidebar-ring))'
     			}
-    		}
+    		},
+			screens: {
+				'scale-100': '1920px', // for 100% scale, >=1920px width
+				'scale-125': { 'max-width': '1536px' }, // for 125% scale, <=1536px width
+			},
     	}
     },
 

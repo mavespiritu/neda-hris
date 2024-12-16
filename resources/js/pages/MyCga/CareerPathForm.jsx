@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import FileUpload from "@/components/FileUpload"
 
-const CareerPathForm = ({ open, onClose, setSelectedCareer, fetchCareers }) => {
+const CareerPathForm = ({ emp_id, open, onClose, setSelectedCareer, fetchCareers }) => {
 
     const { toast } = useToast()
 
@@ -31,7 +31,7 @@ const CareerPathForm = ({ open, onClose, setSelectedCareer, fetchCareers }) => {
 
     const fetchPositions = async () => {
         try {
-            const response = await fetch(`/my-cga/career-positions`);
+            const response = await fetch(`/my-cga/career-positions/${emp_id}`);
             if (!response.ok) {
                 toast({
                     title: "Uh oh! Something went wrong.",
@@ -56,12 +56,12 @@ const CareerPathForm = ({ open, onClose, setSelectedCareer, fetchCareers }) => {
         clearErrors()
     }
     reset()
-  }, [open])
+  }, [open, emp_id])
 
     const handleSubmit = (e) => {
         e.preventDefault()
 
-        post( `/my-cga/career-path/`, {
+        post(`/my-cga/career-path/${emp_id}`, {
             preserveState: true,
             onSuccess: () => {
                 toast({

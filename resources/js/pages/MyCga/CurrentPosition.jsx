@@ -1,6 +1,6 @@
 import Competencies from "@/pages/MyCga/Competencies"
 
-const CurrentPosition = ({ emp_id, position_id }) => {
+const CurrentPosition = ({ emp_id, position_id, fetchHistories }) => {
 
     return (
         <div className="h-full grid grid-rows-[1fr]">

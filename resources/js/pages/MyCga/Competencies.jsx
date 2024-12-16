@@ -3,6 +3,10 @@ import Competency from "@/pages/MyCga/Competency"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { useForm, Link } from '@inertiajs/react'
+import CompetenciesLoading from "@/components/skeletons/CompetenciesLoading"
+import SingleComboBox from "@/components/SingleComboBox"
+import { Label } from "@/components/ui/label"
+import { useTextSize } from "@/providers/TextSizeProvider"
 
 import {
   AlertDialog,
@@ -19,10 +23,14 @@ import {
 import { useToast } from "@/hooks/use-toast"
 
 const Competencies = ({ emp_id, position_id, all, custom, career, setSelectedCareer, fetchCareers }) => {
+    const textSize = useTextSize()
     const [staffCompetencies, setStaffCompetencies] = useState([])
     const [competency, setCompetency] = useState(null)
     const [activeCompetency, setActiveCompetency] = useState(null)
     const [activeProficiency, setActiveProficiency] = useState(null)
+    const [staffCompetenciesLoading, setStaffCompetenciesLoading] = useState(true)
+    const [staffCompetenciesError, setStaffCompetenciesError] = useState(null)
+    const [competencySelections, setCompetencySelections] = useState([])
 
     const { delete: destroy } =  useForm({
         position_id: position_id,
@@ -40,17 +48,32 @@ const Competencies = ({ emp_id, position_id, all, custom, career, setSelectedCar
             }
             const data = await response.json()
 
-            setStaffCompetencies(data)
+            setStaffCompetencies(data.competencies)
+            setCompetencySelections(data.competencySelections)
         } catch (err) {
-          console.log(err)
-        }
+            setStaffCompetenciesError(err.message)
+          } finally {
+            setStaffCompetenciesLoading(false)
+          }
     }
 
     const handleCompetencyClick = (competencyId, proficiency) => {
         setActiveCompetency(competencyId)
         setActiveProficiency(proficiency)
         setCompetency(Object.values(staffCompetencies).flat().find(c => c.id === competencyId))
-        localStorage.setItem('activeCompetency', competencyId)
+        localStorage.setItem('HRIS_activeCompetency', competencyId)
+    }
+
+    const handleCompetencySelectionClick = (competencyId) => {
+        const selectedCompetency = competencySelections.find(c => c.value === competencyId)
+
+        if (selectedCompetency) {
+        setActiveCompetency(competencyId)
+        setActiveProficiency(selectedCompetency.proficiency) 
+        setCompetency(Object.values(staffCompetencies).flat().find(c => c.id === competencyId))
+
+        localStorage.setItem('HRIS_activeCompetency', competencyId)
+        }
     }
 
     useEffect(() => {
@@ -60,7 +83,7 @@ const Competencies = ({ emp_id, position_id, all, custom, career, setSelectedCar
 
   const handleRemoveCompetencyClick = useCallback(
     async () => {
-      destroy(`/my-cga/career-path/`, {
+      destroy(`/my-cga/career-path/${emp_id}`, {
         preserveState: true,
         onSuccess: () => {
           toast({
@@ -81,73 +104,101 @@ const Competencies = ({ emp_id, position_id, all, custom, career, setSelectedCar
   )
 
     return (
-        <div className="grid grid-cols-12 gap-4 h-full">
-            <div className="col-span-3 h-full">
-                <div className="grid grid-rows-[auto,1fr] h-full gap-2">
-                    <div className="flex justify-between items-start">
-                        <div className="flex flex-col">
-                            <h4 className="font-semibold leading-normal text-sm tracking-tight">
-                                {all ? 'All Competencies' : 'Required Competencies for:'}
-                            </h4>
-                            <h5 className="font-medium text-sm">{position_id}</h5>
-                        </div>
-
-                        {career &&
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button size="sm" variant="outline" className="h-8 text-xs">
-                                        Remove
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the career path.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleRemoveCompetencyClick}>Continue</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        }
+        <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 h-auto lg:h-full">
+            <div className="col-span-12 lg:col-span-3 flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                    <div className="flex flex-col">
+                        <h4 className="font-semibold leading-normal text-sm tracking-tight">
+                            {all ? 'All Competencies' : 'Required Competencies for:'}
+                        </h4>
+                        <h5 className="font-medium text-sm">{position_id}</h5>
                     </div>
-                    <div className="flex-1">
-                    <ScrollArea className="h-full pr-4">
-                        <div className="h-12">
-                        {Object.keys(staffCompetencies).map((type) => (
-                            <div key={type}>
-                                <div className="text-xs font-semibold mb-2 sticky top-0 z-20 bg-gray-100 p-2">{type}</div>
-                                <div className="flex flex-col">
-                                {staffCompetencies[type].map((competency) => (
-                                    <a 
-                                    key={competency.id} 
-                                    className={`flex justify-between gap-4 flex-1 items-center rounded-md text-xs transition-colors disabled:pointer-events-none disabled:opacity-50 hover:text-accent-foreground h-9 px-4 py-2 ${ activeCompetency === competency.id ? 'bg-muted hover:bg-muted font-semibold' : 'hover:bg-transparent hover:underline font-medium'}`} 
-                                    href="#"
-                                    onClick={() => handleCompetencyClick(competency.id, competency.proficiency)}
-                                    title={competency.competency}
-                                    >
-                                        <span className="break-words">{competency.competency} {!all && `(${competency.proficiency})`}</span>
 
-                                        <span className="break-words">{competency.percentage}%</span>
-                                    </a>
-                                ))}
-                                </div>
-                            </div>
-                        ))}
+                    {career &&
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive" className="h-8 text-xs">
+                                    Remove 
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the career path.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleRemoveCompetencyClick}>Continue</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    }
+                </div>
+                <div className="block lg:hidden">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="competency">Select Competency:</Label>
+                            <SingleComboBox 
+                                items={competencySelections} 
+                                onChange={(value => handleCompetencySelectionClick(value))}
+                                placeholder="Select competency"
+                                name="competency"
+                                id="competency"
+                                width="w-[460px]"
+                                className="w-full"
+                                value={activeCompetency}
+                            />
                         </div>
-                    </ScrollArea>
+                    </div>
+                </div>
+                <div className="hidden lg:block h-full">
+                    <div className="h-full gap-2">
+                        <ScrollArea className="h-full pr-4">
+                            <div className="h-12">
+                            { !staffCompetenciesLoading ? Object.keys(staffCompetencies).map((type) => (
+                                <div key={type}>
+                                    <div className={`${textSize} text-center font-semibold mb-2 sticky top-0 z-20 bg-gray-100 p-2`}>{type}</div>
+                                    <div className="flex flex-col">
+                                    {staffCompetencies[type].map((competency) => (
+                                        <Link 
+                                            key={competency.id} 
+                                            className={`
+                                                flex flex-col xl:flex-row xl:justify-between 
+                                                items-start flex-1
+                                                rounded-md text-xs transition-colors 
+                                                disabled:pointer-events-none disabled:opacity-50 
+                                                hover:text-accent-foreground h-9 p-2 gap-2
+                                                ${activeCompetency === competency.id ? 
+                                                    'bg-muted hover:bg-muted font-semibold border-2 border-primary' : 
+                                                    'hover:bg-transparent hover:underline font-medium'
+                                                }`}
+                                            onClick={() => handleCompetencyClick(competency.id, competency.proficiency)}
+                                            title={competency.competency}
+                                            preserveState
+                                            preserveScroll
+                                        >
+                                            <span className="break-words">{competency.competency} {!all && `(${competency.proficiency})`}</span>
+                                            <span className="break-words">{competency.percentage}%</span>
+                                        </Link>
+                                    ))}
+                                    </div>
+                                </div>
+                            )) : (
+                                <CompetenciesLoading />
+                            )}
+                            </div>
+                        </ScrollArea>
                     </div>
                 </div>
             </div>
-            <div className="col-span-9 h-full">
+            <div className="col-span-12 lg:col-span-9 h-full">
                 { activeCompetency !== null && position_id !== null ? (
-                    <Competency position_id={position_id} competency={competency} fetchCompetencies={fetchCompetencies} all={all} custom={custom} proficiency={activeProficiency} />
+                    <Competency emp_id={emp_id} position_id={position_id} competency={competency} fetchCompetencies={fetchCompetencies} all={all} custom={custom} proficiency={activeProficiency} />
                 ) : (
-                    <div className="font-semibold text-muted-foreground flex justify-center items-center h-full">
-                        Please choose a competency to view its indicators.
+                    <div className="font-semibold text-muted-foreground text-sm flex justify-center items-center h-full">
+                        Please choose a competency to view indicators.
                     </div>
                 )
                 }
