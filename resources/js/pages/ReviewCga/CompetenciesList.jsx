@@ -61,30 +61,30 @@ const CompetenciesList = ({
                 </div>
             </ScrollArea>
             <div className="flex gap-2 items-center justify-between w-full">
-                {competencies?.total && competencies?.total > 20 && (
-                    <div className="flex items-center space-x-2">
-                    {competencies.links.map((link) => (
-                        link.url ? (
+                {competencies?.total > 20 && (
+                <div className="flex items-center space-x-2">
+                    {competencies.links.map((link) =>
+                    link.url ? (
                         <Button
-                            key={link.label}
-                            variant={link.active ? "default" : "outline"}
-                            size="sm"
-                            onClick={(e) => handlePaginationClick(link, e)}
-                            dangerouslySetInnerHTML={{ __html: link.label }} // Renders the label directly
-                            className="text-xs"
+                        key={link.label}
+                        variant={link.active ? "default" : "outline"}
+                        size="sm"
+                        onClick={(e) => handlePaginationClick(link, e)}
+                        dangerouslySetInnerHTML={{ __html: link.label }} // Renders the label directly
+                        className="text-xs"
                         />
-                        ) : (
+                    ) : (
                         <Button
-                            key={link.label}
-                            variant="outline"
-                            size="sm"
-                            disabled
-                            dangerouslySetInnerHTML={{ __html: link.label }}
-                            className="text-xs text-slate-400"
+                        key={link.label}
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                        className="text-xs text-slate-400"
                         />
-                        )
-                    ))}
-                    </div>
+                    )
+                    )}
+                </div>
                 )}
             </div>
         </div>
