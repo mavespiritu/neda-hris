@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, CircleX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   Command,
@@ -7,14 +7,14 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/Components/ui/command"
+} from "@/components/ui/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/Components/ui/popover"
+} from "@/components/ui/popover"
 import { useState, useEffect } from "react"
-import { Button } from "@/Components/ui/button"
+import { Button } from "@/components/ui/button"
 
 const SingleComboBox = (
   {
@@ -26,6 +26,7 @@ const SingleComboBox = (
     placeholder,
     ref,
     width,
+    labelWidth,
     className
   }
 ) => {
@@ -38,8 +39,13 @@ const SingleComboBox = (
 
   const toggleSelection = (currentValue) => {
     setSelectedValue((prevValue) => (prevValue === currentValue ? null : currentValue))
-    setOpen(false) // Close the popover after selection
+    setOpen(false) 
     onChange(currentValue === selectedValue ? null : currentValue)
+  }
+
+  const clearSelection = () => {
+    setSelectedValue(null)
+    onChange(null)
   }
 
   return (
@@ -50,27 +56,38 @@ const SingleComboBox = (
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={`justify-between w-full ${invalidMessage ? 'border-red-500' : ''}`}
+            className={`justify-between w-full relative ${invalidMessage ? 'border-red-500' : ''}`}
             onClick={() => setOpen((prevOpen) => !prevOpen)}
           >
-            <span className="flex flex-start w-[400px] truncate">{selectedValue
-              ? items.find((item) => item.value === selectedValue)?.label ?? placeholder
-              : placeholder}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <span className={`text-left pr-2 ${labelWidth || `w-[400px]`} truncate overflow-hidden text-ellipsis whitespace-nowrap`}>
+              {selectedValue
+                ? items.find((item) => item.value === selectedValue)?.label ?? placeholder
+                : placeholder}
+            </span>
+            {selectedValue && (
+              <CircleX
+                className="absolute right-10 h-4 w-4 text-gray-500 cursor-pointer hover:text-black"
+                onClick={(e) => {
+                  e.stopPropagation() // Prevents the popover from toggling when clearing the selection
+                  clearSelection()
+                }}
+              />
+            )}
+            <ChevronsUpDown className="ml-4 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className={cn("p-0 w-full", width)}>
           <Command>
-            <CommandInput placeholder={placeholder} className="ring-0 border-0 outline-none focus:ring-0 focus:border-0 focus:outline-none" />
+            <CommandInput placeholder="Type to search..." className="ring-0 border-0 outline-none focus:ring-0 focus:border-0 focus:outline-none" />
             <CommandList>
               <CommandEmpty>{`No ${name} found`}</CommandEmpty>
               <CommandGroup>
-                {items.map((item) => (
+                {items?.map((item) => (
                   <CommandItem
                     key={item.label}
                     value={item.label}
                     onSelect={() => toggleSelection(item.value)}
-                    className="text-xs"
+                    className="text-sm"
                   >
                     <Check
                       className={cn(

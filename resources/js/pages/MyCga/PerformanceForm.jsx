@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 import FileUpload from "@/components/FileUpload"
 
-const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
+const PerformanceForm = ({ emp_id, evidence, indicator, open, onClose, onSuccess }) => {
 
     const { toast } = useToast()
 
@@ -29,7 +29,7 @@ const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
     const initialValues = {
         ipcr_id: null,
         description: "",
-        files: [],
+        newFiles: [],
         oldFiles: [],
         removedFiles: []
     }
@@ -38,7 +38,7 @@ const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
 
     const fetchEvidence = async () => {
         try {
-            const response = await fetch(`/my-cga/evidence/${evidence.id}`);
+            const response = await fetch(`/my-cga/evidence/${emp_id}?evidence_id=${evidence.id}`)
             if (!response.ok) {
                 toast({
                     title: "Uh oh! Something went wrong.",
@@ -50,9 +50,7 @@ const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
             setData({
                 ipcr_id: data.evidence.ipcr_id || null,
                 description: evidence.description || "",
-                files: data.files || [],
                 oldFiles: data.files || [],
-                removedFiles: []
             })
     
         } catch (err) {
@@ -66,7 +64,7 @@ const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
 
     const fetchPerformances = async () => {
         try {
-            const response = await fetch(`/my-cga/performances`);
+            const response = await fetch(`/my-cga/performances/${emp_id}`);
             if (!response.ok) {
                 toast({
                     title: "Uh oh! Something went wrong.",
@@ -90,57 +88,62 @@ const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
             if(evidence) fetchEvidence()
             fetchPerformances()
             clearErrors()
+            setFileErrorMessage("")
         }
         reset()
     }, [open])
 
     useEffect(() => {
-        if (data.files) {
-            const hasErrors = data.files.some((_, index) => errors?.[`files.${index}`])
-            
-            if (hasErrors) {
-                setFileErrorMessage("There are issues with the uploaded files. Please check the type and size of uploaded files")
-            } else {
-                setFileErrorMessage("")
-            }
+        if (data.newFiles) {
+            // Initialize an array to collect error messages
+            const errorMessages = []
+    
+            // Check each file for errors and add specific messages
+            data.newFiles.forEach((_, index) => {
+                const fileError = errors?.[`newFiles.${index}`]
+    
+                if (fileError) {
+                    const message = Array.isArray(fileError) ? fileError.join(', ') : fileError
+                    errorMessages.push(`File ${index + 1}: ${message}`)
+                }
+            })
+    
+            setFileErrorMessage(errorMessages.length > 0 ? errorMessages.join('\n') : "")
         }
-    }, [data.files, errors])
+    }, [data.newFiles, errors])
 
     const handleFileSelect = (files) => {
-    
-        setData((prevData) => {
-            return {
-                ...prevData,
-                files: [...prevData.files, ...files],
-            }
-        })
+   
+        setData((prevData) => ({
+            ...prevData,
+            newFiles: [...files],
+        }))
+        
     }
 
     const handleFileRemove = (fileToRemove) => {
 
         setData((prevData) => ({
           ...prevData,
-          files: prevData.files.filter((file) => file.id !== fileToRemove.id),
-          oldFiles: prevData.files.filter((file) => file.id !== fileToRemove.id),
-          removedFiles: [...prevData.removedFiles, fileToRemove],
+          oldFiles: prevData.oldFiles.filter((file) => file.id !== fileToRemove.id),
+          removedFiles: [...(Array.isArray(prevData.removedFiles) ? prevData.removedFiles : []), fileToRemove],
         }))
     }
-
 
     const handleSubmit = (e) => {
         e.preventDefault()
         const isUpdate = evidence !== null
         const url = isUpdate
         ? `/my-cga/update-performance/${evidence.id}`
-        : `/my-cga/performance/${indicator.indicator_id}`
+        : `/my-cga/performance/${emp_id}?indicator_id=${indicator.indicator_id}`
     
         const formData = new FormData()
         formData.append('award_id', data.award_id)
         formData.append('description', data.description)
         
-        if (Array.isArray(data.files)) {
-            data.files.forEach((file) => {
-                formData.append("files[]", file)
+        if (data.newFiles?.length > 0) {
+            data.newFiles.forEach((file) => {
+                formData.append('newFiles[]', file)
             })
         }
 
@@ -163,7 +166,10 @@ const PerformanceForm = ({ evidence, indicator, open, onClose, onSuccess }) => {
                 onSuccess()
             },
             onError: () => {
-                console.log(e)
+                const fileErrors = Object.entries(errors)
+                .filter(([key]) => key.startsWith('newFiles.'))
+                .map(([key, value]) => `${key}: ${value}`)
+                setFileErrorMessage(fileErrors.join('\n'))
             }
         })
     }
@@ -174,7 +180,7 @@ return (
             <DialogHeader>
                 <DialogTitle>Add performance as evidence</DialogTitle>
                 <DialogDescription>
-                Select from your performances as evidence and give context for this indicator.
+                Select from your performances as evidence and give context for this indicator: <span className="font-medium underline">{indicator.indicator}</span>
                 </DialogDescription>
             </DialogHeader>
             <div>
@@ -210,12 +216,12 @@ return (
                         </div>
 
                         <div className="flex flex-col gap-2">
-                            <Label htmlFor="picture">Files</Label>
+                            <Label htmlFor="newFiles">Supporting Documents</Label>
                             <FileUpload 
-                                name="files[]"
-                                id="files" 
-                                invalidMessage={errors.files}
-                                data={data.files}
+                                name="newFiles[]"
+                                id="newFiles" 
+                                invalidMessage={fileErrorMessage}
+                                data={data.newFiles}
                                 errors={errors}
                                 onFilesSelect={handleFileSelect}
                             />
@@ -229,14 +235,21 @@ return (
                             </>
                             )}
 
-                            {errors?.files ? (<span className="text-red-500 text-xs">{errors.files}</span>) : (
+                            {fileErrorMessage ? (
+                                <div className="text-red-500 text-xs">
+                                    {fileErrorMessage.split('\n').map((msg, index) => (
+                                        <span key={index}>
+                                            {msg}
+                                            <br />
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
                             <div className="inline-flex justify-between text-xs text-muted-foreground">
                                 <span>max allowed files: 5 (5MB each)</span>
                                 <span>file types: jpg, jpeg, png, pdf</span>
                             </div>
                             )}
-
-                            {fileErrorMessage && <span className="text-red-500 text-xs">{fileErrorMessage}</span>}
                             
                             <div className="flex flex-col gap-4 my-4">
                             { evidence !== null && <span className="text-sm font-medium">Choose files to remove:</span> }

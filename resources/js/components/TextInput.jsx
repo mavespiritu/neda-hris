@@ -1,11 +1,13 @@
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
+import React from 'react'
 
-const TextInput = (
-  ({ name, type, value, onChange, isInvalid, ref }) => {
+const TextInput = React.forwardRef(
+  ({ name, type, value, onChange, isInvalid }, ref) => {
     return (
-      <div ref={ref} className="w-full">
+      <div className="w-full">
         <Input 
+          ref={ref}
           type={type}
           name={name} 
           value={value} 

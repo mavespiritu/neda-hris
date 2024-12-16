@@ -14,7 +14,7 @@ const PageTitle = ({pageTitle, breadcrumbItems}) => {
     <>
     <Head title={pageTitle} />
     <div className="flex justify-between items-center mb-2">
-        <h1 className="text-lg font-semibold md:text-2xl">{pageTitle}</h1>
+        <h1 className="text-normal font-semibold md:text-xl">{pageTitle}</h1>
         <Breadcrumbs
             className="md:hidden"
             items={breadcrumbItems}

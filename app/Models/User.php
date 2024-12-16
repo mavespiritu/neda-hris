@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Support\Facades\DB;
+
+use App\Notifications\CompetenciesForReviewSubmitted;
 
 class User extends Authenticatable
 {
@@ -46,5 +49,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function sendCompetencyForReviewSubmissionNotification($staff)
+    {
+        $this->notify(new CompetenciesForReviewSubmitted($staff));
+    }
+
+    public function sendCompetencyForReviewApprovalNotification($staff)
+    {
+        $this->notify(new CompetenciesForReviewApproved($staff));
     }
 }

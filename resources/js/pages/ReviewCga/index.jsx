@@ -7,8 +7,16 @@ import {
 
 import PageTitle from "@/components/PageTitle"
 import Evidences from "@/pages/ReviewCga/Evidences"
+import Menu from "@/pages/ReviewCga/Menu"
+import { useHasPermission } from '@/hooks/useAuth'
 
 const ReviewCga = () => {
+
+    const canViewPage = useHasPermission('HRIS_my-cga.review-competency')
+
+    if (!canViewPage) {
+        return <p className="font-semibold flex justify-center items-center h-full">You do not have permission to view this page.</p>
+    }
 
     const breadcrumbItems = [
         { label: 'Home', href: '/' },
@@ -17,15 +25,12 @@ const ReviewCga = () => {
     ]
 
     return (
-        <div className="grid grid-rows-[auto,1fr] h-full flex-grow overflow-hidden">
+        <div className="grid grid-rows-[auto,1fr] h-screen flex-1 overflow-hidden">
             <PageTitle pageTitle="Review CGA" breadcrumbItems={breadcrumbItems} />
-            <Card className="w-full h-full grid grid-rows-[1fr]">
-                <CardContent className="flex-grow p-4">
-                    <Evidences />
-                </CardContent>
-            </Card>
+            <Menu />
         </div>
     )
 }
 
 export default ReviewCga
+

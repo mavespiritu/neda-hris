@@ -7,10 +7,10 @@ import DefaultLayout from "@/layouts/DefaultLayout"
 
 createInertiaApp({
   resolve: name => {
-    const pages = import.meta.glob('./Pages/**/*.jsx', { eager: true })
-    let page = pages[`./Pages/${name}.jsx`]
+    const pages = import.meta.glob('./pages/**/*.jsx', { eager: true })
+    let page = pages[`./pages/${name}.jsx`]
 
-    page.default.layout = page.default.layout || ((page) => <DefaultLayout children={page} /> )
+    page.default.layout = ((page) => <DefaultLayout children={page} /> )
 
     return page
   },

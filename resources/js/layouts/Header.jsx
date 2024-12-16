@@ -1,6 +1,7 @@
 import {
     CircleUser,
     Package2,
+    ChevronDown
   } from "lucide-react"
   import { Button } from "../components/ui/button"
   import {
@@ -16,6 +17,8 @@ import {
   import { usePage } from '@inertiajs/react'
   import { SidebarTrigger } from "@/components/ui/sidebar"
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+  import { useForm, Link } from '@inertiajs/react'
+  import { useUser } from "@/providers/UserProvider"
 
   const Logo = ({ hidden = false }) => {
 
@@ -36,28 +39,31 @@ import {
   
   const Header = () => {
 
-    const {
-      first_name,
-      last_name,
-      email,
-      ipms_id
-    } = usePage().props.auth.user
+    const { user } = useUser() 
+    const { post } =  useForm()
+
+    const handleLogout = (e) => {
+      post(`/logout`)
+
+      return to_route('login')
+    }
 
     return (
-      <header className="flex gap-10 lg:gap-20 justify-between">
-        <SidebarTrigger />
+      <header className="flex gap-2 justify-between sticky top-0 p-2 items-center h-16 shrink-0 border-b bg-background z-50">
+        <SidebarTrigger className="ml-2" />
         <div className="flex flex-end items-center gap-2">
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">{first_name} {last_name}</span>
-            <span className="text-xs text-muted-foreground">{email}</span>
+            <span className="text-sm font-semibold">{user?.first_name} {user?.last_name}</span>
+            <span className="text-xs text-muted-foreground">Signed in as:</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="rounded-full flex items-center gap-2">
+              <Button variant="ghost" className="p-2 flex items-center gap-2">
                 <Avatar>
-                    <AvatarImage src={`/employees/image/${ipms_id}`} loading="lazy" />
+                    <AvatarImage src={user?.ipms_id ? `/employees/image/${user?.ipms_id}` : `https://github.com/shadcn.png`} loading="lazy" />
                     <AvatarFallback>{`first_name last_name`}</AvatarFallback>
                 </Avatar>
+                <ChevronDown className="size-4"/>
                 <span className="sr-only">Toggle user menu</span>
               </Button>
             </DropdownMenuTrigger>
@@ -67,7 +73,7 @@ import {
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuItem>Support</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Logout</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -8,7 +8,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/Components/ui/breadcrumb"
+} from "@/components/ui/breadcrumb"
 
 const Breadcrumbs = ({ items }) => {
   return (
@@ -16,7 +16,7 @@ const Breadcrumbs = ({ items }) => {
         <BreadcrumbList>
             {items?.map((item, i) => (
                 <React.Fragment key={i}>
-                    <BreadcrumbItem>
+                    <BreadcrumbItem className="text-xs">
                         <BreadcrumbLink asChild>
                             <Link href={item.href}>{item.label}</Link>
                         </BreadcrumbLink>

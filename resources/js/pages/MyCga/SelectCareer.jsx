@@ -3,15 +3,11 @@ import SingleComboBox from "@/components/SingleComboBox"
 import CareerPathForm from "@/pages/MyCga/CareerPathForm"
 import { useState, useEffect } from "react"
 
-const SelectCareer = ({careers, fetchCareers, selectedCareer, setSelectedCareer}) => {
+const SelectCareer = ({emp_id, careers, fetchCareers, selectedCareer, setSelectedCareer}) => {
 
     const [isOpen, setIsOpen] = useState(false)
     const openModal = () => setIsOpen(true)
     const closeModal = () => setIsOpen(false)
-
-    useEffect(() => {
-        fetchCareers()
-    }, [])
 
   return (
     <div className="flex justify-between items-end gap-4">
@@ -27,7 +23,7 @@ const SelectCareer = ({careers, fetchCareers, selectedCareer, setSelectedCareer}
         <Button onClick={openModal} className="gap-2 text-sm">
             Add New Career Path
         </Button>
-        <CareerPathForm open={isOpen} onClose={closeModal} setSelectedCareer={setSelectedCareer} fetchCareers={fetchCareers} />
+        <CareerPathForm emp_id={emp_id} open={isOpen} onClose={closeModal} setSelectedCareer={setSelectedCareer} fetchCareers={fetchCareers} />
     </div>
   )
 }
