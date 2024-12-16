@@ -98,7 +98,7 @@ class MyCgaController extends Controller
             ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'pci.indicator_id')
             ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
             ->where('pci.position_id', $request->position_id)
-            ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id')
+            ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description')
             ->orderBy('type', 'asc')
             ->orderBy('c.competency', 'asc')
             ->get()
@@ -144,7 +144,7 @@ class MyCgaController extends Controller
             ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'pci.indicator_id')
             ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
             ->where('pci.position_id', $request->position_id)
-            ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id')
+            ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description')
             ->orderBy('c.competency', 'asc')
             ->get();
 
@@ -186,7 +186,7 @@ class MyCgaController extends Controller
                     ")
                 ])
                 ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
-                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type')
+                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'c.description')
                 ->orderBy('type', 'asc')
                 ->orderBy('c.competency', 'asc')
                 ->get()
@@ -220,7 +220,7 @@ class MyCgaController extends Controller
                     DB::raw('MAX(ci.proficiency) as proficiency'),
                 ])
                 ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
-                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type')
+                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'c.description')
                 ->orderBy('c.competency', 'asc')
                 ->get();
         }
@@ -230,7 +230,6 @@ class MyCgaController extends Controller
             'competencySelections' => $competencySelections,
         ]);
     }
-
 
     public function showCompetency($id, Request $request)
     {
@@ -2023,7 +2022,7 @@ class MyCgaController extends Controller
             return redirect()->back()->with([
                 'status' => 'error',
                 'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while deleting submission. Please try again.'
+                'message' => $e->getMessage()
             ]);
         }    
 

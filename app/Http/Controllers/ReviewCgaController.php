@@ -78,7 +78,7 @@ class ReviewCgaController extends Controller
             $competencies->whereIn('scr.emp_id', $employeeIDs);
         }
 
-        if ($queryParams['filters']['status']) {
+        if (isset($queryParams['filters']['status'])) {
             if ($queryParams['filters']['status'] === 'pending') {
                 $competencies->whereNull('scr.status')
                     ->whereIn('scr.id', function ($query) {

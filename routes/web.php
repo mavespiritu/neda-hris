@@ -65,7 +65,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/my-cga/update-other-evidence/{id}', [MyCgaController::class, 'updateOtherEvidences'])->name('my-cga.update-other-evidences');
 
     Route::get('/my-cga/histories/{id}', [MyCgaController::class, 'showHistories'])->name('my-cga.show-histories');
-    Route::post('/my-cga/history/', [MyCgaController::class, 'storeHistories'])->name('my-cga.store-histories');
+    Route::post('/my-cga/history', [MyCgaController::class, 'storeHistories'])->name('my-cga.store-histories');
     Route::delete('/my-cga/delete-history/{id}', [MyCgaController::class, 'deleteHistory'])->name('my-cga.delete-history');
     Route::get('/my-cga/history-summary/{id}', [MyCgaController::class, 'showHistorySummary'])->name('my-cga.history-summary');
     Route::get('/my-cga/history-summary/competency/{id}', [MyCgaController::class, 'showHistoryIndicators'])->name('my-cga.show-history-indicators');
@@ -75,7 +75,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 
 
     Route::get('/my-cga/proposed-trainings/{id}', [MyCgaController::class, 'showProposedTrainings'])->name('my-cga.show-proposed-trainings');
-    Route::post('/my-cga/proposed-trainings/', [MyCgaController::class, 'addProposedTraining'])->name('my-cga.add-proposed-trainings');
+    Route::post('/my-cga/proposed-trainings', [MyCgaController::class, 'addProposedTraining'])->name('my-cga.add-proposed-trainings');
     Route::put('/my-cga/proposed-trainings/{id}', [MyCgaController::class, 'editProposedTraining'])->name('my-cga.edit-proposed-trainings');
     Route::delete('/my-cga/proposed-trainings/{id}', [MyCgaController::class, 'deleteProposedTraining'])->name('my-cga.delete-proposed-trainings');
 
@@ -112,8 +112,8 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/trainings/', [TrainingController::class, 'show'])->name('trainings.show');
 
     // Email Notification
-    Route::post('/notification/submit-cga/', [NotificationController::class, 'submitCga'])->name('notification.submit-cga');
-    Route::post('/notification/approve-cga/', [NotificationController::class, 'approveCga'])->name('notification.approve-cga');
+    Route::post('/notification/submit-cga', [NotificationController::class, 'submitCga'])->name('notification.submit-cga');
+    Route::post('/notification/approve-cga', [NotificationController::class, 'approveCga'])->name('notification.approve-cga');
 });
 
 

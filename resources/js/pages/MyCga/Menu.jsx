@@ -237,7 +237,7 @@ const Menu = ({emp_id, position_id}) => {
     const handleSaveUpdates = async (e) => {
         e.preventDefault()
 
-        post(`/my-cga/history/`, {
+        post(`/my-cga/history`, {
             preserveState: true,
             onSuccess: () => {
                 setIsSaveUpdateOpen(false)

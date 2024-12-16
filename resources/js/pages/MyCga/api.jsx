@@ -43,7 +43,7 @@ export const getProposedTrainings = (payload) => {
 
 export const addProposedTraining = (payload) => {
     const { id } = payload
-    const url = `/my-cga/proposed-trainings/`
+    const url = `/my-cga/proposed-trainings`
     return axios.post(url, payload)
 }
 
@@ -61,6 +61,6 @@ export const deleteProposedTraining = (payload) => {
 }
 
 export const sendEmailForCgaSubmission = (payload) => {
-    const url = `/notification/submit-cga/`
+    const url = `/notification/submit-cga`
     return axios.post(url, payload)
 }
