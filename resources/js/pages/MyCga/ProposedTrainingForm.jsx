@@ -116,7 +116,7 @@ const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, open, onC
 
         const isUpdate = selectedTraining != null
         const url = isUpdate ? `/my-cga/proposed-trainings/${selectedTraining?.id}`
-            : `/my-cga/proposed-trainings/`
+            : `/my-cga/proposed-trainings`
 
         const method = isUpdate ? put : post
 

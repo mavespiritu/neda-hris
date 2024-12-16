@@ -54,7 +54,7 @@ import {
         <div className="flex flex-end items-center gap-2">
           <div className="flex flex-col">
             <span className="text-sm font-semibold">{user?.first_name} {user?.last_name}</span>
-            <span className="text-xs text-muted-foreground">Signed in as:</span>
+            <span className="text-xs text-muted-foreground">{user?.email}</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

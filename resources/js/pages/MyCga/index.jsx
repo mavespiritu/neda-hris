@@ -136,7 +136,7 @@ const MyCga = () => {
     const handleSaveUpdates = async (e) => {
         e.preventDefault()
 
-        post(`/my-cga/history/`, {
+        post(`/my-cga/history`, {
             preserveState: true,
             onSuccess: () => {
                 setIsSaveUpdateOpen(false)

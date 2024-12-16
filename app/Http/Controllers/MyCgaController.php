@@ -2022,7 +2022,7 @@ class MyCgaController extends Controller
             return redirect()->back()->with([
                 'status' => 'error',
                 'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while deleting submission. Please try again.'
+                'message' => $e->getMessage()
             ]);
         }    
 
