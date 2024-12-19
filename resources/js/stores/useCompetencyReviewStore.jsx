@@ -7,6 +7,7 @@ import {
     getIndicators,
     updateCompliance,
     updateRemarks,
+    endorseCompetency as saveEndorsedCompetency,
     approveCompetency as saveApprovedCompetency
 } from '@/pages/ReviewCga/api'
 
@@ -33,6 +34,7 @@ const useCompetencyReviewStore = create((set, get) => ({
     selectedCompetencyState: {
         competencies: [],
         loading: true,
+        isEndorsing: false,
         isApproving: false
     },
     indicatorsState: {
@@ -96,6 +98,10 @@ const useCompetencyReviewStore = create((set, get) => ({
         selectedCompetencyState: { ...state.selectedCompetencyState, loading }
     })),
 
+    setSelectedCompetencyEndorsementLoading: (isEndorsing) => set(state => ({
+        selectedCompetencyState: { ...state.selectedCompetencyState, isEndorsing }
+    })),
+    
     setSelectedCompetencyApprovalLoading: (isApproving) => set(state => ({
         selectedCompetencyState: { ...state.selectedCompetencyState, isApproving }
     })),
@@ -131,6 +137,28 @@ const useCompetencyReviewStore = create((set, get) => ({
                         ...state.selectedCompetencyState.competencies,
                         [type]: updatedCompetencies
                     }
+                }
+            }
+        })
+    },
+
+    endorseSelectedCompetencyInfo: (endorser, dateEndorsed) => {
+        set(state => {
+
+            const {
+                competencies,
+                filteredCompetencies,
+                selectedCompetency
+            } = state.competenciesState
+            
+            return {
+                competenciesState: {
+                    ...state.competenciesState,
+                    selectedCompetency: {
+                        ...state.competenciesState.selectedCompetency,
+                        endorser,
+                        date_endorsed: dateEndorsed,
+                    },
                 }
             }
         })
@@ -487,6 +515,43 @@ const useCompetencyReviewStore = create((set, get) => ({
             })
         } finally {
             
+        }
+    },
+
+    endorseCompetency: async (competencyId, endorser, dateEndorsed) => {
+        const { 
+            toast,
+            endorseSelectedCompetencyInfo,
+            setSelectedCompetencyEndorsementLoading
+        } = get()
+
+        try{
+            setSelectedCompetencyEndorsementLoading(true)
+
+            const response = await saveEndorsedCompetency({id: competencyId})
+
+            if (response.status === 200) {
+                endorseSelectedCompetencyInfo(endorser.label, dateEndorsed)
+                
+                toast({
+                    title: "Success!",
+                    description: "Competency endorsed successfully",
+                })
+            } else {
+                toast({
+                    title: "Uh oh! Something went wrong.",
+                    description: "There was a problem with your request.",
+                    variant: "destructive"
+                })
+            }
+        }catch (error) {
+            toast({
+                title: "Uh oh! Something went wrong.",
+                description: error.message,
+                variant: "destructive"
+            })
+        } finally {
+            setSelectedCompetencyEndorsementLoading(false)
         }
     },
 

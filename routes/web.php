@@ -91,6 +91,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/review-cga/competencies-for-review/{id}', [ReviewCgaController::class, 'showCompetencyForReview'])->name('review-cga.show-competency-for-review');
     Route::get('/review-cga/competencies-for-review/competency/{id}', [ReviewCgaController::class, 'showIndicatorsForReview'])->name('review-cga.show-indicators-for-review');
     Route::post('/review-cga/competencies-for-review/competency/{id}', [ReviewCgaController::class, 'updateIndicatorsForReview'])->name('review-cga.update-indicators-for-review');
+    Route::post('/review-cga/competencies-for-review/endorse/{id}', [ReviewCgaController::class, 'endorseCompetency'])->name('review-cga.endorseCompetency');
     Route::post('/review-cga/competencies-for-review/approve/{id}', [ReviewCgaController::class, 'approveCompetency'])->name('review-cga.approveCompetency');
     Route::post('/review-cga/competencies-for-review/indicator/{id}', [ReviewCgaController::class, 'updateRemarks'])->name('review-cga.update-remarks');
 
@@ -113,6 +114,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 
     // Email Notification
     Route::post('/notification/submit-cga', [NotificationController::class, 'submitCga'])->name('notification.submit-cga');
+    Route::post('/notification/endorse-cga', [NotificationController::class, 'endorseCga'])->name('notification.endorse-cga');
     Route::post('/notification/approve-cga', [NotificationController::class, 'approveCga'])->name('notification.approve-cga');
 });
 

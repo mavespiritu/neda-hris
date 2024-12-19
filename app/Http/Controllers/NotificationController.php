@@ -14,6 +14,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\CompetenciesForReviewSubmitted;
+use App\Notifications\CompetenciesForReviewEndorsed;
+use App\Notifications\CompetenciesForReviewEndorsedToDc;
 use App\Notifications\CompetenciesForReviewApproved;
 
 class NotificationController extends Controller
@@ -28,7 +30,11 @@ class NotificationController extends Controller
                 ->where('emp_id', $request->emp_id)
                 ->first();
 
-            $supervisors = User::role('HRIS_DC')->where('division', $staff->division_id)->get();
+                $supervisors = User::whereHas('roles', function ($query) {
+                    $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+                })
+                ->where('division', $staff->division_id)
+                ->get();
 
             $payload = [
                 'emp_id' => $staff->emp_id
@@ -53,6 +59,64 @@ class NotificationController extends Controller
                 'message' => 'An error occurred while sending an email notification. Please try again.'
             ]);
         }    
+    }
+
+    public function endorseCga(Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $user = Auth::user();
+
+        try{
+            $conn2->table('staff_competency_review')
+                ->where('id', $request->review_id)
+                ->update([
+                    'endorsed_by' => $user->ipms_id,
+                    'date_endorsed' => Carbon::now()->format('Y-m-d H:i:s')
+                ]);
+
+            $competency = $conn2->table('staff_competency_review')
+                ->where('id', $request->review_id)
+                ->first();
+
+            if($competency->endorsed_by){
+
+                $staff = User::where('ipms_id', $competency->emp_id)->first();
+
+                $chief = User::role('HRIS_DC')
+                    ->where('division', $staff->division)
+                    ->get();
+
+                $payload = [
+                    'competency_id' => $competency->id,
+                    'endorser_id' => $competency->endorsed_by
+                ];
+
+                if($staff){
+                    Notification::sendNow($staff, new CompetenciesForReviewEndorsed($payload));
+                }
+
+                if($chief){
+                    Notification::sendNow($chief, new CompetenciesForReviewEndorsedToDc($payload));
+                }
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to endorse competency: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }
     }
 
     public function approveCga(Request $request)

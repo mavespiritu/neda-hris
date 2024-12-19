@@ -34,9 +34,20 @@ export const updateRemarks = (payload) => {
     return axios.post(url, payload)
 }
 
+export const endorseCompetency = (payload) => {
+    const { id } = payload
+    const url = `/review-cga/competencies-for-review/endorse/${id}`
+    return axios.post(url, payload)
+}
+
 export const approveCompetency = (payload) => {
     const { id } = payload
     const url = `/review-cga/competencies-for-review/approve/${id}`
+    return axios.post(url, payload)
+}
+
+export const sendEmailForCgaEndorsement = (payload) => {
+    const url = `/notification/endorse-cga/`
     return axios.post(url, payload)
 }
 

@@ -104,8 +104,6 @@ const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, selectedS
         }))
     }, [selectedTraining])
 
-    console.log(data)
-
     const handleSubmit = (e) => {
         e.preventDefault()
 

@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import useCompetencyReviewStore from '@/stores/useCompetencyReviewStore'
 import useCgaTrainingStore from '@/stores/useCgaTrainingStore'
 import { 
+    sendEmailForCgaEndorsement,
     sendEmailForCgaApproval,
 } from '@/pages/ReviewCga/api'
 
@@ -54,6 +55,7 @@ import {
 import { MessageCirclePlus, Pencil, Trash2 } from 'lucide-react'
 import ProposedTrainingForm from "@/pages/MyCga/ProposedTrainingForm"
 import { useForm } from '@inertiajs/react'
+import { useHasRole } from '@/hooks/useAuth'
 
 const Competencies = ({employees}) => {
 
@@ -89,6 +91,7 @@ const Competencies = ({employees}) => {
         toggleCompliance,
         openIndicatorModal,
         closeIndicatorModal,
+        endorseCompetency,
         approveCompetency,
         updateIndicatorAdditionalInfo,
         deleteRemarks,
@@ -96,6 +99,8 @@ const Competencies = ({employees}) => {
         openFilterModal,
         closeFilterModal
     } = useCompetencyReviewStore()
+
+    console.log(selectedCompetency)
 
     const {
         setToast: setTrainingsToast,
@@ -111,6 +116,9 @@ const Competencies = ({employees}) => {
         setCurrentPage: setTrainingsCurrentPage
       } = useCgaTrainingStore()
 
+    const canEndorseCompetency = useHasRole('HRIS_ADC')
+    const canApproveCompetency = useHasRole('HRIS_HR') || useHasRole('HRIS_DC') 
+
     const textSize = useTextSize()
     const { user } = useUser()
     const { toast } = useToast()
@@ -120,6 +128,7 @@ const Competencies = ({employees}) => {
 
     const [activeSubmissionTab, setActiveSubmissionTab] = useState('competencies')
 
+    const [isEndorseDialogOpen, setIsEndorseDialogOpen] = useState(false)
     const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false)
 
     const total = useMemo(() => competencies?.total || 0, [competencies])
@@ -292,6 +301,19 @@ const Competencies = ({employees}) => {
         })
     }
 
+    const handleEndorseCompetency = async () => {
+
+        const { id: competencyId } = selectedCompetency
+
+        const endorser = employees.find(employee => employee.value === user.ipms_id)
+        const dateEndorsed = format(new Date(), 'MMMM dd, yyyy hh:mm:ss a')
+
+        await endorseCompetency(competencyId, endorser, dateEndorsed)
+        await sendEndorsementNotification()
+
+        setIsEndorseDialogOpen(false)
+    }
+
     const handleApproveCompetency = async () => {
 
         const { id: competencyId } = selectedCompetency
@@ -300,12 +322,30 @@ const Competencies = ({employees}) => {
         const dateApproved = format(new Date(), 'MMMM dd, yyyy hh:mm:ss a')
 
         await approveCompetency(competencyId, approver, dateApproved)
-        await sendEmailNotification()
+        await sendApprovalNotification()
 
         setIsApproveDialogOpen(false)
     }
 
-    const sendEmailNotification = async () => {
+    const sendEndorsementNotification = async () => {
+        try {
+            const response = await sendEmailForCgaEndorsement({review_id: selectedCompetency.id})
+    
+            if (response.status !== 200) {
+                throw new Error("Failed to send email notification.");
+            }
+    
+        } catch (err) {
+            console.error(err)
+            toast({
+                title: "Error",
+                description: "Failed to send email notification.",
+                variant: "destructive",
+            })
+        }
+    }
+
+    const sendApprovalNotification = async () => {
         try {
             const response = await sendEmailForCgaApproval({review_id: selectedCompetency.id})
     
@@ -369,7 +409,8 @@ const Competencies = ({employees}) => {
                             <span className="text-sm font-medium">Submitted on {selectedCompetency.date_submitted}</span>
                         </div>
                     </div>
-                    {!selectedCompetency.status ? (
+                    <div className="flex flex-col gap-2">
+                    {selectedCompetency.status !== 'Approved' && canApproveCompetency ? (
                         <AlertDialog open={isApproveDialogOpen}>
                             <AlertDialogTrigger asChild>
                                 <Button onClick={() => setIsApproveDialogOpen(true)}>Approve Submission</Button>
@@ -398,10 +439,65 @@ const Competencies = ({employees}) => {
                         </AlertDialog>
                     ) : (
                         <div className="flex flex-col text-right">
-                            <h4 className="text-normal font-semibold">Approved by {selectedCompetency?.approver}</h4>
-                            <span className="text-sm font-medium">Approved on {selectedCompetency.date_acted}</span>
+                            <h4 className="text-sm font-semibold">Approved by {selectedCompetency?.approver}</h4>
+                            <span className="text-xs font-medium">Approved on {selectedCompetency.date_acted}</span>
                         </div>
                     )}
+                    {selectedCompetency.endorser === null ? (
+                        canEndorseCompetency ? (
+                            <AlertDialog open={isEndorseDialogOpen}>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        onClick={() => setIsEndorseDialogOpen(true)}
+                                    >
+                                        Endorse Submission
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                            Are you sure you want to endorse this submission?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. Once endorsed, reviewing of this submission will no longer be available to you.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel
+                                            onClick={() => setIsEndorseDialogOpen(false)}
+                                            className="border-0"
+                                        >
+                                            Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={handleEndorseCompetency}
+                                            disabled={selectedCompetencyState.isEndorsing}
+                                        >
+                                            {selectedCompetencyState.isEndorsing ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    <span>Please wait</span>
+                                                </>
+                                            ) : (
+                                                'Continue'
+                                            )}
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        ) : null // No button or dialog if canEndorseCompetency is false
+                    ) : (
+                        <div className="flex flex-col text-right">
+                            <h4 className="text-sm font-semibold">
+                                Endorsed by {selectedCompetency?.endorser}
+                            </h4>
+                            <span className="text-xs font-medium">
+                                Endorsed on {selectedCompetency.date_endorsed}
+                            </span>
+                        </div>
+                    )}
+
+                    </div>
                 </div>
                 <Tabs value={activeSubmissionTab} onValueChange={setActiveSubmissionTab} className="flex-grow grid grid-rows-[auto] h-full">
                     <TabsList className="w-full justify-start gap-4">

@@ -49,9 +49,10 @@ class ReviewCgaController extends Controller
         $user = Auth::user();
         $isHRRole = $user->hasRole('HRIS_HR');
         $isDCRole = $user->hasRole('HRIS_DC');
+        $isADCRole = $user->hasRole('HRIS_ADC');
         $employeeIDs = collect();
 
-        if (!$isHRRole && $isDCRole) {
+        if (!$isHRRole && ($isADCRole || $isADCRole)) {
             $employee = $conn3->table('tblemployee')
                 ->where('emp_id', $user->ipms_id)
                 ->first();
@@ -71,11 +72,13 @@ class ReviewCgaController extends Controller
                 DB::raw("DATE_FORMAT(date_created, '%M %d, %Y %h:%i:%s %p') as date_submitted"),
                 'scr.status',
                 'scr.acted_by',
+                'scr.endorsed_by',
                 DB::raw("DATE_FORMAT(scr.date_acted, '%M %d, %Y %h:%i:%s %p') as date_acted"),
+                DB::raw("DATE_FORMAT(scr.date_endorsed, '%M %d, %Y %h:%i:%s %p') as date_endorsed"),
             ])
             ->where('scr.emp_id', '<>', $user->ipms_id);
         
-        if (!$isHRRole && $isDCRole && $employeeIDs->isNotEmpty()) {
+        if (!$isHRRole && ($isADCRole || $isADCRole) && $employeeIDs->isNotEmpty()) {
             $competencies->whereIn('scr.emp_id', $employeeIDs);
         }
 
@@ -97,10 +100,13 @@ class ReviewCgaController extends Controller
             ->paginate(20);
 
         $staffIDs = $competencies->pluck('emp_id')->unique();
+        $endorserIDs = $competencies->pluck('endorsed_by')->unique();
         $approverIDs = $competencies->pluck('acted_by')->unique();
 
+        $mergedIDs = $staffIDs->merge($endorserIDs)->merge($approverIDs)->unique();
+
         $employees = $conn3->table('tblemployee')
-            ->whereIn('emp_id', $staffIDs->merge($approverIDs))
+            ->whereIn('emp_id', $mergedIDs)
             ->get()
             ->keyBy('emp_id')
             ->map(function ($employee) {
@@ -111,6 +117,7 @@ class ReviewCgaController extends Controller
             
         $competencies->transform(function ($competency) use ($employees) {
             $competency->staff = $employees->get($competency->emp_id)->staff ?? null;
+            $competency->endorser = $employees->get($competency->endorsed_by)->staff ?? null;
             $competency->approver = $employees->get($competency->acted_by)->staff ?? null;
             return $competency;
         });
@@ -367,6 +374,77 @@ class ReviewCgaController extends Controller
                 'status' => 'error',
                 'title' => 'Uh oh! Something went wrong.',
                 'message' => 'An error occurred while updating the remarks. Please try again.'
+            ]);
+        }
+    }
+
+    public function endorseCompetency($id, Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $user = Auth::user();
+
+        try{
+            $conn2->table('staff_competency_review')
+            ->where('id', $id)
+            ->update([
+                'endorsed_by' => $user->ipms_id,
+                'date_endorsed' => Carbon::now()->format('Y-m-d H:i:s')
+            ]);
+
+            /* $competency = $conn2->table('staff_competency_review')
+                ->where('id', $id)
+                ->first();
+
+            $changedIndicators = $conn2->table('staff_competency_indicator_history')
+                ->where('date_created', $competency->date_created)
+                ->where('emp_id', $competency->emp_id)
+                ->where('position_id', $competency->position_id)
+                ->whereNotNull('updated_by')
+                ->get();
+
+            if($changedIndicators){
+                foreach($changedIndicators as $indicator){
+        
+                    $conn2->table('staff_all_indicator')
+                    ->updateOrInsert(
+                        [
+                            'emp_id' => $indicator->emp_id,
+                            'indicator_id' => $indicator->indicator_id,
+                        ],
+                        [
+                            'compliance' => $indicator->compliance
+                        ]
+                    );
+
+                    $conn2->table('staff_competency_indicator')
+                    ->updateOrInsert(
+                        [
+                            'emp_id' => $indicator->emp_id,
+                            'position_id' => $indicator->position_id,
+                            'indicator_id' => $indicator->indicator_id,
+                        ],
+                        [
+                            'compliance' => $indicator->compliance
+                        ]
+                    );
+                }
+            } */
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Competency endorsed successfully!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to endorse competency: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while endorsing the competency. Please try again.'
             ]);
         }
     }
