@@ -53,8 +53,20 @@ export default function Login({ status, canResetPassword }) {
           className: "text-white dark:text-white",
         },
         {
-          text: "gold.",
+          text: "oil.",
           className: "text-[#F7D000] dark:text-[#F7D000]",
+        },
+        {
+            text: "-",
+            className: "text-white dark:text-white",
+        },
+        {
+            text: "Clive",
+            className: "text-white dark:text-white",
+        },
+        {
+            text: "Humby",
+            className: "text-white dark:text-white",
         },
       ]
 
