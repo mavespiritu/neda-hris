@@ -332,11 +332,7 @@ const handleRemoveSubmissionClick = useCallback(
                                           Level {proficiency}: {indicator}
                                         </TableCell>
                                         <TableCell className="text-center text-xs p-2">
-                                          {dateEntry
-                                            ? dateEntry.compliance === 1
-                                              ? 'Complied'
-                                              : 'Not Complied'
-                                            : 'Complied'}
+                                          {dateEntry ? (dateEntry.compliance === 1 ? <Badge variant="outline">Complied</Badge> : <Badge variant="destructive">Not Complied</Badge>) : <Badge variant="outline">Complied</Badge>}
                                         </TableCell>
                                         <TableCell className="text-xs p-2">
                                           {selectedSubmission.status === 'Approved' ? dateEntry?.remarks : ''}

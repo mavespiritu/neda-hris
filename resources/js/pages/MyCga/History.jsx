@@ -268,7 +268,7 @@ const History = ({ emp_id, summary, isSummaryLoading, histories }) => {
                                                     const dateEntry = dates.find(d => d.dateCreated === date)
                                                     return (
                                                         <TableCell key={`date-${date}`} className="text-center text-xs p-2">
-                                                        {dateEntry ? (dateEntry.compliance === 1 ? 'Complied' : 'Not Complied') : 'Complied'}
+                                                        {dateEntry ? (dateEntry.compliance === 1 ? <Badge variant="outline">Complied</Badge> : <Badge variant="destructive">Not Complied</Badge>) : <Badge variant="outline">Complied</Badge>}
                                                         </TableCell>
                                                     )
                                                     })}

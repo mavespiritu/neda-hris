@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { MessageCirclePlus, Pencil, Trash2 } from 'lucide-react'
 import { Switch } from "@/components/ui/switch"
 
@@ -72,9 +73,9 @@ const Indicators = ({competency, handleComplianceToggleChange, handleRemarksDele
     <Table className="text-xs">
         <TableHeader>
             <TableRow>
-                <TableHead className="w-[50%]">Indicator</TableHead>
+                <TableHead className="w-[40%]">Indicator</TableHead>
                 <TableHead className="text-center w-[10%]">Evidences</TableHead>
-                <TableHead className="text-center w-[10%]">Compliance</TableHead>
+                <TableHead className="text-center w-[20%]">Compliance</TableHead>
                 <TableHead>Remarks</TableHead>
             </TableRow>
         </TableHeader>
@@ -92,14 +93,14 @@ const Indicators = ({competency, handleComplianceToggleChange, handleRemarksDele
                     onCheckedChange={(isChecked) => handleComplianceToggleChange(competency, indicator.id, isChecked)}
                     value={indicator.compliance === 1}
                 />) : (
-                    indicator.compliance === 1 ? 'Complied' : 'Not Complied'
+                    indicator.compliance === 1 ? <Badge variant="outline">Complied</Badge> : <Badge variant="destructive">Not Complied</Badge>
                 )}
                 </TableCell>
                 <TableCell className="flex justify-between items-center">
                 {indicator.remarks ? (
                     <div className="flex gap-4 justify-between items-center w-full">
                         <span className="leading-normal">{indicator.remarks}</span>
-                        {!selectedCompetency.status && (
+                        {/* {!selectedCompetency.status && (
                             <div className="flex justify-end">
                                 <AlertDialog>
                                     <TooltipProvider>
@@ -152,10 +153,62 @@ const Indicators = ({competency, handleComplianceToggleChange, handleRemarksDele
                                     </AlertDialogContent>
                                 </AlertDialog>
                             </div>
-                        )}
+                        )} */}
+                        <div className="flex justify-end">
+                            <AlertDialog>
+                                <TooltipProvider>
+                                    <div className="flex">
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="icon"
+                                                    size="sm"
+                                                    onClick={() => openIndicatorModal('remarks', indicator)}
+                                                    className="p-1"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Edit remarks</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        variant="icon"
+                                                        size="sm"
+                                                        className="p-1"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Clear remarks</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </TooltipProvider>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure you want to clear remarks?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently clear the remarks.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleRemarksDelete(indicator)}>Confirm</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
                     </div>
                 ) : (
-                    !selectedCompetency.status && (
+                    /* !selectedCompetency.status && (
                         <div className="flex justify-end w-full items-center">
                             <TooltipProvider>
                                 <Tooltip>
@@ -170,7 +223,21 @@ const Indicators = ({competency, handleComplianceToggleChange, handleRemarksDele
                                 </Tooltip>
                             </TooltipProvider>
                         </div>
-                    )
+                    ) */
+                    <div className="flex justify-end w-full items-center">
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="icon" size="sm" onClick={() => openIndicatorModal('remarks', indicator)} className="p-1">
+                                        <MessageCirclePlus className="w-4 h-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Add remarks</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
                 )}
             </TableCell>
             </TableRow>
