@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import useCgaHistoryStore from '@/stores/useCgaHistoryStore'
 
-const CompetenciesList = () => {
+const HistoryList = () => {
     const {
         submissionsState: { 
             submissions, 
@@ -14,7 +14,7 @@ const CompetenciesList = () => {
             selectedSubmission,
             filteredSubmissions,
         },
-        setCurrentPage ,
+        setCurrentPage,
         setSelectedSubmission,
     } = useCgaHistoryStore()
 
@@ -102,4 +102,4 @@ const CompetenciesList = () => {
     )
 }
 
-export default CompetenciesList
+export default HistoryList

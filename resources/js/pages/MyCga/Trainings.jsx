@@ -117,7 +117,10 @@ const Trainings = ({emp_id, position_id}) => {
   return (
     <>
         <div className="flex justify-between items-start">
-            <h4 className="font-semibold leading-normal text-lg tracking-tight">Proposed Trainings</h4>
+            <div className="flex flex-col gap-2">
+              <h4 className="font-semibold leading-normal text-lg tracking-tight">Proposed Trainings</h4>
+              <span className="text-xs">These trainings are collected to address gaps in your competencies, equipping you with the necessary skills and knowledge to meet the required standards effectively.</span>
+            </div>
             <Button onClick={() => openFormModal()}>Add Training</Button>
         </div>
 
@@ -137,7 +140,7 @@ const Trainings = ({emp_id, position_id}) => {
               trainings.data.map((training, idx) => (
                 <TableRow key={training.id}>
                   <TableCell>{(currentPage - 1) * trainings.per_page + idx + 1}</TableCell>
-                  <TableCell>{training.competency}</TableCell>
+                  <TableCell>{training.competency} {training?.percentage ? `(${training.percentage}%)` : ''}</TableCell>
                   <TableCell>{training.title}</TableCell>
                   <TableCell>{training.date_created ? formatDateWithTime(training.date_created) : <Badge variant="destructive">Not Submitted</Badge>}</TableCell>
                   <TableCell className="flex justify-end">

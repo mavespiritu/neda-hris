@@ -22,7 +22,7 @@ import {
     getCompetencies,
 } from '@/pages/MyCga/api'
 
-const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, open, onClose, onSuccess }) => {
+const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, selectedSubmission, open, onClose, onSuccess }) => {
     
     const { toast } = useToast()
 
@@ -35,7 +35,8 @@ const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, open, onC
         training_id: selectedTraining?.training_id || null,
         training_title: selectedTraining?.training_title || "",
         emp_id,
-        position_id
+        position_id,
+        review_id: selectedSubmission?.id || null
     }
 
     const { data, setData, post, put, processing, errors, clearErrors, reset } = useForm(initialValues)
@@ -64,7 +65,7 @@ const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, open, onC
 
     const fetchCompetencies = async () => {
         try {
-            const response = await getCompetencies({emp_id, position_id})
+            const response = await getCompetencies({emp_id, position_id, gapOnly: true})
 
             if (response.status === 200) {
                 setCompetencies(response.data?.competencySelections)
@@ -99,8 +100,11 @@ const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, open, onC
             competency_id: selectedTraining?.competency_id || null,
             training_id: selectedTraining?.training_id || null,
             training_title: selectedTraining?.training_title || "",
+            review_id: selectedSubmission?.id || null
         }))
     }, [selectedTraining])
+
+    console.log(data)
 
     const handleSubmit = (e) => {
         e.preventDefault()
@@ -144,9 +148,9 @@ const ProposedTrainingForm = ({ emp_id, position_id, selectedTraining, open, onC
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{selectedTraining ? `Edit` : `Add`} training</DialogTitle>
+                    <DialogTitle>{selectedTraining ? `Edit` : `Add`} training requirement</DialogTitle>
                     <DialogDescription>
-                    Select from the stored trainings in the database
+                    Add training to address competency gap
                     </DialogDescription>
                 </DialogHeader>
                 <div>

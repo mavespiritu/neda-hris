@@ -151,6 +151,7 @@ const fetchAdditionalInfo = async (competencyId, proficiency) => {
           acc[item.indicator][item.proficiency].push({
               dateCreated: item.dateCreated,
               compliance: item.compliance,
+              remarks: item.remarks
           })
           
           return acc
@@ -224,6 +225,7 @@ const handleRemoveSubmissionClick = useCallback(
   },
   [destroy, toast]
 )
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex justify-between">
@@ -271,6 +273,7 @@ const handleRemoveSubmissionClick = useCallback(
                   <TableRow>
                       <TableHead className={`${textSize} w-[40%]`}>Competency (Level Required)</TableHead>
                       <TableHead className={`${textSize} text-center`}>Percentage</TableHead>
+                      <TableHead className={`${textSize}`}>Remarks</TableHead>
                   </TableRow>
               </TableHeader>
               <TableBody>
@@ -292,6 +295,9 @@ const handleRemoveSubmissionClick = useCallback(
                         </TableCell>
                         <TableCell className={`${textSize} text-center font-medium`}>
                           {dateEntry ? `${dateEntry.percentage}%` : '-'}
+                        </TableCell>
+                        <TableCell className={`${textSize} font-medium`}>
+                          
                         </TableCell>
                         <TableCell className="w-[5%]">
                           <ChevronDown className="h-4 w-4" />
@@ -332,6 +338,9 @@ const handleRemoveSubmissionClick = useCallback(
                                               : 'Not Complied'
                                             : 'Complied'}
                                         </TableCell>
+                                        <TableCell className="text-xs p-2">
+                                          {selectedSubmission.status === 'Approved' ? dateEntry?.remarks : ''}
+                                        </TableCell>
                                       </TableRow>
                                     )
                                   }
@@ -371,7 +380,7 @@ const handleRemoveSubmissionClick = useCallback(
                 trainings.data.map((training, idx) => (
                   <TableRow key={training.id}>
                     <TableCell>{idx + 1}</TableCell>
-                    <TableCell>{training.competency}</TableCell>
+                    <TableCell>{training.competency} {training?.percentage ? `(${training.percentage}%)` : ''}</TableCell>
                     <TableCell>{training.title}</TableCell>
                   </TableRow>
                 ))

@@ -63,7 +63,7 @@ const History = ({ emp_id, summary, isSummaryLoading, histories }) => {
 
     useEffect(() => {
         loadSubmissions(emp_id)
-    }, [currentPage])
+    }, [currentPage, emp_id])
 
     useEffect(() => {
         if (submissions.data){ 

@@ -10,8 +10,6 @@ const DefaultLayout = ({ children }) => {
     
     const user = usePage().props.auth.user
 
-    console.log(user)
-
     return (
         <CsrfProvider>
         <TextSizeProvider>

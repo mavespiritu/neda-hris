@@ -225,6 +225,186 @@ class MyCgaController extends Controller
                 ->get();
         }
 
+        if($request->has('gapOnly') && $request->gapOnly) {
+            // Main competencies query with the percentage calculation
+            $competencies = $conn2->table('position_competency_indicator as pci')
+            ->select([
+                'c.comp_id as id',
+                'c.competency',
+                'c.description',
+                DB::raw('MAX(ci.proficiency) as proficiency'),
+                DB::raw("CASE 
+                            WHEN c.comp_type = 'org' THEN 'Organizational'
+                            WHEN c.comp_type = 'mnt' THEN 'Managerial'
+                            ELSE 'Technical/Functional'
+                        END as type"),
+                DB::raw("
+                    ROUND(
+                        (
+                            SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                            FROM (
+                                SELECT indicator_id, MAX(id) as latest_id
+                                FROM staff_all_indicator
+                                WHERE emp_id = '".$id."'
+                                GROUP BY indicator_id
+                            ) as latest_ids
+                            JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                            LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
+                            WHERE latest_sai.compliance = 1
+                            AND ci.competency_id = c.comp_id
+                            AND ci.proficiency IN (
+                                SELECT DISTINCT ci3.proficiency
+                                FROM position_competency_indicator as pci3
+                                LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
+                                WHERE ci3.competency_id = c.comp_id 
+                                AND pci3.position_id = pci.position_id
+                            )
+                        ) / NULLIF( 
+                            (
+                                SELECT COUNT(*)
+                                FROM position_competency_indicator as pci2
+                                LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
+                                WHERE ci2.competency_id = c.comp_id 
+                                AND pci2.position_id = pci.position_id
+                            ), 0
+                        ) * 100, 2
+                    ) AS percentage
+                ")
+            ])
+            ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'pci.indicator_id')
+            ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
+            ->where('pci.position_id', $request->position_id)
+            ->having('percentage', '<', 100)
+            ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description')
+            ->orderBy('type', 'asc')
+            ->orderBy('c.competency', 'asc')
+            ->get()
+            ->groupBy('type');
+        
+        // Selections query
+        $competencySelections = $conn2->table('position_competency_indicator as pci')
+            ->select([
+                'c.comp_id as value',
+                DB::raw("CONCAT(c.competency, ' (', MAX(ci.proficiency), ') - ', 
+                        ROUND(
+                            (
+                                SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                                FROM (
+                                    SELECT indicator_id, MAX(id) as latest_id
+                                    FROM staff_all_indicator
+                                    WHERE emp_id = '".$id."'
+                                    GROUP BY indicator_id
+                                ) as latest_ids
+                                JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                                LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
+                                WHERE latest_sai.compliance = 1
+                                AND ci.competency_id = c.comp_id
+                                AND ci.proficiency IN (
+                                    SELECT DISTINCT ci3.proficiency
+                                    FROM position_competency_indicator as pci3
+                                    LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
+                                    WHERE ci3.competency_id = c.comp_id 
+                                    AND pci3.position_id = pci.position_id
+                                )
+                            ) / NULLIF(
+                                (
+                                    SELECT COUNT(*)
+                                    FROM position_competency_indicator as pci2
+                                    LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
+                                    WHERE ci2.competency_id = c.comp_id 
+                                    AND pci2.position_id = pci.position_id
+                                ), 0
+                            ) * 100, 2
+                        ), '%') AS label"),
+                DB::raw('MAX(ci.proficiency) as proficiency'),
+                DB::raw("
+                    ROUND(
+                        (
+                            SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                            FROM (
+                                SELECT indicator_id, MAX(id) as latest_id
+                                FROM staff_all_indicator
+                                WHERE emp_id = '".$id."'
+                                GROUP BY indicator_id
+                            ) as latest_ids
+                            JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                            LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
+                            WHERE latest_sai.compliance = 1
+                            AND ci.competency_id = c.comp_id
+                            AND ci.proficiency IN (
+                                SELECT DISTINCT ci3.proficiency
+                                FROM position_competency_indicator as pci3
+                                LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
+                                WHERE ci3.competency_id = c.comp_id 
+                                AND pci3.position_id = pci.position_id
+                            )
+                        ) / NULLIF( 
+                            (
+                                SELECT COUNT(*)
+                                FROM position_competency_indicator as pci2
+                                LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
+                                WHERE ci2.competency_id = c.comp_id 
+                                AND pci2.position_id = pci.position_id
+                            ), 0
+                        ) * 100, 2
+                    ) AS percentage
+                ")
+            ])
+            ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'pci.indicator_id')
+            ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
+            ->where('pci.position_id', $request->position_id)
+            ->having('percentage', '<', 100)
+            ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description')
+            ->orderBy('c.competency', 'asc')
+            ->get();
+
+            if($competencySelections->isEmpty()){
+                $competencySelections = $conn2->table('position_competency_indicator as pci')
+                ->select([
+                    'c.comp_id as value',
+                    DB::raw("CONCAT(c.competency, ' (', MAX(ci.proficiency), ') - ', 
+                            ROUND(
+                                (
+                                    SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                                    FROM (
+                                        SELECT indicator_id, MAX(id) as latest_id
+                                        FROM staff_all_indicator
+                                        WHERE emp_id = '".$id."'
+                                        GROUP BY indicator_id
+                                    ) as latest_ids
+                                    JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                                    LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
+                                    WHERE latest_sai.compliance = 1
+                                    AND ci.competency_id = c.comp_id
+                                    AND ci.proficiency IN (
+                                        SELECT DISTINCT ci3.proficiency
+                                        FROM position_competency_indicator as pci3
+                                        LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
+                                        WHERE ci3.competency_id = c.comp_id 
+                                        AND pci3.position_id = pci.position_id
+                                    )
+                                ) / NULLIF(
+                                    (
+                                        SELECT COUNT(*)
+                                        FROM position_competency_indicator as pci2
+                                        LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
+                                        WHERE ci2.competency_id = c.comp_id 
+                                        AND pci2.position_id = pci.position_id
+                                    ), 0
+                                ) * 100, 2
+                            ), '%') AS label"),
+                    DB::raw('MAX(ci.proficiency) as proficiency'),
+                ])
+                ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'pci.indicator_id')
+                ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')
+                ->where('pci.position_id', $request->position_id)
+                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description')
+                ->orderBy('c.competency', 'asc')
+                ->get();
+            }
+            
+        }
+
         return response()->json([
             'competencies' => $competencies,
             'competencySelections' => $competencySelections,
@@ -1620,6 +1800,7 @@ class MyCgaController extends Controller
         ->select(
             'sct.*',
             'competency.competency',
+            'sch.percentage',
             DB::raw("IF(sct.training_id IS NULL, sct.training_title, training.training_title) as title"),
             'scr.date_created'
         )
@@ -1627,6 +1808,10 @@ class MyCgaController extends Controller
         ->leftJoin('training', 'training.id', '=', 'sct.training_id')
         ->leftJoin('staff_training_review as str', 'str.training_id', '=', 'sct.id')
         ->leftJoin('staff_competency_review as scr', 'scr.id', '=', 'str.review_id')
+        ->leftJoin('staff_competency_history as sch', function($join) {
+            $join->on('sch.date_created', '=', 'scr.date_created')
+                 ->on('sch.competency_id', '=', 'sct.competency_id');
+        })
         ->where('sct.emp_id', $id)
         ->orderBy('sct.id', 'desc');
 
@@ -1645,13 +1830,24 @@ class MyCgaController extends Controller
         $conn3 = DB::connection('mysql3');
 
         try{
-            $conn2->table('staff_competency_training')->insert([
+            $trainingId = $conn2->table('staff_competency_training')->insertGetId([
                 'emp_id' => $request->emp_id,
                 'position_id' => $request->position_id,
                 'competency_id' => $request->competency_id,
                 'training_id' => $request->training_id,
                 'training_title' => $request->training_title
             ]);
+
+            if($request->review_id){
+                $review = $conn2->table('staff_competency_review')
+                    ->where('id', $request->review_id)
+                    ->first();
+
+                $conn2->table('staff_training_review')->insert([
+                    'review_id' => $review->id,
+                    'training_id' => $trainingId,
+                ]);
+            }
 
             return redirect()->back()->with([
                 'status' => 'success',
@@ -2092,6 +2288,7 @@ class MyCgaController extends Controller
             'scih.compliance',
             'ci.proficiency',
             DB::raw("DATE_FORMAT(scih.date_created, '%M %d, %Y %h:%i:%s %p') as dateCreated"),
+            'scih.remarks'
         ])
         ->leftJoin('competency_indicator as ci', 'ci.id', '=', 'scih.indicator_id')
         ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id')

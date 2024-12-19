@@ -67,6 +67,7 @@ class ReviewCgaController extends Controller
             ->select([
                 'scr.id',
                 'scr.emp_id',
+                'scr.position_id',
                 DB::raw("DATE_FORMAT(date_created, '%M %d, %Y %h:%i:%s %p') as date_submitted"),
                 'scr.status',
                 'scr.acted_by',
