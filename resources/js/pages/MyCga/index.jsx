@@ -178,7 +178,7 @@ const MyCga = () => {
         <div className="min-h-screen flex flex-col gap-4">
             <PageTitle pageTitle="My CGA" breadcrumbItems={breadcrumbItems} />
             <div className="flex justify-between">
-            <span className="text-xs font-semibold">Note: <br/> If you submit this for review, you are subjecting the updates in competencies and proposed trainings for review of your supervisor.</span>
+            <span className="text-xs font-semibold">Note: <br/> If you submit this, you are subjecting the updates in competencies and proposed trainings for review and approval of your supervisor.</span>
             <AlertDialog open={isSaveUpdateOpen} onOpenChange={setIsSaveUpdateOpen}>
                 <AlertDialogTrigger asChild>
                     <Button size="sm" className="flex gap-2 w-fit">
