@@ -100,8 +100,6 @@ const Competencies = ({employees}) => {
         closeFilterModal
     } = useCompetencyReviewStore()
 
-    console.log(selectedCompetency)
-
     const {
         setToast: setTrainingsToast,
         trainingsState: { 
