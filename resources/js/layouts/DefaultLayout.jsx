@@ -3,7 +3,6 @@ import AuthenticatedLayout from "@/layouts/AuthenticatedLayout"
 import GuestLayout from "@/layouts/GuestLayout"
 import { TextSizeProvider } from "@/providers/TextSizeProvider"
 import { UserProvider } from "@/providers/UserProvider"
-import { CsrfProvider } from "@/providers/CsrfProvider"
 import { User } from 'lucide-react'
 
 const DefaultLayout = ({ children }) => {
@@ -11,7 +10,6 @@ const DefaultLayout = ({ children }) => {
     const user = usePage().props.auth.user
 
     return (
-        <CsrfProvider>
         <TextSizeProvider>
         {user ? (
             <UserProvider>
@@ -21,7 +19,6 @@ const DefaultLayout = ({ children }) => {
             <GuestLayout>{children}</GuestLayout>
         )}
         </TextSizeProvider>
-        </CsrfProvider>
     )
 }
 
