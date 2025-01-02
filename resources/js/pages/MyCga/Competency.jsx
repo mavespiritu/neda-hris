@@ -103,6 +103,11 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
     }
   }
 
+  const { post, setData } =  useForm({
+    compliance: false,
+    indicator_id: null
+  })
+
   const handleToggleChange = async (indicatorId, isChecked) => {
     
     const currentCompliance = compliances[indicatorId]?.compliance
@@ -114,34 +119,37 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
       [indicatorId]: { compliance: newCompliance }
     }))
 
+    setData(prev => ({
+        ...prev,
+        compliance: newCompliance, 
+        indicator_id: indicatorId
+    }))
+
     //Save the change to the server
     try {
-      const response = await fetch(`/my-cga/compliances/${emp_id}`, {
-        method: 'POST',
-        body: JSON.stringify({ compliance: newCompliance, indicator_id: indicatorId }),
+      post(`/my-cga/compliances/${emp_id}`, {
+        preserveState: true,
+        onSuccess: () => {
+          toast({
+            title: "Success!",
+            description: "The indicator compliance has been updated successfully",
+          })
+          
+          fetchCompetencies()
+        },
+        onError: () => {
+          toast({
+            title: "Uh oh! Something went wrong.",
+            description: "There was a problem updating your indicator compliance",
+          })
+
+          setCompliances(prev => ({
+            ...prev,
+            [indicatorId]: { compliance: currentCompliance }
+          }))
+        }
       })
-      if (!response.ok) {
 
-        toast({
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem updating your indicator compliance",
-        })
-
-        setCompliances(prev => ({
-          ...prev,
-          [indicatorId]: { compliance: currentCompliance } // Revert to previous state
-        }))
-
-      }else{
-        
-        toast({
-          title: "Success!",
-          description: "The indicator compliance has been updated successfully",
-        })
-
-        fetchCompetencies()
-
-      }
     } catch (err) {
       console.log(err)
       toast({
