@@ -60,6 +60,7 @@ class ReviewCgaController extends Controller
             if ($employee) {
                 $employeeIDs = $conn3->table('tblemployee')
                     ->where('division_id', $employee->division_id)
+                    ->where('work_status', 'active')
                     ->pluck('emp_id');
             }
         }
@@ -78,7 +79,7 @@ class ReviewCgaController extends Controller
             ])
             ->where('scr.emp_id', '<>', $user->ipms_id);
         
-        if (!$isHRRole && ($isADCRole || $isADCRole) && $employeeIDs->isNotEmpty()) {
+        if (!$isHRRole && ($isDCRole || $isADCRole) && $employeeIDs->isNotEmpty()) {
             $competencies->whereIn('scr.emp_id', $employeeIDs);
         }
 
