@@ -52,7 +52,7 @@ class ReviewCgaController extends Controller
         $isADCRole = $user->hasRole('HRIS_ADC');
         $employeeIDs = collect();
 
-        if (!$isHRRole && ($isADCRole || $isADCRole)) {
+        if (!$isHRRole && ($isDCRole || $isADCRole)) {
             $employee = $conn3->table('tblemployee')
                 ->where('emp_id', $user->ipms_id)
                 ->first();
