@@ -21,8 +21,6 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
 
   const { toast } = useToast()
 
-  const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-
   const [activeIndicator, setActiveIndicator] = useState(null)
   const [indicator, setIndicator] = useState(null)
   const [indicators, setIndicators] = useState([])
