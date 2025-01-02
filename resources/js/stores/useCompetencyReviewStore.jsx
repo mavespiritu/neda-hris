@@ -35,7 +35,8 @@ const useCompetencyReviewStore = create((set, get) => ({
         competencies: [],
         loading: true,
         isEndorsing: false,
-        isApproving: false
+        isApproving: false,
+        isDeleting: false
     },
     indicatorsState: {
         expandedRows: {},

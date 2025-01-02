@@ -135,7 +135,7 @@ const Competencies = ({employees}) => {
     const startIndex = useMemo(() => (currentPage - 1) * itemsPerPage + 1, [currentPage])
     const endIndex = useMemo(() => Math.min(startIndex + itemsPerPage - 1, total), [startIndex, total])
 
-    const { delete: destroy } = useForm()
+    const { delete: destroy, processing } = useForm()
 
     useEffect(() => {
         if(toast){
@@ -327,6 +327,25 @@ const Competencies = ({employees}) => {
         setIsApproveDialogOpen(false)
     }
 
+    const handleDeleteCompetency = async () => {
+        destroy(`/my-cga/delete-history/${selectedCompetency.id}`, {
+          preserveState: true,
+          onSuccess: () => {
+            toast({
+              title: "Success!",
+              description: "The submission has been deleted successfully",
+            })
+            
+            loadCompetencies()
+            setSelectedCompetency(null)
+    
+          },
+          onError: (e) => {
+            console.error(e)
+          },
+        })
+    }
+
     const sendEndorsementNotification = async () => {
         try {
             const response = await sendEmailForCgaEndorsement({review_id: selectedCompetency.id})
@@ -410,6 +429,30 @@ const Competencies = ({employees}) => {
                         </div>
                     </div>
                     <div className="flex flex-col gap-2">
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive">Delete Submission</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the submission.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDeleteCompetency} disabled={processing}>
+                                    {processing ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            <span>Please wait</span>
+                                        </>
+                                    ) : 'Proceed'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                     {selectedCompetency.status !== 'Approved' && canApproveCompetency ? (
                         <AlertDialog open={isApproveDialogOpen}>
                             <AlertDialogTrigger asChild>
