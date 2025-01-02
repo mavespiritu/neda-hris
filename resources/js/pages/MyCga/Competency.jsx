@@ -118,10 +118,6 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
     try {
       const response = await fetch(`/my-cga/compliances/${emp_id}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': csrfToken,
-        },
         body: JSON.stringify({ compliance: newCompliance, indicator_id: indicatorId }),
       })
       if (!response.ok) {
