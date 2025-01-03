@@ -135,8 +135,6 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
         }))
       }
     })
-
-    console.log(compliances)
   }, [data])
 
   const handleToggleChange = (indicatorId, isChecked) => {
