@@ -103,65 +103,52 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
     }
   }
 
-  const { post, setData } =  useForm({
-    compliance: false,
-    indicator_id: null
-  })
+  const { post, data, setData } = useForm()
 
-  const handleToggleChange = async (indicatorId, isChecked) => {
+  useEffect(() => {
+    //Save the change to the server
+    post(`/my-cga/compliances/${emp_id}`, {
+      preserveState: true,
+      onSuccess: () => {
+        toast({
+          title: "Success!",
+          description: "The indicator compliance has been updated successfully",
+        })
+
+        // Update local state
+        setCompliances(prev => ({
+          ...prev,
+          [data.indicator_id]: { compliance: data.compliance }
+        }))
+        
+        fetchCompetencies()
+      },
+      onError: () => {
+        toast({
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem updating your indicator compliance",
+        })
+
+        setCompliances(prev => ({
+          ...prev,
+          [data.indicator_id]: { compliance: !data.compliance }
+        }))
+      }
+    })
+
+    console.log(compliances)
+  }, [data])
+
+  const handleToggleChange = (indicatorId, isChecked) => {
     
     const currentCompliance = compliances[indicatorId]?.compliance
     const newCompliance = !currentCompliance
 
-    // Update local state
-    setCompliances(prev => ({
+    setData((prev) => ({
       ...prev,
-      [indicatorId]: { compliance: newCompliance }
+      compliance: newCompliance,
+      indicator_id: indicatorId,
     }))
-
-    setData(prev => ({
-        ...prev,
-        compliance: newCompliance, 
-        indicator_id: indicatorId
-    }))
-
-    //Save the change to the server
-    try {
-      post(`/my-cga/compliances/${emp_id}`, {
-        preserveState: true,
-        onSuccess: () => {
-          toast({
-            title: "Success!",
-            description: "The indicator compliance has been updated successfully",
-          })
-          
-          fetchCompetencies()
-        },
-        onError: () => {
-          toast({
-            title: "Uh oh! Something went wrong.",
-            description: "There was a problem updating your indicator compliance",
-          })
-
-          setCompliances(prev => ({
-            ...prev,
-            [indicatorId]: { compliance: currentCompliance }
-          }))
-        }
-      })
-
-    } catch (err) {
-      console.log(err)
-      toast({
-        title: "Uh oh! Something went wrong.",
-        description: "There was a problem updating your indicator compliance",
-      })
-
-      setCompliances(prev => ({
-        ...prev,
-        [indicatorId]: { compliance: currentCompliance }
-      }))
-    }
   }
 
   return (

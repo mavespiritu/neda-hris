@@ -596,7 +596,9 @@ class MyCgaController extends Controller
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
-        $position = $conn3->table('tblemp_emp_item as eei')
+        try{
+
+            $position = $conn3->table('tblemp_emp_item as eei')
             ->select([
                 'epi.*'
             ])
@@ -606,49 +608,64 @@ class MyCgaController extends Controller
             ->orderBy('eei.from_date', 'desc')
             ->first();
 
-        $allIndicator = $conn2->table('staff_all_indicator')
-        ->where('emp_id', $id)
-        ->where('indicator_id', $request->indicator_id)
-        ->first();
-
-        if(!$allIndicator){
-            $newIndicator = $conn2->table('staff_all_indicator')->insert([
-                'emp_id' => $id,
-                'indicator_id' => $request->indicator_id,
-                'compliance' => $request->compliance ? 1 : 0
-            ]);
-        }
-
-        $competencyIndicator = $conn2->table('staff_competency_indicator')
-        ->where('emp_id', $id)
-        ->where('position_id', $position->item_no)
-        ->where('indicator_id', $request->indicator_id)
-        ->first();
-
-        if(!$competencyIndicator){
-            $newCompetencyIndicator = $conn2->table('staff_competency_indicator')->insert([
-                'emp_id' => $id,
-                'position_id' => $position->item_no,
-                'indicator_id' => $request->indicator_id,
-                'compliance' => $request->compliance ? 1 : 0
-            ]);
-        }
-
-        $conn2->table('staff_competency_indicator')
+            $allIndicator = $conn2->table('staff_all_indicator')
             ->where('emp_id', $id)
-            ->where('indicator_id', $request->indicator_id)
+            ->where('indicator_id', $request->input('indicator_id'))
+            ->first();
+
+            if(!$allIndicator){
+                $newIndicator = $conn2->table('staff_all_indicator')->insert([
+                    'emp_id' => $id,
+                    'indicator_id' => $request->input('indicator_id'),
+                    'compliance' => $request->input('compliance') ? 1 : 0
+                ]);
+            }
+
+            $competencyIndicator = $conn2->table('staff_competency_indicator')
+            ->where('emp_id', $id)
+            ->where('position_id', $position->item_no)
+            ->where('indicator_id', $request->input('indicator_id'))
+            ->first();
+
+            if(!$competencyIndicator){
+                $newCompetencyIndicator = $conn2->table('staff_competency_indicator')->insert([
+                    'emp_id' => $id,
+                    'position_id' => $position->item_no,
+                    'indicator_id' => $request->input('indicator_id'),
+                    'compliance' => $request->input('compliance') ? 1 : 0
+                ]);
+            }
+
+            $conn2->table('staff_competency_indicator')
+            ->where('emp_id', $id)
+            ->where('indicator_id', $request->input('indicator_id'))
             ->update([
-                'compliance' => $request->compliance ? 1 : 0
+                'compliance' => $request->input('compliance') ? 1 : 0
             ]);
         
-        $conn2->table('staff_all_indicator')
+            $conn2->table('staff_all_indicator')
             ->where('emp_id', $id)
-            ->where('indicator_id', $request->indicator_id)
+            ->where('indicator_id', $request->input('indicator_id'))
             ->update([
-                'compliance' => $request->compliance ? 1 : 0
+                'compliance' => $request->input('compliance') ? 1 : 0
+            ]);
+    
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Indicator compliance updated successfully.'
             ]);
 
-        return redirect()->back()->with('message', 'Indicator compliance updated successfully.');
+        } catch (\Exception $e) {
+            Log::error('Failed to update compliance: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while updating compliance. Please try again.'
+            ]);
+        }    
+
     }
     
     public function showIndicator($id, Request $request)
