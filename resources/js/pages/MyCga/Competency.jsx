@@ -107,34 +107,37 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
 
   useEffect(() => {
     //Save the change to the server
-    post(`/my-cga/compliances/${emp_id}`, {
-      preserveState: true,
-      onSuccess: () => {
-        toast({
-          title: "Success!",
-          description: "The indicator compliance has been updated successfully",
-        })
-
-        // Update local state
-        setCompliances(prev => ({
-          ...prev,
-          [data.indicator_id]: { compliance: data.compliance }
-        }))
-        
-        fetchCompetencies()
-      },
-      onError: () => {
-        toast({
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem updating your indicator compliance",
-        })
-
-        setCompliances(prev => ({
-          ...prev,
-          [data.indicator_id]: { compliance: !data.compliance }
-        }))
-      }
-    })
+    if(Object.keys(data).length !== 0)
+    {
+      post(`/my-cga/compliances/${emp_id}`, {
+        preserveState: true,
+        onSuccess: () => {
+          toast({
+            title: "Success!",
+            description: "The indicator compliance has been updated successfully",
+          })
+  
+          // Update local state
+          setCompliances(prev => ({
+            ...prev,
+            [data.indicator_id]: { compliance: data.compliance }
+          }))
+          
+          fetchCompetencies()
+        },
+        onError: () => {
+          toast({
+            title: "Uh oh! Something went wrong.",
+            description: "There was a problem updating your indicator compliance",
+          })
+  
+          setCompliances(prev => ({
+            ...prev,
+            [data.indicator_id]: { compliance: !data.compliance }
+          }))
+        }
+      })
+    }
   }, [data])
 
   const handleToggleChange = (indicatorId, isChecked) => {

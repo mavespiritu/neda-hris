@@ -81,14 +81,8 @@ const AppSidebar = () => {
       ],
     },
     {
-      title: "Administrator",
-      url: "#",
-      icon: UserRoundCog,
-      roles: ['HRIS_Administrator']
-    },
-    {
       title: "Settings",
-      url: "#",
+      url: '/settings',
       icon: Cog,
       roles: ['HRIS_HR', 'HRIS_Administrator']
     },
@@ -112,36 +106,44 @@ const AppSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
             {items
-              .filter(isVisible)
-              .map((item) => {
-              const isActive = item.submenu?.some(subitem => url === subitem.url)
+            .filter(isVisible)
+            .map((item) => {
+              const isActive = item.submenu?.some(subitem => url === subitem.url);
               return (
                 <Collapsible key={item.title} className="group/collapsible" defaultOpen={isActive}>
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
+                    {item.submenu ? (
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton asChild>
+                          <div>
+                            <item.icon />
+                            <span className="font-medium text-sm">{item.title}</span>
+                            {item.submenu && (
+                              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                            )}
+                          </div>
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                    ) : (
                       <SidebarMenuButton asChild>
-                        <div>
+                        <Link href={item.url} className={`flex items-center gap-2 ${url === item.url ? 'bg-muted' : ''}`}>
                           <item.icon />
                           <span className="font-medium text-sm">{item.title}</span>
-                          {item.submenu && (
-                            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                          )}
-                        </div>
+                        </Link>
                       </SidebarMenuButton>
-                    </CollapsibleTrigger>
+                    )}
                     {item.submenu && (
                       <CollapsibleContent>
                         <SidebarMenuSub>
                           {item.submenu
                             .filter(isVisible)
                             .map((subitem) => (
-                            <SidebarMenuButton key={subitem.title} className={`font-medium ${url === subitem.url && 'bg-muted'}`}>
-                              <Link href={subitem.url}>
-                                <span>{subitem.title}</span>
-                              </Link>
-                            </SidebarMenuButton>
-                          ))}
-                          <SidebarMenuSubItem />
+                              <SidebarMenuButton key={subitem.title} className={`font-medium ${url === subitem.url ? 'bg-muted' : ''}`}>
+                                <Link href={subitem.url}>
+                                  <span>{subitem.title}</span>
+                                </Link>
+                              </SidebarMenuButton>
+                            ))}
                         </SidebarMenuSub>
                       </CollapsibleContent>
                     )}
