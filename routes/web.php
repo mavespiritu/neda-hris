@@ -12,6 +12,7 @@ use App\Http\Controllers\ReviewCgaController;
 use App\Http\Controllers\CompareCgaController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\SettingsController;
 
 /* Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -29,6 +30,7 @@ Route::get('/', function () {
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
     Route::get('/trainings/', [TrainingController::class, 'show'])->name('trainings.show');
+    Route::get('/settings/', [SettingsController::class, 'index'])->name('settings.index');
 });
 
 
@@ -49,3 +51,4 @@ require __DIR__ . '/staff-cga.php';
 require __DIR__ . '/compare-cga.php';
 require __DIR__ . '/employees.php';
 require __DIR__ . '/notifications.php';
+require __DIR__ . '/settings.php';

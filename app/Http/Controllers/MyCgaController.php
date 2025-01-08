@@ -1587,8 +1587,8 @@ class MyCgaController extends Controller
             'indicator_id' => $request->indicator_id,
             'title' => $request->title,
             'description' => $request->description,
-            'start_date' => Carbon::parse($request->start_date)->format('Y-m-d'),
-            'end_date' => Carbon::parse($request->end_date)->format('Y-m-d'),
+            'start_date' => Carbon::parse($request->start_date)->startOfDay()->addDay()->format('Y-m-d'),
+            'end_date' => Carbon::parse($request->end_date)->endOfDay()->addDay()->format('Y-m-d'),
             'reference' => 'Others'
         ]);
 
@@ -1653,8 +1653,8 @@ class MyCgaController extends Controller
             ->update([
                 'title' => $request->title,
                 'description' => $request->description,
-                'start_date' => Carbon::parse($request->start_date)->format('Y-m-d'),
-                'end_date' => Carbon::parse($request->end_date)->format('Y-m-d'),
+                'start_date' => Carbon::parse($request->start_date)->startOfDay()->addDay()->format('Y-m-d'),
+                'end_date' => Carbon::parse($request->end_date)->endOfDay()->addDay()->format('Y-m-d'),
             ]);
 
         if ($request->has('removedFiles')) {

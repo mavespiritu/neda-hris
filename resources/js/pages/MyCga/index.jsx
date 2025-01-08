@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 import { 
     sendEmailForCgaSubmission,
 } from '@/pages/MyCga/api'
+import useSettingsStore from '@/stores/useSettingsStore'
 
 const MyCga = () => {
 
@@ -174,17 +175,34 @@ const MyCga = () => {
         }
     }
 
+    const {
+        loadCgaEnableUpdatingDates
+      } = useSettingsStore()
+
+    useEffect(() => {
+        loadCgaEnableUpdatingDates()
+    }, [])
+
+    const { startDate, endDate } = useSettingsStore(state => state.competenciesState.enableUpdatingState)
+
+    const isWithinCgaEnableUpdatingDateRange = () => {
+        const currentDate = new Date()
+        return new Date(startDate) <= currentDate && new Date(endDate) >= currentDate
+    }
+
     return (
         <div className="min-h-screen flex flex-col gap-4">
-            <PageTitle pageTitle="My CGA" breadcrumbItems={breadcrumbItems} />
+            <PageTitle pageTitle="My CGA" description="Manage your competencies and CGA submissions" breadcrumbItems={breadcrumbItems} />
             <div className="flex justify-between">
-            <span className="text-xs font-semibold">Note: <br/> If you submit this, you are subjecting the updates in competencies and proposed trainings for review and approval of your supervisor.</span>
+            <span className="text-xs font-semibold">Note: <br/> If you submit this, you are presenting the updates in competencies and proposed trainings for review and approval of your supervisor.</span>
             <AlertDialog open={isSaveUpdateOpen} onOpenChange={setIsSaveUpdateOpen}>
                 <AlertDialogTrigger asChild>
-                    <Button size="sm" className="flex gap-2 w-fit">
-                        <Send className="size-4"/>
-                        Submit for Review 
-                    </Button>
+                    {isWithinCgaEnableUpdatingDateRange() && (
+                        <Button size="sm" className="flex gap-2 w-fit">
+                            <Send className="size-4"/>
+                            Submit for Review
+                        </Button>
+                    )}
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>

@@ -9,12 +9,15 @@ import {
     CardTitle,
   } from "@/components/ui/card"
 
-const PageTitle = ({pageTitle, breadcrumbItems}) => {
+const PageTitle = ({pageTitle, description, breadcrumbItems}) => {
   return (
     <>
     <Head title={pageTitle} />
     <div className="flex justify-between items-center mb-2">
-        <h1 className="text-normal font-semibold md:text-xl">{pageTitle}</h1>
+        <div className="flex flex-col">
+          <h1 className="text-normal font-semibold md:text-xl">{pageTitle}</h1>
+          <span className="text-sm">{description}</span>
+        </div>
         <Breadcrumbs
             className="md:hidden"
             items={breadcrumbItems}
