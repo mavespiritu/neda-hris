@@ -1817,7 +1817,7 @@ class MyCgaController extends Controller
         ->select(
             'sct.*',
             'competency.competency',
-            'sch.percentage',
+            //'sch.percentage',
             DB::raw("IF(sct.training_id IS NULL, sct.training_title, training.training_title) as title"),
             'scr.date_created'
         )
@@ -1825,10 +1825,10 @@ class MyCgaController extends Controller
         ->leftJoin('training', 'training.id', '=', 'sct.training_id')
         ->leftJoin('staff_training_review as str', 'str.training_id', '=', 'sct.id')
         ->leftJoin('staff_competency_review as scr', 'scr.id', '=', 'str.review_id')
-        ->leftJoin('staff_competency_history as sch', function($join) {
+        /* ->leftJoin('staff_competency_history as sch', function($join) {
             $join->on('sch.date_created', '=', 'scr.date_created')
                  ->on('sch.competency_id', '=', 'sct.competency_id');
-        })
+        }) */
         ->where('sct.emp_id', $id)
         ->orderBy('sct.id', 'desc');
 
