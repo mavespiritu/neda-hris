@@ -62,26 +62,24 @@ class RtoController extends Controller
         $employees = $employeesQuery->get();
 
         // Subquery: Get latest submission_history per RTO
-        $latestHistory = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RTO'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RTO'
-            ) as sh
-        ");
+        $latestHistory = DB::raw("(
+            SELECT sh1.*
+            FROM ".$conn2->getDatabaseName().".submission_history sh1
+            INNER JOIN (
+                SELECT model_id, MAX(date_acted) as latest_date
+                FROM ".$conn2->getDatabaseName().".submission_history
+                WHERE model = 'RTO'
+                GROUP BY model_id
+            ) sh2
+            ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
+            WHERE sh1.model = 'RTO'
+        ) as sh");
 
         // RTO with latest submission history
-        $targetsQuery = $conn2->table('flexi_rto as fr')
-            ->join($conn3->getDatabaseName().'.tblemployee as e', 'fr.emp_id', '=', 'e.emp_id')
-            ->leftJoin($latestHistory, 'sh.model_id', '=', 'fr.id')
-            ->leftJoin($conn3->getDatabaseName().'.tblemployee as emp', 'emp.emp_id', '=', 'sh.acted_by')
+        $targetsQuery = $conn2->table(DB::raw($conn2->getDatabaseName() . '.flexi_rto as fr'))
+            ->join(DB::raw($conn3->getDatabaseName() . '.tblemployee as e'), 'fr.emp_id', '=', 'e.emp_id')
+            ->leftJoin(DB::raw($latestHistory), 'sh.model_id', '=', 'fr.id')
+            ->leftJoin(DB::raw($conn3->getDatabaseName().'.tblemployee as emp'), 'emp.emp_id', '=', 'sh.acted_by')
             ->select([
                 'fr.*',
                 DB::raw('concat(e.lname, ", ", e.fname, " ", e.mname) as employee_name'),
