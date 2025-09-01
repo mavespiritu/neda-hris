@@ -27,175 +27,102 @@ class RtoController extends Controller
 {
     public function index(Request $request)
     {
-        $conn2 = DB::connection('mysql2');
-        $conn3 = DB::connection('mysql3');
+        $conn2 = DB::connection('mysql2'); // flexi_rto, flexi_target, submission_history
+        $conn3 = DB::connection('mysql3'); // tblemployee
 
         $sort      = $request->get('sort');
         $direction = $request->get('direction', 'asc');
         $search    = $request->input('search');
 
-        $sortable = [
-            'employee_name' => DB::raw('employee_name'),
-            'status'        => DB::raw('status'),       
-            'date'          => 'fr.date',               
-        ];
-
         $hasDCRole  = Auth::user()->hasRole('HRIS_DC');
         $hasADCRole = Auth::user()->hasRole('HRIS_ADC');
 
-        // Employees (for dropdown filter)
+        // Step 1: Get employees from mysql3
         $employeesQuery = $conn3->table('tblemployee')
-            ->select([
-                'emp_id',
-                DB::raw('concat(lname, ", ", fname, " ", mname) as name'),
-                'division_id',
-            ])
+            ->select(['emp_id', DB::raw('concat(lname, ", ", fname, " ", mname) as name'), 'division_id'])
             ->where('work_status', 'active')
-            ->orderBy('lname')
-            ->orderBy('fname')
-            ->orderBy('mname');
+            ->orderBy('lname')->orderBy('fname')->orderBy('mname');
 
         if ($hasDCRole || $hasADCRole) {
             $employeesQuery->where('division_id', auth()->user()->division);
         }
 
-        $employees = $employeesQuery->get();
+        $employees = $employeesQuery->get()->keyBy('emp_id'); // key by emp_id for fast lookup
 
-        // Subquery: Get latest submission_history per RTO
-        $latestHistory = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RTO'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RTO'
-            ) as sh
-        ");
-
-        // RTO with latest submission history
-        $targetsQuery = $conn2->table('flexi_rto as fr')
-            ->join($conn3->getDatabaseName().'.tblemployee as e', 'fr.emp_id', '=', 'e.emp_id')
-            ->leftJoin($latestHistory, 'sh.model_id', '=', 'fr.id')
-            ->leftJoin($conn3->getDatabaseName().'.tblemployee as emp', 'emp.emp_id', '=', 'sh.acted_by')
-            ->select([
-                'fr.*',
-                DB::raw('concat(e.lname, ", ", e.fname, " ", e.mname) as employee_name'),
-                'sh.status',
-                'sh.acted_by',
-                DB::raw('concat(emp.lname, ", ", emp.fname, " ", emp.mname) as acted_by_name'),
-                'sh.remarks',
-                'sh.date_acted',
-                // Use latestHistory for isLocked
-                DB::raw('(
-                    CASE 
-                        WHEN fr.emp_id = "'.auth()->user()->ipms_id.'" 
-                            AND (sh.status IS NULL OR sh.status NOT IN ("Endorsed", "Approved", "Disapproved", "Submitted"))
-                        THEN false
-                        ELSE true
-                    END
-                ) as isLocked'),
-            ]);
-
-        // Filters
-        if ($request->filled('emp_id')) {
-            $targetsQuery->where('fr.emp_id', $request->emp_id);
-        }
-
-        if ($request->filled('date')) {
-            $targetsQuery->whereDate('fr.date', Carbon::parse($request->date)->format('Y-m-d'));
-        }
-
-        // Global search
-        if ($search) {
-            $targetsQuery->where(function($query) use ($search, $conn2) {
-                // Employee name
-                $query->whereRaw("concat(e.lname, ', ', e.fname, ' ', e.mname) like ?", ["%{$search}%"]);
-
-                // Status
-                $query->orWhere('sh.status', 'like', "%{$search}%");
-
-                // Flexible date search (month names, year, day)
-                $query->orWhere(function($q) use ($search) {
-                    $q->whereRaw("DATE_FORMAT(fr.date, '%M %Y') like ?", ["%{$search}%"])
-                    ->orWhereRaw("DATE_FORMAT(fr.date, '%M') like ?", ["%{$search}%"])
-                    ->orWhereRaw("DATE_FORMAT(fr.date, '%Y') like ?", ["%{$search}%"])
-                    ->orWhereRaw("DATE_FORMAT(fr.date, '%d') like ?", ["%{$search}%"]);
-                });
-
-                // Target outputs (search each output via emp_id + date)
-                $query->orWhereIn('fr.id', function($sub) use ($search) {
-                    $sub->select('fr2.id')
-                        ->from('flexi_rto as fr2')
-                        ->join('flexi_target as fa', function($join) {
-                            $join->on('fa.rto_id', '=', 'fr2.id');
-                        })
-                        ->whereRaw("fa.output like ?", ["%{$search}%"]);
-                });
-            });
-        }
-
-        // Sorting
-        if ($sort && isset($sortable[$sort]) && in_array(strtolower($direction), ['asc', 'desc'])) {
-            $targetsQuery->orderBy($sortable[$sort], $direction);
-        } else {
-            $targetsQuery->orderBy('fr.date', 'desc')
-                        ->orderBy('employee_name', 'asc');
-        }
-
-        // Default employee filter if not DC/ADC
-        if (!$hasDCRole && !$hasADCRole) {
-            $targetsQuery->where('fr.emp_id', auth()->user()->ipms_id);
-        }
+        // Step 2: Get flexi_rto from mysql2
+        $targetsQuery = $conn2->table('flexi_rto')
+            ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
+            ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
+            ->orderBy('date', 'desc');
 
         $targets = $targetsQuery->paginate(20);
 
-        // Attach outputs
-        $targets->getCollection()->transform(function ($item) use ($conn2) {
-            $item->outputs = $conn2->table('flexi_target')
-                ->where('rto_id', $item->id)
-                ->select('id', 'output')
-                ->get();
+        $targetIds = $targets->pluck('id')->all();
+
+        // Step 3: Get submission_history for these targets
+        $histories = $conn2->table('submission_history')
+            ->where('model', 'RTO')
+            ->whereIn('model_id', $targetIds)
+            ->orderBy('date_acted', 'desc')
+            ->get()
+            ->groupBy('model_id'); // group by RTO id
+
+        // Step 4: Get flexi_target outputs
+        $outputs = $conn2->table('flexi_target')
+            ->whereIn('rto_id', $targetIds)
+            ->get()
+            ->groupBy('rto_id');
+
+        // Step 5: Merge all data in PHP
+        $targets->getCollection()->transform(function ($item) use ($employees, $histories, $outputs) {
+            $item->employee_name = $employees[$item->emp_id]->name ?? null;
+
+            $latestHistory = $histories[$item->id][0] ?? null;
+            if ($latestHistory) {
+                $item->status        = $latestHistory->status;
+                $item->acted_by      = $latestHistory->acted_by;
+                $item->acted_by_name = $employees[$latestHistory->acted_by]->name ?? null;
+                $item->remarks       = $latestHistory->remarks;
+                $item->date_acted    = $latestHistory->date_acted;
+            } else {
+                $item->status        = null;
+                $item->acted_by      = null;
+                $item->acted_by_name = null;
+                $item->remarks       = null;
+                $item->date_acted    = null;
+            }
+
+            $item->isLocked = !($item->emp_id == auth()->user()->ipms_id && (!$item->status || !in_array($item->status, ["Endorsed", "Approved", "Disapproved", "Submitted"])));
+
+            $item->outputs = $outputs[$item->id] ?? [];
+
             return $item;
         });
 
-        // Compute Fridays for date picker
+        // Step 6: Compute Fridays for date picker
         $fridays = [];
-        $now   = Carbon::now();
-        $year  = $now->year;
-        $month = $now->month;
-
+        $now = Carbon::now();
         $months = [
-            Carbon::createFromDate($year, $month, 1)->subMonth(),
-            Carbon::createFromDate($year, $month, 1),
-            Carbon::createFromDate($year, $month, 1)->addMonth(),
+            Carbon::createFromDate($now->year, $now->month, 1)->subMonth(),
+            Carbon::createFromDate($now->year, $now->month, 1),
+            Carbon::createFromDate($now->year, $now->month, 1)->addMonth(),
         ];
 
         foreach ($months as $monthDate) {
             $date = $monthDate->copy()->startOfMonth();
             $lastDay = $monthDate->copy()->endOfMonth();
-
             while ($date->lte($lastDay)) {
-                if ($date->isFriday()) {
-                    $fridays[] = $date->format('Y-m-d');
-                }
+                if ($date->isFriday()) $fridays[] = $date->format('Y-m-d');
                 $date->addDay();
             }
         }
 
         return Inertia::render('Dtr/Rto/index', [
             'data' => [
-                'employees' => $employees->map(fn ($emp) => [
-                    'value' => $emp->emp_id,
-                    'label' => $emp->name,
-                ]),
-                'dates'   => $fridays,
-                'targets' => $targets,
-                'filters' => $request->only(['employee', 'date', 'sort', 'direction', 'search']),
+                'employees' => $employees->map(fn($emp) => ['value' => $emp->emp_id, 'label' => $emp->name])->values(),
+                'dates'     => $fridays,
+                'targets'   => $targets,
+                'filters'   => $request->only(['employee', 'date', 'sort', 'direction', 'search']),
             ],
         ]);
     }
@@ -868,14 +795,6 @@ class RtoController extends Controller
         $conn3 = DB::connection('mysql3');
         $conn4 = DB::connection('mysql4');
 
-        $fullName = DB::raw("
-            CONCAT(
-                e.fname, ' ',
-                IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '. '), ''),
-                e.lname
-            ) AS name
-        ");
-
         $getSignature = function ($binary) {
             if (!$binary) return null;
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -884,23 +803,25 @@ class RtoController extends Controller
             return 'data:' . $mimeType . ';base64,' . base64_encode($binary);
         };
 
-        $rto = $conn2->table('flexi_rto as fr')
-        ->join($conn3->getDatabaseName() . '.tblemployee as e', 'fr.emp_id', '=', 'e.emp_id')
-        ->select([
-            'fr.*', $fullName, 'e.division_id', 'e.emp_id',
-        ])
-        ->where('fr.id', $id)
-        ->first();
-
+        // Fetch RTO record
+        $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
         if (!$rto) abort(404, 'RTO not found');
 
+        // Fetch employee info separately
+        $employee = $conn3->table('tblemployee')
+            ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+            ->where('emp_id', $rto->emp_id)
+            ->first();
 
+        $rto->name = $employee->name ?? null;
+        $rto->division_id   = $employee->division_id ?? null;
+
+        // Fetch outputs
         $outputs = $conn2->table('flexi_target')
-        ->where('rto_id', $rto->id)
-        ->select('id', 'output')
-        ->pluck('output');
+            ->where('rto_id', $rto->id)
+            ->pluck('output');
 
-        // Get current RAA status
+        // Current RTO status
         $currentStatus = $conn2->table('submission_history')
             ->where('model', 'RTO')
             ->where('model_id', $rto->id)
@@ -921,12 +842,12 @@ class RtoController extends Controller
         $supervisorEmpId = $endorser->acted_by ?? $dcUser->ipms_id ?? null;
 
         $supervisorInfo = $supervisorEmpId
-        ? $conn3->table('tblemployee as e')
-            ->select(['e.emp_id', $fullName, 'e.division_id'])
-            ->where('e.work_status', 'active')
-            ->where('e.emp_id', $supervisorEmpId)
-            ->first()
-        : null;
+            ? $conn3->table('tblemployee')
+                ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+                ->where('work_status', 'active')
+                ->where('emp_id', $supervisorEmpId)
+                ->first()
+            : null;
 
         $supervisorSignature = null;
         if ($supervisorEmpId && in_array($currentStatus, ['Endorsed', 'Approved'])) {
@@ -942,27 +863,29 @@ class RtoController extends Controller
             ->orderByDesc('date_acted')
             ->first();
 
-        $approverName = $approverInfo
-        ? $conn3->table('tblemployee as e')
-            ->select(['e.emp_id', $fullName, 'e.division_id'])
-            ->where(['e.emp_id' => $approverInfo->acted_by, 'e.work_status' => 'active'])
-            ->first()?->name
-        : $conn2->table('settings')->where('title', 'Agency Sub-Head')->value('value');
+        if ($approverInfo) {
+            $approverEmp = $conn3->table('tblemployee')
+                ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+                ->where('emp_id', $approverInfo->acted_by)
+                ->where('work_status', 'active')
+                ->first();
 
-        $approverPosition = $approverInfo
-        ? $conn3->table('tblemp_emp_item as eei')
-            ->leftJoin('tblemp_position_item as epi', 'eei.item_no', '=', 'epi.item_no')
-            ->leftJoin('tblposition as p', 'p.position_id', '=', 'epi.position_id')
-            ->where('eei.emp_id', $approverInfo->acted_by)
-            ->whereNull('eei.to_date')
-            ->orderByDesc('eei.from_date')
-            ->value('p.post_description')
-        : $conn2->table('settings')->where('title', 'Agency Sub-Head Position')->value('value');
+            $approverName = $approverEmp->name ?? null;
 
-        $approverSignature = null;
-        if ($approverInfo && $currentStatus === 'Approved') {
-            $approver = $conn4->table('users')->where('ipms_id', $approverInfo->acted_by)->first();
-            $approverSignature = $approver ? $getSignature($approver->signature) : null;
+            $approverPosition = $conn3->table('tblemp_emp_item as eei')
+                ->leftJoin('tblemp_position_item as epi', 'eei.item_no', '=', 'epi.item_no')
+                ->leftJoin('tblposition as p', 'p.position_id', '=', 'epi.position_id')
+                ->where('eei.emp_id', $approverInfo->acted_by)
+                ->whereNull('eei.to_date')
+                ->orderByDesc('eei.from_date')
+                ->value('p.post_description');
+
+            $approverSignature = $conn4->table('users')->where('ipms_id', $approverInfo->acted_by)->first();
+            $approverSignature = $approverSignature ? $getSignature($approverSignature->signature) : null;
+        } else {
+            $approverName     = $conn2->table('settings')->where('title', 'Agency Sub-Head')->value('value');
+            $approverPosition = $conn2->table('settings')->where('title', 'Agency Sub-Head Position')->value('value');
+            $approverSignature = null;
         }
 
         // -------------------
@@ -970,31 +893,30 @@ class RtoController extends Controller
         // -------------------
         $creator = $conn4->table('users')->where('ipms_id', $rto->emp_id)->first();
         $creatorSignature = $creator ? $getSignature($creator->signature) : null;
+
         $creatorPosition = $conn3->table('tblemp_emp_item as eei')
             ->leftJoin('tblemp_position_item as epi', 'eei.item_no', '=', 'epi.item_no')
             ->leftJoin('tblposition as p', 'p.position_id', '=', 'epi.position_id')
-            ->select([
-                'p.post_description as position'
-            ])
-            ->where('eei.emp_id', $rto->emp_id) 
+            ->select(['p.post_description as position'])
+            ->where('eei.emp_id', $rto->emp_id)
             ->whereNull('eei.to_date')
-            ->orderBy('eei.from_date', 'desc')
+            ->orderByDesc('eei.from_date')
             ->first();
 
         $today = now()->format('YmdHis');
         $rtoDate = Carbon::parse($rto->date)->format('F_d_Y');
-        
+
         $pdf = Pdf::loadView('reports.rto', [
-            'rto'       => $rto,
-            'position'  => $creatorPosition,
-            'outputs'   => $outputs,
-            'date'      => $today,
-            'supervisorName' => $supervisorInfo->name ?? '',
-            'approverName' => $approverName,
-            'approverPosition' => $approverPosition,
-            'creatorSignature' => $creatorSignature,
-            'supervisorSignature' => $supervisorSignature,
-            'approverSignature' => $approverSignature,
+            'rto'                => $rto,
+            'position'           => $creatorPosition,
+            'outputs'            => $outputs,
+            'date'               => $today,
+            'supervisorName'     => $supervisorInfo->name ?? '',
+            'approverName'       => $approverName,
+            'approverPosition'   => $approverPosition,
+            'creatorSignature'   => $creatorSignature,
+            'supervisorSignature'=> $supervisorSignature,
+            'approverSignature'  => $approverSignature,
         ]);
 
         return $pdf->download("{$today}_RTO_{$rtoDate}.pdf");

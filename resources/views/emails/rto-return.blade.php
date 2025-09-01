@@ -1,5 +1,5 @@
 @component('mail::message')
-# RTO Disapproval
+# RTO Needs Revision
 
 You are receiving this email because {{ $senderName }} has returned your submitted RTO for revision.
 

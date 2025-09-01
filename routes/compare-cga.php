@@ -15,6 +15,6 @@ use App\Http\Controllers\NotificationController;
 
 Route::middleware(['web', 'auth.any'])->group(function () {
     Route::get('/compare-cga', [CompareCgaController::class, 'index'])->name('compare-cga');
-    Route::get('/compare-cga/compare/', [CompareCgaController::class, 'showComparison'])->name('compare-cga.show-comparison');
+    Route::get('/compare-cga/compare', [CompareCgaController::class, 'showComparison'])->name('compare-cga.show-comparison');
     Route::get('/compare-cga/compare/competency/{id}', [CompareCgaController::class, 'showComparisonIndicators'])->name('compare-cga.show-comparison-indicators');
 });

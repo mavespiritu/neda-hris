@@ -42,7 +42,6 @@ import {
 } from 'lucide-react'
 
 import { parse, format, isValid } from 'date-fns'
-import { flexRender } from "@tanstack/react-table"
 import { cn } from "@/lib/utils"
 import { useTable } from '@/hooks/useTable'
 import { formatDateWithTime } from "@/lib/utils.jsx"

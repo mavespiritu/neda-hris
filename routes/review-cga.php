@@ -17,7 +17,7 @@ Route::middleware(['web', 'auth.any'])->group(function () {
     Route::get('/review-cga', [ReviewCgaController::class, 'index'])->name('review-cga');
 
     Route::get('/review-cga/evidences', [ReviewCgaController::class, 'showEvidences'])->name('review-cga.show-evidences');
-    Route::get('/review-cga/competencies/', [ReviewCgaController::class, 'showCompetencies'])->name('review-cga.show-competencies');
+    Route::get('/review-cga/competencies', [ReviewCgaController::class, 'showCompetencies'])->name('review-cga.show-competencies');
     Route::post('/review-cga/evidences/approve/{id}', [ReviewCgaController::class, 'approveEvidence'])->name('review-cga.approve-evidences');
     Route::post('/review-cga/evidences/disapprove/{id}', [ReviewCgaController::class, 'disapproveEvidence'])->name('review-cga.disapprove-evidences');
     Route::get('/review-cga/competencies-for-review/', [ReviewCgaController::class, 'showCompetenciesForReview'])->name('review-cga.show-competencies-for-review');

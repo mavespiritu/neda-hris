@@ -61,62 +61,26 @@ class RaaController extends Controller
 
         $employees = $employeesQuery->get();
 
-        // Subquery: Get latest submission_history per RTO
-        $latestHistoryRTO = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RTO'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RTO'
-            ) as sh_rto
-        ");
+        // Latest submission_history subqueries (same as before)
+        $latestHistoryRTO = DB::raw("(SELECT sh1.* FROM submission_history sh1 INNER JOIN (SELECT model_id, MAX(date_acted) as latest_date FROM submission_history WHERE model = 'RTO' GROUP BY model_id) sh2 ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date WHERE sh1.model = 'RTO') as sh_rto");
 
-        // Subquery: Get latest submission_history per RAA
-        $latestHistoryRAA = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RAA'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RAA'
-            ) as sh_raa
-        ");
+        $latestHistoryRAA = DB::raw("(SELECT sh1.* FROM submission_history sh1 INNER JOIN (SELECT model_id, MAX(date_acted) as latest_date FROM submission_history WHERE model = 'RAA' GROUP BY model_id) sh2 ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date WHERE sh1.model = 'RAA') as sh_raa");
 
-        // RTO with latest submission history
+        // Step 1: Fetch RTOs + RAA + latest submission history from mysql2
         $targetsQuery = $conn2->table('flexi_rto as rto')
-            ->join($conn3->getDatabaseName().'.tblemployee as e', 'rto.emp_id', '=', 'e.emp_id')
             ->leftJoin($latestHistoryRTO, 'sh_rto.model_id', '=', 'rto.id')
             ->leftJoin($conn2->getDatabaseName().'.flexi_raa as raa', 'raa.rto_id', '=', 'rto.id')
             ->leftJoin($latestHistoryRAA, 'sh_raa.model_id', '=', 'raa.id')
-            ->leftJoin($conn3->getDatabaseName().'.tblemployee as empRto', 'empRto.emp_id', '=', 'sh_rto.acted_by')
-            ->leftJoin($conn3->getDatabaseName().'.tblemployee as empRaa', 'empRaa.emp_id', '=', 'sh_raa.acted_by')
             ->select([
                 'rto.*',
-                DB::raw('concat(e.lname, ", ", e.fname, " ", e.mname) as employee_name'),
-                // RTO fields
                 'sh_rto.status as rto_status',
                 'sh_rto.acted_by as rto_acted_by',
-                DB::raw('concat(empRto.lname, ", ", empRto.fname, " ", empRto.mname) as rto_acted_by_name'),
                 'sh_rto.remarks as rto_remarks',
                 'sh_rto.date_acted as rto_date_acted',
-                // RAO fields
                 'sh_raa.status as raa_status',
                 'sh_raa.acted_by as raa_acted_by',
-                DB::raw('concat(empRaa.lname, ", ", empRaa.fname, " ", empRaa.mname) as raa_acted_by_name'),
                 'sh_raa.remarks as raa_remarks',
                 'sh_raa.date_acted as raa_date_acted',
-                // Use latestHistory for isLocked
                 DB::raw('(
                     CASE 
                         WHEN rto.emp_id = "'.auth()->user()->ipms_id.'" 
@@ -131,37 +95,19 @@ class RaaController extends Controller
         if ($request->filled('emp_id')) {
             $targetsQuery->where('rto.emp_id', $request->emp_id);
         }
-
         if ($request->filled('date')) {
             $targetsQuery->whereDate('rto.date', Carbon::parse($request->date)->format('Y-m-d'));
         }
-
-        // Global search
         if ($search) {
-            $targetsQuery->where(function($query) use ($search, $conn2) {
-                // Employee name
-                $query->whereRaw("concat(e.lname, ', ', e.fname, ' ', e.mname) like ?", ["%{$search}%"]);
-
-                // Status
-                $query->orWhere('sh_raa.status', 'like', "%{$search}%");
-
-                // Flexible date search (month names, year, day)
-                $query->orWhere(function($q) use ($search) {
-                    $q->whereRaw("DATE_FORMAT(rto.date, '%M %Y') like ?", ["%{$search}%"])
-                    ->orWhereRaw("DATE_FORMAT(rto.date, '%M') like ?", ["%{$search}%"])
-                    ->orWhereRaw("DATE_FORMAT(rto.date, '%Y') like ?", ["%{$search}%"])
-                    ->orWhereRaw("DATE_FORMAT(rto.date, '%d') like ?", ["%{$search}%"]);
-                });
-
-                // Target outputs (search each output via emp_id + date)
-                $query->orWhereIn('rto.id', function($sub) use ($search) {
-                    $sub->select('rto2.id')
-                        ->from('flexi_rto as rto2')
-                        ->join('flexi_target as ft', function($join) {
-                            $join->on('ft.rto_id', '=', 'rto2.id');
-                        })
-                        ->whereRaw("ft.output like ?", ["%{$search}%"]);
-                });
+            $targetsQuery->where(function($query) use ($search) {
+                $query->where('sh_raa.status', 'like', "%{$search}%")
+                    ->orWhereRaw("DATE_FORMAT(rto.date, '%M %Y') like ?", ["%{$search}%"])
+                    ->orWhereIn('rto.id', function($sub) use ($search) {
+                        $sub->select('rto2.id')
+                            ->from('flexi_rto as rto2')
+                            ->join('flexi_target as ft', 'ft.rto_id', '=', 'rto2.id')
+                            ->whereRaw("ft.output like ?", ["%{$search}%"]);
+                    });
             });
         }
 
@@ -169,11 +115,9 @@ class RaaController extends Controller
         if ($sort && isset($sortable[$sort]) && in_array(strtolower($direction), ['asc', 'desc'])) {
             $targetsQuery->orderBy($sortable[$sort], $direction);
         } else {
-            $targetsQuery->orderBy('rto.date', 'desc')
-                        ->orderBy('employee_name', 'asc');
+            $targetsQuery->orderBy('rto.date', 'desc');
         }
 
-        // Default employee filter if not DC/ADC
         if (!$hasDCRole && !$hasADCRole) {
             $targetsQuery->where('rto.emp_id', auth()->user()->ipms_id);
         }
@@ -181,8 +125,31 @@ class RaaController extends Controller
         $targetsQuery->where('sh_rto.status', 'Approved');
         $targets = $targetsQuery->paginate(20);
 
-        // Attach outputs + accomplishments
-        $targets->getCollection()->transform(function ($item) use ($conn2) {
+        // Step 2: Collect all employee IDs needed for mapping
+        $empIds = collect();
+        foreach ($targets->items() as $item) {
+            $empIds->push($item->emp_id, $item->rto_acted_by, $item->raa_acted_by);
+        }
+        $empIds = $empIds->filter()->unique();
+
+        // Step 3: Fetch employees from mysql3
+        $employeesMap = $conn3->table('tblemployee')
+            ->whereIn('emp_id', $empIds)
+            ->get()
+            ->keyBy('emp_id');
+
+        // Step 4: Map employees back to targets
+        $targets->getCollection()->transform(function ($item) use ($employeesMap, $conn2) {
+            $emp = $employeesMap[$item->emp_id] ?? null;
+            $item->employee_name = $emp ? "{$emp->lname}, {$emp->fname} {$emp->mname}" : null;
+
+            $rtoActor = $employeesMap[$item->rto_acted_by] ?? null;
+            $item->rto_acted_by_name = $rtoActor ? "{$rtoActor->lname}, {$rtoActor->fname} {$rtoActor->mname}" : null;
+
+            $raaActor = $employeesMap[$item->raa_acted_by] ?? null;
+            $item->raa_acted_by_name = $raaActor ? "{$raaActor->lname}, {$raaActor->fname} {$raaActor->mname}" : null;
+
+            // Attach outputs + accomplishments
             $item->outputs = $conn2->table('flexi_target')
                 ->where('rto_id', $item->id)
                 ->select('id', 'output')
@@ -193,54 +160,39 @@ class RaaController extends Controller
                         ->select('id', 'accomplishment', 'remarks')
                         ->get()
                         ->map(function ($acc) use ($conn2) {
-                            // Fetch related files
                             $files = $conn2->table('file')
-                                ->where([
-                                    'model' => 'RAA',
-                                    'itemId' => $acc->id,
-                                ])
+                                ->where(['model' => 'RAA', 'itemId' => $acc->id])
                                 ->get()
-                                ->map(function ($file) {
-                                    return [
-                                        'id'   => $file->id,
-                                        'filename' => $file->name,
-                                        'type' => $file->type,
-                                        'hash' => $file->hash,
-                                        'size' => $file->size,
-                                        'path'  => route('files.download', $file->id), 
-                                    ];
-                                });
-
+                                ->map(fn($file) => [
+                                    'id' => $file->id,
+                                    'filename' => $file->name,
+                                    'type' => $file->type,
+                                    'hash' => $file->hash,
+                                    'size' => $file->size,
+                                    'path' => route('files.download', $file->id),
+                                ]);
                             $acc->files = $files;
                             return $acc;
                         });
-
                     return $output;
                 });
 
             return $item;
         });
 
-        // Compute Fridays for date picker
+        // Compute Fridays (same as before)
         $fridays = [];
         $now   = Carbon::now();
-        $year  = $now->year;
-        $month = $now->month;
-
         $months = [
-            Carbon::createFromDate($year, $month, 1)->subMonth(),
-            Carbon::createFromDate($year, $month, 1),
-            Carbon::createFromDate($year, $month, 1)->addMonth(),
+            Carbon::createFromDate($now->year, $now->month, 1)->subMonth(),
+            Carbon::createFromDate($now->year, $now->month, 1),
+            Carbon::createFromDate($now->year, $now->month, 1)->addMonth(),
         ];
-
         foreach ($months as $monthDate) {
             $date = $monthDate->copy()->startOfMonth();
             $lastDay = $monthDate->copy()->endOfMonth();
-
             while ($date->lte($lastDay)) {
-                if ($date->isFriday()) {
-                    $fridays[] = $date->format('Y-m-d');
-                }
+                if ($date->isFriday()) $fridays[] = $date->format('Y-m-d');
                 $date->addDay();
             }
         }
@@ -263,59 +215,53 @@ class RaaController extends Controller
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
-        // Subquery: Get latest submission_history per RTO
-        $latestHistoryRTO = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RTO'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RTO'
-            ) as sh_rto
-        ");
+        // Latest submission_history subqueries
+        $latestHistoryRTO = DB::raw("(
+            SELECT sh1.*
+            FROM submission_history sh1
+            INNER JOIN (
+                SELECT model_id, MAX(date_acted) as latest_date
+                FROM submission_history
+                WHERE model = 'RTO'
+                GROUP BY model_id
+            ) sh2
+            ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
+            WHERE sh1.model = 'RTO'
+        ) as sh_rto");
 
-        // Subquery: Get latest submission_history per RAA
-        $latestHistoryRAA = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RAA'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RAA'
-            ) as sh_raa
-        ");
+        $latestHistoryRAA = DB::raw("(
+            SELECT sh1.*
+            FROM submission_history sh1
+            INNER JOIN (
+                SELECT model_id, MAX(date_acted) as latest_date
+                FROM submission_history
+                WHERE model = 'RAA'
+                GROUP BY model_id
+            ) sh2
+            ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
+            WHERE sh1.model = 'RAA'
+        ) as sh_raa");
 
-        // Main query (patterned from index)
+        // Main query
         $target = $conn2->table('flexi_rto as rto')
-            ->join($conn3->getDatabaseName().'.tblemployee as e', 'rto.emp_id', '=', 'e.emp_id')
+            // Removed cross-connection joins
+            // ->join($conn3->getDatabaseName().'.tblemployee as e', 'rto.emp_id', '=', 'e.emp_id')
             ->leftJoin($latestHistoryRTO, 'sh_rto.model_id', '=', 'rto.id')
             ->leftJoin($conn2->getDatabaseName().'.flexi_raa as raa', 'raa.rto_id', '=', 'rto.id')
             ->leftJoin($latestHistoryRAA, 'sh_raa.model_id', '=', 'raa.id')
-            ->leftJoin($conn3->getDatabaseName().'.tblemployee as empRto', 'empRto.emp_id', '=', 'sh_rto.acted_by')
-            ->leftJoin($conn3->getDatabaseName().'.tblemployee as empRaa', 'empRaa.emp_id', '=', 'sh_raa.acted_by')
+            // ->leftJoin($conn3->getDatabaseName().'.tblemployee as empRto', 'empRto.emp_id', '=', 'sh_rto.acted_by')
+            // ->leftJoin($conn3->getDatabaseName().'.tblemployee as empRaa', 'empRaa.emp_id', '=', 'sh_raa.acted_by')
             ->select([
                 'rto.*',
-                DB::raw('concat(e.lname, ", ", e.fname, " ", e.mname) as employee_name'),
+                // Employee fields removed because cross-connection join is gone
                 // RTO fields
                 'sh_rto.status as rto_status',
                 'sh_rto.acted_by as rto_acted_by',
-                DB::raw('concat(empRto.lname, ", ", empRto.fname, " ", empRto.mname) as rto_acted_by_name'),
                 'sh_rto.remarks as rto_remarks',
                 'sh_rto.date_acted as rto_date_acted',
                 // RAA fields
                 'sh_raa.status as raa_status',
                 'sh_raa.acted_by as raa_acted_by',
-                DB::raw('concat(empRaa.lname, ", ", empRaa.fname, " ", empRaa.mname) as raa_acted_by_name'),
                 'sh_raa.remarks as raa_remarks',
                 'sh_raa.date_acted as raa_date_acted',
                 // isLocked logic
@@ -335,38 +281,36 @@ class RaaController extends Controller
             abort(404, 'Record not found.');
         }
 
+        // The rest of your logic (outputs, accomplishments, files) remains **unchanged**
         $outputs = $conn2->table('flexi_target')
-        ->where('rto_id', $target->id)
-        ->select('id', 'output')
-        ->get();
+            ->where('rto_id', $target->id)
+            ->select('id', 'output')
+            ->get();
 
         $outputIds = $outputs->pluck('id');
 
         $accomplishments = $conn2->table('flexi_accomplishment')
-        ->whereIn('target_id', $outputIds)
-        ->select('id', 'accomplishment', 'remarks', 'rto_id', 'raa_id', 'target_id')
-        ->get();
+            ->whereIn('target_id', $outputIds)
+            ->select('id', 'accomplishment', 'remarks', 'rto_id', 'raa_id', 'target_id')
+            ->get();
 
         $accomplishmentIds = $accomplishments->pluck('id');
 
         $files = $conn2->table('file')
-        ->where('model', 'RAA')
-        ->whereIn('itemId', $accomplishmentIds)
-        ->select('id', 'itemId', 'path', 'name')
-        ->get();
+            ->where('model', 'RAA')
+            ->whereIn('itemId', $accomplishmentIds)
+            ->select('id', 'itemId', 'path', 'name')
+            ->get();
 
         $accomplishmentsByTarget = $accomplishments->groupBy('target_id');
-
         $filesByAcc = $files->groupBy('itemId');
 
         foreach ($outputs as $output) {
             $accs = $accomplishmentsByTarget->get($output->id, collect());
-
             foreach ($accs as $acc) {
                 $acc->files = $filesByAcc->get($acc->id, collect());
                 $acc->removedFiles = [];
             }
-
             $output->accomplishments = $accs;
         }
 

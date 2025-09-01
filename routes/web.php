@@ -36,7 +36,7 @@ Route::get('/jobs/{id}', fn () => Inertia::render('JobDetails'));
 
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
-    Route::get('/settings/', [SettingsController::class, 'index'])->name('settings.index');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
 });
 
 
