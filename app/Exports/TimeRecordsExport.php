@@ -26,46 +26,60 @@ class TimeRecordsExport implements FromCollection, WithHeadings, WithEvents
     {
         $conn3 = DB::connection('mysql3');
 
-        $fullName = DB::raw("
-            CONCAT(
-                e.lname, ', ',
-                e.fname, ' ',
-                IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')
-            ) AS name
-        ");
+        $date = $this->date;
 
-        return $conn3->table('tblactual_dtr as d')
+        return $conn3->table('tblemployee as e')
             ->select(
                 'e.division_id as division',
-                $fullName,
-                DB::raw("MAX(CASE WHEN d.time = 'AM' THEN TIME(d.time_in) END) as am_time_in"),
-                DB::raw("MAX(CASE WHEN d.time = 'AM' THEN TIME(d.time_out) END) as am_time_out"),
-                DB::raw("MAX(CASE WHEN d.time = 'PM' THEN TIME(d.time_in) END) as pm_time_in"),
-                DB::raw("MAX(CASE WHEN d.time = 'PM' THEN TIME(d.time_out) END) as pm_time_out"),
+                DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')) as name"),
+                DB::raw('TIME(am.time_in) as am_time_in'),
+                DB::raw('TIME(am.time_out) as am_time_out'),
+                DB::raw('TIME(pm.time_in) as pm_time_in'),
+                DB::raw('TIME(pm.time_out) as pm_time_out'),
                 DB::raw("
-                    (
-                        SUM(
-                            GREATEST(
-                                0,
-                                TIMESTAMPDIFF(
-                                    SECOND,
-                                    d.time_in,
-                                    d.time_out
-                                )
+                    SEC_TO_TIME(
+                        GREATEST(
+                            0,
+                            TIMESTAMPDIFF(
+                                SECOND,
+                                am.time_in,
+                                CASE WHEN TIME(am.time_out) > '12:00:00' THEN CONCAT(DATE(am.time_out),' 12:00:00') ELSE am.time_out END
+                            )
+                            +
+                            TIMESTAMPDIFF(
+                                SECOND,
+                                CASE WHEN TIME(pm.time_in) < '13:00:00' THEN CONCAT(DATE(pm.time_in),' 13:00:00') ELSE pm.time_in END,
+                                pm.time_out
                             )
                         )
-                        - 3600
-                    ) / 3600 as total_hours
+                    ) AS total_hours
                 ")
             )
-            ->leftJoin('tblemployee as e', 'e.emp_id', '=', 'd.emp_id')
-            ->join('tblemp_dtr_type as dt', function ($join) {
-                $join->on('dt.emp_id', '=', 'd.emp_id')
-                    ->on('dt.date', '=', 'd.date');
+            ->leftJoinSub(function($query) use ($date) {
+                $query->from('tblactual_dtr')
+                    ->select(
+                        'emp_id', 
+                        'time_in', 
+                        'time_out'
+                    )
+                    ->where('time', 'AM')
+                    ->whereDate('date', $date);
+            }, 'am', function($join){
+                $join->on('am.emp_id', '=', 'e.emp_id');
             })
-            ->where('dt.dtr_id', 'FLEXIPLACE')
-            ->whereDate('d.date', $this->date)
-            ->groupBy('d.emp_id', 'd.date')
+            ->leftJoinSub(function($query) use ($date) {
+                $query->from('tblactual_dtr')
+                    ->select(
+                        'emp_id', 
+                        'time_in', 
+                        'time_out'
+                    )
+                    ->where('time', 'PM')
+                    ->whereDate('date', $date);
+            }, 'pm', function($join){
+                $join->on('pm.emp_id', '=', 'e.emp_id');
+            })
+            ->where('e.work_status', 'active')
             ->orderBy('e.division_id')
             ->orderBy('e.lname')
             ->orderBy('e.fname')

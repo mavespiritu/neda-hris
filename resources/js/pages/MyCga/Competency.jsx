@@ -204,14 +204,12 @@ const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, c
                               checked={compliances[indicator.indicator_id]?.compliance || false}
                               onCheckedChange={(isChecked) => handleToggleChange(indicator.indicator_id, isChecked)}
                             />
-                            <Link
-                              preserveState
-                              preserveScroll
+                            <span
                               className="text-xs hover:underline break-normal"
                               onClick={() => handleIndicatorClick(indicator.indicator_id, proficiency)}
                             >
                               {indicator.indicator}
-                            </Link>
+                            </span>
                           </div>
                         </li>
                       ))}

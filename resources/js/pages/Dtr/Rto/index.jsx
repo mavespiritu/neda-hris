@@ -53,8 +53,6 @@ const Rto = () => {
 
     const { auth: { user }, data: { targets, employees, dates } } = usePage().props
 
-    console.log(usePage().props)
-
     const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
 
     const [confirmAction, setConfirmAction] = useState(null)

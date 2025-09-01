@@ -20,56 +20,66 @@ class ReportController extends Controller
 
     public function timeRecords(Request $request)
     {
-        $conn2 = DB::connection('mysql2'); 
         $conn3 = DB::connection('mysql3');
-
         $date = $request->date ? Carbon::parse($request->date)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
 
-        $fullName = DB::raw("
-            CONCAT(
-                e.lname, ', ',
-                e.fname, ' ',
-                IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')
-            ) AS name
-        ");
-
-        $timeRecords = $conn3->table('tblactual_dtr as d')
-        ->select(
-            'e.division_id as division',
-            $fullName,
-            DB::raw("MAX(CASE WHEN d.time = 'AM' THEN TIME(d.time_in) END) as am_time_in"),
-            DB::raw("MAX(CASE WHEN d.time = 'AM' THEN TIME(d.time_out) END) as am_time_out"),
-            DB::raw("MAX(CASE WHEN d.time = 'PM' THEN TIME(d.time_in) END) as pm_time_in"),
-            DB::raw("MAX(CASE WHEN d.time = 'PM' THEN TIME(d.time_out) END) as pm_time_out"),
-            DB::raw("
-                (
-                    SUM(
+        $timeRecords = $conn3->table('tblemployee as e')
+            ->select(
+                'e.division_id as division',
+                DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')) as name"),
+                DB::raw('TIME(am.time_in) as am_time_in'),
+                DB::raw('TIME(am.time_out) as am_time_out'),
+                DB::raw('TIME(pm.time_in) as pm_time_in'),
+                DB::raw('TIME(pm.time_out) as pm_time_out'),
+                DB::raw("
+                    SEC_TO_TIME(
                         GREATEST(
                             0,
                             TIMESTAMPDIFF(
                                 SECOND,
-                                d.time_in,
-                                d.time_out
+                                am.time_in,
+                                CASE WHEN TIME(am.time_out) > '12:00:00' THEN CONCAT(DATE(am.time_out),' 12:00:00') ELSE am.time_out END
+                            )
+                            +
+                            TIMESTAMPDIFF(
+                                SECOND,
+                                CASE WHEN TIME(pm.time_in) < '13:00:00' THEN CONCAT(DATE(pm.time_in),' 13:00:00') ELSE pm.time_in END,
+                                pm.time_out
                             )
                         )
+                    ) AS total_hours
+                ")
+            )
+            ->leftJoinSub(function($query) use ($date) {
+                $query->from('tblactual_dtr')
+                    ->select(
+                        'emp_id', 
+                        'time_in', 
+                        'time_out'
                     )
-                    - 3600
-                ) / 3600 as total_hours
-            ")
-        )
-        ->leftJoin('tblemployee as e', 'e.emp_id', '=', 'd.emp_id')
-        ->join('tblemp_dtr_type as dt', function ($join) {
-            $join->on('dt.emp_id', '=', 'd.emp_id')
-                 ->on('dt.date', '=', 'd.date');
-        })
-        ->where('dt.dtr_id', 'FLEXIPLACE')
-        ->whereDate('d.date', $date)
-        ->groupBy('d.emp_id', 'd.date')
-        ->orderBy('e.division_id')
-        ->orderBy('e.lname')
-        ->orderBy('e.fname')
-        ->orderBy('e.mname')
-        ->get();
+                    ->where('time', 'AM')
+                    ->whereDate('date', $date);
+            }, 'am', function($join){
+                $join->on('am.emp_id', '=', 'e.emp_id');
+            })
+            ->leftJoinSub(function($query) use ($date) {
+                $query->from('tblactual_dtr')
+                    ->select(
+                        'emp_id', 
+                        'time_in', 
+                        'time_out'
+                    )
+                    ->where('time', 'PM')
+                    ->whereDate('date', $date);
+            }, 'pm', function($join){
+                $join->on('pm.emp_id', '=', 'e.emp_id');
+            })
+            ->where('e.work_status', 'active')
+            ->orderBy('e.division_id')
+            ->orderBy('e.lname')
+            ->orderBy('e.fname')
+            ->orderBy('e.mname')
+            ->get();
 
         return response()->json([
             'data' => [
@@ -77,46 +87,6 @@ class ReportController extends Controller
             ]
         ]);
     }
-
-    /* public function timeRecords(Request $request)
-    {
-        $conn2 = DB::connection('mysql2'); 
-        $conn3 = DB::connection('mysql3');
-
-        $date = $request->date ? Carbon::parse($request->date)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
-
-        $fullName = DB::raw("
-            CONCAT(
-                e.lname, ', ',
-                e.fname, ' ',
-                IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')
-            ) AS name
-        ");
-
-        $timeRecords = $conn3->table('tblemp_dtr_type as d')
-        ->select(
-            'e.division_id as division',
-            $fullName,
-            'd.am_in',
-            'd.am_out',
-            'd.pm_in',
-            'd.pm_out',
-            'total_with_pass_slip as total_hours'
-        )
-        ->leftJoin('tblemployee as e', 'e.emp_id', '=', 'd.emp_id')
-        ->whereDate('d.date', $date)
-        ->orderBy('e.division_id')
-        ->orderBy('e.lname')
-        ->orderBy('e.fname')
-        ->orderBy('e.mname')
-        ->get();
-
-        return response()->json([
-            'data' => [
-                'timeRecords' => $timeRecords
-            ]
-        ]);
-    } */
 
     public function exportTimeRecords(Request $request)
     {

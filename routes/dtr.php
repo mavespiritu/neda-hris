@@ -78,6 +78,6 @@ Route::middleware(['web'])->group(function () {
     ->middleware('signed');
 
     Route::get('/fwa/schedule/{key}', [ScheduleController::class, 'indexPublic'])
-    ->where('key', env('PUBLIC_FWA_KEY'));
+    ->where('key', config('fwa.public_key'));
 
 });

@@ -1,5 +1,5 @@
 @component('mail::message')
-# RAA Disapproval
+# RAA Needs Revision
 
 You are receiving this email because {{ $senderName }} has returned your submitted RAA for revision.
 
