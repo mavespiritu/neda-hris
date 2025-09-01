@@ -13,6 +13,6 @@ use App\Http\Controllers\CompareCgaController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
 
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth.any'])->group(function () {
     Route::get('/staff-cga', [StaffCgaController::class, 'index'])->name('staff-cga');
 });

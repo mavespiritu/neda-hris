@@ -206,7 +206,7 @@ const MyCga = () => {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Submic Competencies for Review</AlertDialogTitle>
+                        <AlertDialogTitle>Submit Competencies for Review</AlertDialogTitle>
                         <AlertDialogDescription>
                         You are submitting updates on your competencies. Once submitted, an email notification will be sent to your supervisor requesting a review of your submitted competency.
                         </AlertDialogDescription>

@@ -1,0 +1,557 @@
+import PageTitle from "@/components/PageTitle"
+import { useState, useEffect, useMemo } from 'react'
+import { useHasRole, useHasPermission, useCanViewResource } from '@/hooks/useAuth'
+import { useToast } from "@/hooks/use-toast"
+import { Badge } from "@/components/ui/badge"
+import { Link } from '@inertiajs/react'
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import PaginationControls from "@/components/PaginationControls"
+import {
+    Table,
+    TableBody,
+    TableCaption,
+    TableCell,
+    TableFooter,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { flexRender } from "@tanstack/react-table"
+import { parse, format, isValid } from 'date-fns'
+import { 
+    Search, 
+    ThumbsUp, 
+    Plus, 
+    ThumbsDown, 
+    Trash2, 
+    Pencil, 
+    Send, 
+    Undo2,
+} from 'lucide-react'
+import { store } from './store'
+import { cn } from "@/lib/utils"
+import { useTable } from '@/hooks/useTable'
+import { usePage } from '@inertiajs/react'
+
+const Vacancies = () => {
+
+    const { toast } = useToast()
+
+    const breadcrumbItems = [
+        { label: 'Home', href: '/' },
+        { label: 'RSP', href: '#' },
+        { label: 'Vacancies', href: '/vacancies' },
+    ]
+
+    const { vacancies } = usePage().props
+
+    console.log(usePage().props)
+
+    const {
+        data,
+        current_page,
+        last_page: pageCount,
+        total,
+        per_page: perPage,
+    } = vacancies
+
+    const canViewPage = useHasPermission('HRIS_vacancies.view-vacancies')
+    const canViewOne = useHasPermission('HRIS_vacancies.view-vacancy')
+    const canCreate = useHasPermission('HRIS_vacancies.create-vacancy')
+    const canUpdate = useHasPermission('HRIS_vacancies.update-vacancy')
+    const canDelete = useHasPermission('HRIS_vacancies.delete-vacancy')
+    const canApprove = useHasPermission('HRIS_vacancies.approve-vacancy')
+    const canDisapprove = useHasPermission('HRIS_vacancies.disapprove-vacancy')
+    const canSubmit = useHasPermission('HRIS_vacancies.submit-vacancy')
+
+    const {
+        setSelectedItem,
+        deleteVacancy,
+        deleteVacancies,
+        approveVacancies,
+        disapproveVacancies
+    } = store()
+
+    const [hoveredRowId, setHoveredRowId] = useState(null)
+    const [showSearch, setShowSearch] = useState(false)
+
+    const columns = useMemo(() => [
+        {
+            id: 'select',
+            header: ({ table }) => (
+                <Checkbox
+                checked={table.getIsAllRowsSelected()}
+                onCheckedChange={() => table.toggleAllPageRowsSelected()}
+                className="peer border-neutral-400 dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                />
+            ),
+            meta: {
+                className: "w-[5%] text-center",
+            },
+            cell: ({ row }) => (
+                <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={() => row.toggleSelected()}
+                className="peer border-neutral-400 dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                />
+            ),
+        },
+        {
+            header: "#",
+            cell: ({ row }) => {
+                return (row.index + 1) + ((current_page - 1) * perPage)
+            },
+        },
+        {
+            header: "Division",
+            accessorKey: "division",
+        },
+        {
+            header: "Appointment Status",
+            accessorKey: "appointment_status",
+        },
+        {
+            header: "Position",
+            cell: ({ row }) => {
+                const { position_description, item_no, appointment_status } = row.original
+
+                return (
+                    <div>
+                        {position_description}
+                        {appointment_status === 'Permanent' && (
+                            <>
+                                <br />
+                                ({item_no})
+                            </>
+                        )}
+                    </div>
+                )
+            }
+        },
+        {
+            header: "Salary Grade",
+            cell: ({ row }) => {
+                return row.original.sg
+            }
+        },
+        {
+            header: "Monthly Salary",
+            cell: ({ row }) => {
+                const salary = row.original.monthly_salary
+                return parseFloat(salary).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                })
+            }
+        },
+        {
+            header: "Last Action",
+            accessorKey: "creator",
+            cell: ({ row }) => {
+              const actor = row.original.actor
+              const actedAt = row.original.date_acted
+              const date = actedAt ? new Date(actedAt) : null
+              const formattedDate = date ? format(date, 'MMMM d, yyyy') : ''
+          
+              return (
+                <div className="flex flex-col">
+                  <Badge className="w-fit inline-flex mb-1">{row.original.status}</Badge>
+                  <span className="font-medium">{actor}</span>
+                  {formattedDate && (
+                    <span className="text-xs italic text-muted-foreground">{formattedDate}</span>
+                  )}
+                </div>
+              )
+            },
+        },
+        {
+            id: "actions",
+            header: "",
+            cell: ({ row }) => {
+              const isHovered = row.id === hoveredRowId
+              return (
+                <div className="flex gap-2 justify-end items-center w-full">
+                  <div
+                    className={`flex transition-opacity duration-150 ${
+                      isHovered ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    <Link
+                        href={route("vacancies.edit", row.original.id)}
+                        onClick={() => setSelectedItem(row.original)}
+                        className="h-8 w-8 p-0 flex items-center justify-center hover:bg-muted rounded"
+                        >
+                        <Pencil className="h-4 w-4" />
+                    </Link>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the vacancy.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="border-0">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                            onClick={() => {
+                                deleteVacancy({
+                                    id: row.original.id,
+                                    form, 
+                                    toast
+                                })
+                            }}
+                          >
+                            Yes, delete it
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    </div>
+            
+                    <Link
+                        href={route('vacancies.show', row.original.id)}
+                        className="h-8 gap-2 text-xs inline-flex items-center justify-center rounded-md px-3 py-1 bg-primary text-white hover:bg-primary/90 transition"
+                    >
+                        View
+                    </Link>
+                </div>
+              )
+            },
+        }
+          
+    ], [hoveredRowId])
+
+    const {
+        table,
+        form,
+        search,
+        setSearch,
+        pageIndex,
+        setPageIndex,
+        selectedRows
+    } = useTable({
+        data,
+        pageCount,
+        pageSize: 10,
+        currentPage: current_page,
+        searchQuery: '',
+        routeName: route('vacancies.index'),
+        columns
+    })
+
+    const selectedStatuses = selectedRows.map(row => row.original.status)
+
+    const canAllowSubmit = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Draft', 'Changes Requested'].includes(status))
+    const canAllowApprove = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Ready for Approval', 'Submitted'].includes(status))
+    const canAllowDisapprove = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Submitted'].includes(status))
+    const canAllowDelete = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Draft'].includes(status))
+    const canAllowRequestChanges = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Ready for Approval', 'Submitted'].includes(status))
+
+    return (
+        <div className="flex flex-col gap-4">
+            <PageTitle pageTitle="Vacancies" description="Request publication of vacant positions in this page." breadcrumbItems={breadcrumbItems} />
+
+            <div className="w-full flex items-center gap-1">
+                <Link
+                    href={route('vacancies.create')}
+                >
+                    <Button
+                        variant=""
+                        className="flex items-center rounded-md disabled:opacity-50"
+                        size="sm"
+                    >
+                        <Plus className="h-6 w-6" />
+                        <span className="text-xs">New Vacancy</span>
+                    </Button>
+                </Link>
+                {!showSearch && (
+                    <Button
+                        variant="ghost"
+                        className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
+                        size="sm"
+                        onClick={() => setShowSearch(true)}
+                    >
+                        <Search className="h-6 w-6" />
+                        <span className="text-xs">Search</span>
+                    </Button>
+                )}
+
+                {showSearch && (
+                    <div className="relative px-2">
+                        <Search className="absolute left-4 top-2.5 h-3 w-3 text-muted-foreground" />
+                        <Input
+                            autoFocus
+                            placeholder="Type to search..."
+                            type="search"
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value)
+                                setPageIndex(0)
+                            }}
+                            onBlur={() => setShowSearch(false)}
+                            className="pl-8 w-full max-w-xs text-sm rounded h-8"
+                        />
+                    </div>
+                )}
+
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            className="flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-50"
+                            disabled={!canAllowDelete}
+                            size="sm"
+                        >
+                        <Trash2 className="h-8 w-8" />
+                        <span className="text-xs">Delete</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the selected vacancies. This action cannot be undone.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                            onClick={() => {
+                                deleteVacancies({
+                                    form,
+                                    toast,
+                                })
+                            }}
+                        >
+                            Yes, delete it
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                        variant="ghost"
+                        className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
+                        size="sm"
+                        disabled={!canAllowSubmit}
+                        >
+                        <Send className="h-8 w-8" />
+                        <span className="text-xs">Submit</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Submit Vacancies</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will notify the reviewer to review your submission.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                            //sendDraftsForApproval({ toast })
+                            }}
+                        >
+                            Confirm
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                        variant="ghost"
+                        className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
+                        size="sm"
+                        disabled={!canAllowRequestChanges}
+                        >
+                        <Undo2 className="h-8 w-8" />
+                        <span className="text-xs">Request Changes</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Request changes for vacancies</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will notify the sender to revise the submitted vacancies.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                            //sendDraftsForApproval({ toast })
+                            }}
+                        >
+                            Confirm
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
+                            disabled={!canAllowApprove}
+                            size="sm"
+                        >
+                        <ThumbsUp className="h-8 w-8" />
+                        <span className="text-xs">Approve</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Approval</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently approve the selected publication requests. This action cannot be undone.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                approveVacancies({
+                                    form,
+                                    toast,
+                                })
+                            }}
+                        >
+                            Continue
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            className="flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-50"
+                            disabled={!canAllowDisapprove}
+                            size="sm"
+                        >
+                        <ThumbsDown className="h-8 w-8" />
+                        <span className="text-xs">Disapprove</span>
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Bulk Disapproval</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently disapprove the selected vacancies. This action cannot be undone.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                disapproveVacancies({
+                                    form,
+                                    toast,
+                                })
+                            }}
+                        >
+                            Continue
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
+
+            <span className="text-sm font-medium">
+                {!data || data.length === 0 ? (
+                    <>Showing 0 items</>
+                    ) : (
+                    <>
+                        Showing {(pageIndex * perPage) + 1} - {Math.min((pageIndex + 1) * perPage, total)} of {total} items
+                    </>
+                )}
+            </span>
+            
+            <div className="border rounded-lg">
+                <Table>
+                    <TableHeader className="bg-gray-100">
+                    {table.getHeaderGroups().map(headerGroup => (
+                        <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map(header => (
+                            <TableHead key={header.id} className="px-4 py-2 font-medium text-gray-700">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            </TableHead>
+                        ))}
+                        </TableRow>
+                    ))}
+                    </TableHeader>
+                    <TableBody className="font-medium">
+                        {data?.length > 0 ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow 
+                                    key={row.id}
+                                    onMouseEnter={() => setHoveredRowId(row.id)}
+                                    onMouseLeave={() => setHoveredRowId(null)}
+                                    className={cn(
+                                        "transition hover:bg-muted/50",
+                                        row.getIsSelected() && "bg-muted"
+                                    )}
+                                >
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="p-4 text-center">
+                                    No data found.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <PaginationControls
+                pageIndex={pageIndex}
+                pageCount={pageCount}
+                setPageIndex={setPageIndex}
+                selectedRowsLength={selectedRows.length}
+            />
+
+        </div>
+    )
+}
+
+export default Vacancies
+

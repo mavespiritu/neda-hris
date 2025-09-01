@@ -20,6 +20,38 @@ export function formatDate(selectedDate) {
   return formattedDate
 }
 
+export function formatTime(time) {
+  const date = new Date(time)
+
+  if (isNaN(date.getTime())) {
+    return 'Invalid Time'
+  }
+
+  return date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+}
+
+export function formatTime12(time) {
+  if (!time) return "-- : -- --" 
+
+  const date = new Date(time)
+
+  if (isNaN(date.getTime())) {
+    return '-- : -- --'
+  }
+
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
+}
+
 export function formatDateWithTime(selectedDate) {
   // Convert the input string to a Date object
   const date = new Date(selectedDate)

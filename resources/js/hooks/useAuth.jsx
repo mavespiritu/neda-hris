@@ -32,3 +32,20 @@ export const useHasPermission = (permissions) => {
     // Check if user has any of the permissions
     return permissionArray.some((permission) => user.permissions.includes(permission))
 }
+
+export const useCanViewResource = (resource, options = {}) => {
+    const user = useAuth()
+    const userRoles = usePage().props.auth?.roles || []
+
+    // HR or other allowed roles can view all
+    if (options.allowedRoles && userRoles.some(role => options.allowedRoles.includes(role))) {
+        return true
+    }
+
+    // Check division-based access
+    if (options.divisionKey && resource[options.divisionKey]) {
+        return user?.division === resource[options.divisionKey]
+    }
+
+    return false
+}

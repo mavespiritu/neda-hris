@@ -70,7 +70,7 @@ const CgaUpdatingForm = () => {
             onSuccess: () => {
                 toast({
                     title: "Success!",
-                    description: "The CGA enable updating dates have been updated successfully",
+                    description: "The CGA submission date has been updated successfully",
                 })
                 reset()
                 clearErrors()
@@ -84,16 +84,16 @@ const CgaUpdatingForm = () => {
         <Dialog open={isFormOpen} onOpenChange={closeCgaEnableUpdatingForm}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Enable Updating of CGA</DialogTitle>
+                    <DialogTitle>Enable Submission of CGA</DialogTitle>
                     <DialogDescription>
-                    Adjust dates to enable updating of CGA
+                    Adjust dates to enable submission of CGA
                     </DialogDescription>
                 </DialogHeader>
                 <div>
                 <form onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-2">
-                            <Label htmlFor="startDate">Available dates for CGA updating</Label>
+                            <Label htmlFor="startDate">Available date for submission</Label>
                             <DateRangePicker 
                             startDate={data.startDate} 
                             endDate={data.endDate} 

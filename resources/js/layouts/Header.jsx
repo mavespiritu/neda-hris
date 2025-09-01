@@ -14,10 +14,9 @@ import {
   } from "../components/ui/dropdown-menu"
   import { Input } from "../components/ui/input"
   import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet"
-  import { usePage } from '@inertiajs/react'
   import { SidebarTrigger } from "@/components/ui/sidebar"
   import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-  import { useForm, Link } from '@inertiajs/react'
+  import { useForm, usePage, Link } from '@inertiajs/react'
   import { useUser } from "@/providers/UserProvider"
 
   const Logo = ({ hidden = false }) => {
@@ -30,7 +29,7 @@ import {
       >
         <a href="/" className="flex gap-2 items-center text-xl font-bold">
           <Package2 className="h-6 w-6" />
-          <span>HRIS</span>
+          <span>DRO1 HRIS</span>
           {/* <img src={logo} className="h-6" /> */}
         </a>
       </div>
@@ -39,28 +38,31 @@ import {
   
   const Header = () => {
 
-    const { user } = useUser() 
+    const { user, isApplicant } = useUser() 
     const { post } =  useForm()
 
     const handleLogout = (e) => {
-      post(`/logout`)
+      post(route('logout'))
 
       return to_route('login')
     }
 
     return (
-      <header className="flex gap-2 justify-between sticky top-0 p-2 items-center h-16 shrink-0 border-b bg-background z-50">
+      <header className="flex gap-2 justify-between sticky top-0 p-2 items-center h-16 shrink-0 border-b bg-blue-800 z-50 text-white">
         <SidebarTrigger className="ml-2" />
         <div className="flex flex-end items-center gap-2">
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">{user?.first_name} {user?.last_name}</span>
-            <span className="text-xs text-muted-foreground">{user?.email}</span>
+          <div className="flex-col hidden md:flex">
+            <span className="text-sm font-semibold">
+                {(!isApplicant && `${user?.first_name} ${user?.last_name}`) 
+                    || user?.name}
+            </span>
+            <span className="text-xs text-white">{user?.email}</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="p-2 flex items-center gap-2">
                 <Avatar>
-                    <AvatarImage src={user?.ipms_id ? `/employees/image/${user?.ipms_id}` : `https://github.com/shadcn.png`} loading="lazy" />
+                    <AvatarImage src={user?.ipms_id ? `/employees/image/${user?.ipms_id}` : `https://www.gravatar.com/avatar/?d=mp&s=200`} loading="lazy" />
                     <AvatarFallback>{`first_name last_name`}</AvatarFallback>
                 </Avatar>
                 <ChevronDown className="size-4"/>

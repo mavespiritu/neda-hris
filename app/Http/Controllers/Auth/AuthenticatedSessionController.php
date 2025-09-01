@@ -29,11 +29,35 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        $request->authenticate();
+        /* $request->authenticate();
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended(route('dashboard', absolute: false)); */
+
+        // attempt employee login first
+
+        if (Auth::guard('web')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+
+            $request->session()->regenerate();
+
+            return redirect()->intended(route('dashboard'));
+
+        }
+
+        // if employee login failed, try applicant login
+
+        if (Auth::guard('applicant')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+
+            $request->session()->regenerate();
+
+            return redirect()->intended(route('dashboard'));
+            
+        }
+
+        return back()->withErrors([
+            'email' => 'The provided credentials do not match our records.',
+        ])->onlyInput('email');
     }
 
     /**
@@ -41,10 +65,17 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        Auth::guard('web')->logout();
+        if (Auth::guard('web')->check()) {
+
+            Auth::guard('web')->logout();
+
+        } elseif (Auth::guard('applicant')->check()) {
+
+            Auth::guard('applicant')->logout();
+            
+        }
 
         $request->session()->invalidate();
-
         $request->session()->regenerateToken();
 
         return redirect('/');

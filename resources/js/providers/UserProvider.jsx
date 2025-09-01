@@ -16,7 +16,9 @@ export const UserProvider = ({children}) => {
         }
       }, [auth.user])
 
-    const value = { user, setUser }
+    const isApplicant = !user?.roles || user.roles.length === 0
+
+    const value = { user, setUser, isApplicant }
 
     return (
         <UserContext.Provider value={value}>
