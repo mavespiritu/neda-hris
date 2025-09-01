@@ -28,16 +28,16 @@ class FwaController extends Controller
 
     public function index()
     {
-        $conn2 = DB::connection('mysql2');
-        $conn3 = DB::connection('mysql3');
+        $conn2 = DB::connection('mysql2'); // flexi tables
+        $conn3 = DB::connection('mysql3'); // DTR tables
 
         $empId = auth()->user()->ipms_id ?? null; 
         $today = now()->format('Y-m-d');
         $year  = now()->year;
         $month = now()->format('F');
-        
         $invalidDate = '0001-01-01 00:00:00';
 
+        // --- Fetch AM record
         $am = $conn3->table('tblactual_dtr')
             ->where('emp_id', $empId)
             ->where('date', $today)
@@ -46,6 +46,7 @@ class FwaController extends Controller
             ->where('month', $month)
             ->first();
 
+        // --- Fetch PM record
         $pm = $conn3->table('tblactual_dtr')
             ->where('emp_id', $empId)
             ->where('date', $today)
@@ -54,13 +55,13 @@ class FwaController extends Controller
             ->where('month', $month)
             ->first();
 
-        // Normalize invalid values to null
+        // Normalize invalid times
         $amIn  = ($am?->time_in  === $invalidDate) ? null : $am?->time_in;
         $amOut = ($am?->time_out === $invalidDate) ? null : $am?->time_out;
         $pmIn  = ($pm?->time_in  === $invalidDate) ? null : $pm?->time_in;
         $pmOut = ($pm?->time_out === $invalidDate) ? null : $pm?->time_out;
 
-        // Decide next logType
+        // Determine next logType
         $logType = null;
         if (!$amIn) {
             $logType = 'amIn';
@@ -72,6 +73,7 @@ class FwaController extends Controller
             $logType = 'pmOut';
         }
 
+        // --- Fetch schedule (mysql2)
         $schedule = $conn2->table('flexi_schedule')
             ->select('emp_id', 'dtr_type', 'date')
             ->where('emp_id', $empId)
@@ -79,36 +81,35 @@ class FwaController extends Controller
             ->where('dtr_type', 'Flexiplace')
             ->first();
 
-        $latestStatus = DB::raw("
-            (
-                SELECT sh1.*
-                FROM submission_history sh1
-                INNER JOIN (
-                    SELECT model_id, MAX(date_acted) as latest_date
-                    FROM submission_history
-                    WHERE model = 'RTO'
-                    GROUP BY model_id
-                ) sh2
-                ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date
-                WHERE sh1.model = 'RTO'
-            ) as sh
-        ");
-        
-        $approvedRto = $conn2->table('flexi_rto as rto')
-        ->leftJoin($latestStatus, 'sh.model_id', '=', 'rto.id')
-        ->where('rto.emp_id', $empId)
-        ->whereDate('rto.date', $today)
-        ->where('sh.status', 'Approved')
-        ->exists();
+        // --- Get latest RTO status separately (no join)
+        $latestStatus = $conn2->table('submission_history')
+            ->select('model_id', 'status')
+            ->where('model', 'RTO')
+            ->orderBy('date_acted', 'desc');
 
+        $approvedRto = $conn2->table('flexi_rto')
+            ->where('emp_id', $empId)
+            ->whereDate('date', $today)
+            ->whereExists(function ($q) use ($latestStatus) {
+                $q->select(DB::raw(1))
+                    ->from('submission_history as sh')
+                    ->whereColumn('sh.model_id', 'flexi_rto.id')
+                    ->where('sh.model', 'RTO')
+                    ->where('sh.status', 'Approved')
+                    ->orderBy('sh.date_acted', 'desc');
+            })
+            ->exists();
+
+        // Determine flexiplace flag
         $isFlexiplaceToday = $schedule !== null && $approvedRto;
 
+        // Return Inertia data
         return Inertia::render('Dtr/Fwa/index', [
             'data' => [
-                'amIn'    => $amIn,
-                'amOut'   => $amOut,
-                'pmIn'    => $pmIn,
-                'pmOut'   => $pmOut,
+                'amIn' => $amIn,
+                'amOut' => $amOut,
+                'pmIn' => $pmIn,
+                'pmOut' => $pmOut,
                 'logType' => $logType,
                 'schedule' => $schedule,
                 'approvedRto' => $approvedRto,
