@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { addDays, format } from "date-fns"
+import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ export function DateRangePicker({ className, startDate, endDate, onDateChange, i
     from: startDate,
     to: endDate,
   })
+  const [open, setOpen] = useState(false) // control popover open/close
 
   useEffect(() => {
     if (startDate && endDate) {
@@ -23,28 +24,29 @@ export function DateRangePicker({ className, startDate, endDate, onDateChange, i
   }, [startDate, endDate])
 
   const handleSelect = (range) => {
-    // Ensure that `range` is valid and has both `from` and `to` dates
     const newRange = range?.from && range?.to
       ? { from: range.from, to: range.to }
       : range?.from
       ? { from: range.from, to: range.from }
-      : { from: null, to: null } // Handle deselecting
-  
+      : { from: null, to: null }
+
     setDate(newRange)
-  
-    // Check if the `onDateChange` callback exists and pass null for deselected cases
+
     if (onDateChange) {
-      onDateChange(newRange?.from ?? null, newRange?.to ?? null)
+      onDateChange(
+        newRange.from ? format(newRange.from, "yyyy-MM-dd") : null,
+        newRange.to ? format(newRange.to, "yyyy-MM-dd") : null
+      )
     }
   }
 
   return (
     <div className={cn("grid gap-2", className)}>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id="date"
-            variant={"outline"}
+            variant="outline"
             className={cn(
               `w-full justify-start text-left font-normal ${invalidStartDateMessage && invalidEndDateMessage ? 'border-red-500' : ''}`,
               !date && "text-muted-foreground"
@@ -66,14 +68,26 @@ export function DateRangePicker({ className, startDate, endDate, onDateChange, i
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={handleSelect}
-            numberOfMonths={2}
-          />
+          <div className="p-2">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={date?.from}
+              selected={date}
+              onSelect={handleSelect}
+              numberOfMonths={2}
+            />
+            <div className="flex justify-end mt-2">
+              <Button
+                type="button"
+                variant=""
+                size="sm"
+                onClick={() => setOpen(false)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

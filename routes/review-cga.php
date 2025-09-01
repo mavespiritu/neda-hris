@@ -13,7 +13,7 @@ use App\Http\Controllers\CompareCgaController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
 
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth.any'])->group(function () {
     Route::get('/review-cga', [ReviewCgaController::class, 'index'])->name('review-cga');
 
     Route::get('/review-cga/evidences', [ReviewCgaController::class, 'showEvidences'])->name('review-cga.show-evidences');

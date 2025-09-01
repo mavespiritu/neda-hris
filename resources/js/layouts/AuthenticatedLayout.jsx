@@ -21,9 +21,9 @@ const AuthenticatedLayout = ({ children }) => {
       "--sidebar-width-mobile": "15rem",
     }}>
       <AppSidebar />
-      <main className="w-full flex flex-col">
+      <main className="w-full flex flex-col min-h-full">
         <Header />
-        <div className="flex flex-1 flex-col px-4 py-2">
+        <div className="flex flex-1 flex-col pt-4 px-8 pb-8">
           {children}
         </div>
       </main>

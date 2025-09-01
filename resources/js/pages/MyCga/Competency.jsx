@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useTextSize } from "@/providers/TextSizeProvider"
 
+
 const Competency = ({ emp_id, position_id, competency, fetchCompetencies, all, custom, proficiency }) => {
 
   const textSize = useTextSize()

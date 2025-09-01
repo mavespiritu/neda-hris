@@ -13,35 +13,46 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
-use App\Notifications\CompetenciesForReviewSubmitted;
-use App\Notifications\CompetenciesForReviewEndorsed;
-use App\Notifications\CompetenciesForReviewEndorsedToDc;
-use App\Notifications\CompetenciesForReviewApproved;
+use App\Notifications\NotifySupervisorOfGapAnalysisSubmission;
+use App\Notifications\NotifyStaffOfGapAnalysisEndorsement;
+use App\Notifications\NotifySupervisorOfGapAnalysisEndorsement;
+use App\Notifications\NotifyStaffOfGapAnalysisApproval;
+use App\Notifications\NotifyStaffOfGapAnalysisDisapproval;
+use App\Notifications\NotifySupervisorOfRtoSubmission;
+use App\Notifications\NotifyArdOfRtoEndorsement;
+use App\Notifications\NotifyStaffOfRtoApproval;
+use App\Notifications\NotifyStaffOfRtoDisapproval;
+use App\Notifications\NotifyStaffOfRtoReturn;
+use App\Notifications\NotifySupervisorOfRaaSubmission;
+use App\Notifications\NotifyArdOfRaaEndorsement;
+use App\Notifications\NotifyStaffOfRaaApproval;
+use App\Notifications\NotifyStaffOfRaaDisapproval;
+use App\Notifications\NotifyStaffOfRaaReturn;
 
 class NotificationController extends Controller
 {
-    public function submitCga(Request $request)
+    public function submitGapAnalysis(Request $request)
     {
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
         try{
             $staff = $conn3->table('tblemployee')
-                ->where('emp_id', $request->emp_id)
-                ->first();
+            ->where('emp_id', $request->emp_id)
+            ->first();
 
-                $supervisors = User::whereHas('roles', function ($query) {
-                    $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
-                })
-                ->where('division', $staff->division_id)
-                ->get();
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
 
             $payload = [
                 'emp_id' => $staff->emp_id
             ];
 
             if($supervisors){
-                Notification::sendNow($supervisors, new CompetenciesForReviewSubmitted($payload));
+                Notification::sendNow($supervisors, new NotifySupervisorOfGapAnalysisSubmission($payload));
             }
 
             return redirect()->back()->with([
@@ -51,7 +62,7 @@ class NotificationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to submit competency: ' . $e->getMessage());
+            Log::error('Failed to submit gap analysis: ' . $e->getMessage());
 
             return redirect()->back()->with([
                 'status' => 'error',
@@ -61,7 +72,7 @@ class NotificationController extends Controller
         }    
     }
 
-    public function endorseCga(Request $request)
+    public function endorseGapAnalysis(Request $request)
     {
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
@@ -69,18 +80,11 @@ class NotificationController extends Controller
         $user = Auth::user();
 
         try{
-            $conn2->table('staff_competency_review')
-                ->where('id', $request->review_id)
-                ->update([
-                    'endorsed_by' => $user->ipms_id,
-                    'date_endorsed' => Carbon::now()->format('Y-m-d H:i:s')
-                ]);
-
             $competency = $conn2->table('staff_competency_review')
                 ->where('id', $request->review_id)
                 ->first();
 
-            if($competency->endorsed_by){
+            if($competency){
 
                 $staff = User::where('ipms_id', $competency->emp_id)->first();
 
@@ -94,11 +98,11 @@ class NotificationController extends Controller
                 ];
 
                 if($staff){
-                    Notification::sendNow($staff, new CompetenciesForReviewEndorsed($payload));
+                    Notification::sendNow($staff, new NotifyStaffOfGapAnalysisEndorsement($payload));
                 }
 
                 if($chief){
-                    Notification::sendNow($chief, new CompetenciesForReviewEndorsedToDc($payload));
+                    Notification::sendNow($chief, new NotifySupervisorOfGapAnalysisEndorsement($payload));
                 }
             }
 
@@ -109,7 +113,7 @@ class NotificationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to endorse competency: ' . $e->getMessage());
+            Log::error('Failed to endorse gap analysis: ' . $e->getMessage());
 
             return redirect()->back()->with([
                 'status' => 'error',
@@ -119,7 +123,7 @@ class NotificationController extends Controller
         }
     }
 
-    public function approveCga(Request $request)
+    public function approveGapAnalysis(Request $request)
     {
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
@@ -127,19 +131,11 @@ class NotificationController extends Controller
         $user = Auth::user();
 
         try{
-            $conn2->table('staff_competency_review')
-                ->where('id', $request->review_id)
-                ->update([
-                    'status' => 'Approved',
-                    'acted_by' => $user->ipms_id,
-                    'date_acted' => Carbon::now()->format('Y-m-d H:i:s')
-                ]);
-
             $competency = $conn2->table('staff_competency_review')
                 ->where('id', $request->review_id)
                 ->first();
 
-            if($competency->acted_by){
+            if($competency){
 
                 $recipient = User::where('ipms_id', $competency->emp_id)->first();
 
@@ -149,7 +145,7 @@ class NotificationController extends Controller
                 ];
 
                 if($recipient){
-                    Notification::sendNow($recipient, new CompetenciesForReviewApproved($payload));
+                    Notification::sendNow($recipient, new NotifyStaffOfGapAnalysisApproval($payload));
                 }
             }
 
@@ -160,7 +156,7 @@ class NotificationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to submit competency: ' . $e->getMessage());
+            Log::error('Failed to approve gap analysis: ' . $e->getMessage());
 
             return redirect()->back()->with([
                 'status' => 'error',
@@ -168,5 +164,942 @@ class NotificationController extends Controller
                 'message' => 'An error occurred while sending an email notification. Please try again.'
             ]);
         }
+    }
+
+    public function disapproveGapAnalysis(Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $user = Auth::user();
+
+        try{
+            $competency = $conn2->table('staff_competency_review')
+                ->where('id', $request->review_id)
+                ->first();
+
+            if($competency){
+
+                $recipient = User::where('ipms_id', $competency->emp_id)->first();
+
+                $payload = [
+                    'competency_id' => $competency->id,
+                    'disapprover_id' => $competency->acted_by
+                ];
+
+                if($recipient){
+                    Notification::sendNow($recipient, new NotifyStaffOfGapAnalysisDisapproval($payload));
+                }
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to approve gap analysis: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }
+    }
+
+    public function submitRto($id)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $payload = [
+                'rto_id' => $rto->id
+            ];
+
+            if($supervisors){
+                Notification::sendNow($supervisors, new NotifySupervisorOfRtoSubmission($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to submit RTO: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function endorseRto($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $ard = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ARD']);
+            })
+            ->get();
+
+            if ($ard->isEmpty()) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'No ARD users found to notify.'
+                ]);
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $payload = [
+                'rto_id' => $rto->id,
+                'submitter_email' => $submitter->email,
+                'endorser_id' => $userId,
+            ];
+
+            if($ard){
+                Notification::sendNow($ard, new NotifyArdOfRtoEndorsement($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to endorse RTO: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function approveRto($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $payload = [
+                'rto_id' => $rto->id,
+                'approver_id' => $userId,
+                'supervisor_emails' => $supervisors->pluck('email')->toArray(),
+            ];
+
+            if($submitter){
+                Notification::sendNow($submitter, new NotifyStaffOfRtoApproval($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to approve RTO: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function disapproveRto($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $remarks = $conn2->table('submission_history')->where([
+                'model' => 'RTO',
+                'model_id' => $rto->id,
+                'status' => 'Disapproved',
+                'acted_by' => $userId,
+            ])
+            ->orderBy('date_acted', 'desc')
+            ->first();
+
+            if (!$remarks) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Remarks not found.'
+                ]);
+            }
+
+            $payload = [
+                'rto_id' => $rto->id,
+                'disapprover_id' => $userId,
+                'supervisor_emails' => $supervisors->pluck('email')->toArray(),
+                'remarks' => $remarks->remarks
+            ];
+
+            if($submitter){
+                Notification::sendNow($submitter, new NotifyStaffOfRtoDisapproval($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to disapprove RTO: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function returnRto($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $remarks = $conn2->table('submission_history')->where([
+                'model' => 'RTO',
+                'model_id' => $rto->id,
+                'status' => 'Needs Revision',
+                'acted_by' => $userId,
+            ])
+            ->orderBy('date_acted', 'desc')
+            ->first();
+
+            if (!$remarks) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Remarks not found.'
+                ]);
+            }
+
+            $payload = [
+                'rto_id' => $rto->id,
+                'returner_id' => $userId,
+                'supervisor_emails' => $supervisors->pluck('email')->toArray(),
+                'remarks' => $remarks->remarks
+            ];
+
+            if($submitter){
+                Notification::sendNow($submitter, new NotifyStaffOfRtoReturn($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to return RTO: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function submitRaa($id)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $raa = $conn2->table('flexi_raa')
+            ->where('rto_id', $id)
+            ->first();
+
+            if (!$raa) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RAA record not found.'
+                ]);
+            }
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $raa->rto_id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $payload = [
+                'raa_id' => $raa->id
+            ];
+
+            if($supervisors){
+                Notification::sendNow($supervisors, new NotifySupervisorOfRaaSubmission($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to submit RAA: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function endorseRaa($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $raa = $conn2->table('flexi_raa')
+            ->where('rto_id', $id)
+            ->first();
+
+            if (!$raa) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RAA record not found.'
+                ]);
+            }
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $raa->rto_id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $ard = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ARD']);
+            })
+            ->get();
+
+            if ($ard->isEmpty()) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'No ARD users found to notify.'
+                ]);
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $payload = [
+                'raa_id' => $raa->id,
+                'submitter_email' => $submitter->email,
+                'endorser_id' => $userId,
+            ];
+
+            if($ard){
+                Notification::sendNow($ard, new NotifyArdOfRaaEndorsement($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to endorse RAA: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function approveRaa($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $raa = $conn2->table('flexi_raa')
+            ->where('rto_id', $id)
+            ->first();
+
+            if (!$raa) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RAA record not found.'
+                ]);
+            }
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $raa->rto_id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $payload = [
+                'raa_id' => $raa->id,
+                'approver_id' => $userId,
+                'supervisor_emails' => $supervisors->pluck('email')->toArray(),
+            ];
+
+            if($submitter){
+                Notification::sendNow($submitter, new NotifyStaffOfRaaApproval($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to approve RAA: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function disapproveRaa($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $raa = $conn2->table('flexi_raa')
+            ->where('rto_id', $id)
+            ->first();
+
+            if (!$raa) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RAA record not found.'
+                ]);
+            }
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $raa->rto_id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $remarks = $conn2->table('submission_history')->where([
+                'model' => 'RAA',
+                'model_id' => $raa->id,
+                'status' => 'Disapproved',
+                'acted_by' => $userId,
+            ])
+            ->orderBy('date_acted', 'desc')
+            ->first();
+
+            if (!$remarks) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Remarks not found.'
+                ]);
+            }
+
+            $payload = [
+                'raa_id' => $raa->id,
+                'disapprover_id' => $userId,
+                'supervisor_emails' => $supervisors->pluck('email')->toArray(),
+                'remarks' => $remarks->remarks
+            ];
+
+            if($submitter){
+                Notification::sendNow($submitter, new NotifyStaffOfRaaDisapproval($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to disapprove RAA: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
+    }
+
+    public function returnRaa($id, $userId)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        try{
+
+            $raa = $conn2->table('flexi_raa')
+            ->where('rto_id', $id)
+            ->first();
+
+            if (!$raa) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RAA record not found.'
+                ]);
+            }
+
+            $rto = $conn2->table('flexi_rto')
+            ->where('id', $raa->rto_id)
+            ->first();
+
+            if (!$rto) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'RTO record not found.'
+                ]);
+            }
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $supervisors = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+            if ($supervisors->isEmpty()) {
+                Log::warning("No supervisors found for division: {$staff->division_id}");
+            }
+
+            $submitter = User::where('ipms_id', $rto->emp_id)->first();
+
+            if (!$submitter) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submitter account not found.'
+                ]);
+            }
+
+            $remarks = $conn2->table('submission_history')->where([
+                'model' => 'RAA',
+                'model_id' => $raa->id,
+                'status' => 'Needs Revision',
+                'acted_by' => $userId,
+            ])
+            ->orderBy('date_acted', 'desc')
+            ->first();
+
+            if (!$remarks) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Remarks not found.'
+                ]);
+            }
+
+            $payload = [
+                'raa_id' => $raa->id,
+                'returner_id' => $userId,
+                'supervisor_emails' => $supervisors->pluck('email')->toArray(),
+                'remarks' => $remarks->remarks
+            ];
+
+            if($submitter){
+                Notification::sendNow($submitter, new NotifyStaffOfRaaReturn($payload));
+            }
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Email notification sent!'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to return RAA: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while sending an email notification. Please try again.'
+            ]);
+        }    
     }
 }
