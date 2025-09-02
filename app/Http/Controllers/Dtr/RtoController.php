@@ -34,6 +34,7 @@ class RtoController extends Controller
         $direction = $request->get('direction', 'asc');
         $search    = $request->input('search');
 
+        $hasStaffRole  = Auth::user()->hasRole('HRIS_Staff');
         $hasDCRole  = Auth::user()->hasRole('HRIS_DC');
         $hasADCRole = Auth::user()->hasRole('HRIS_ADC');
 
@@ -43,14 +44,17 @@ class RtoController extends Controller
             ->where('work_status', 'active')
             ->orderBy('lname')->orderBy('fname')->orderBy('mname');
 
-        if ($hasDCRole || $hasADCRole) {
+        if ($hasDCRole || $hasADCRole || $hasStaffRole) {
             $employeesQuery->where('division_id', auth()->user()->division);
         }
 
         $employees = $employeesQuery->get()->keyBy('emp_id'); // key by emp_id for fast lookup
 
+        $employeeIds = $employees->keys()->all();
+
         // Step 2: Get flexi_rto from mysql2
         $targetsQuery = $conn2->table('flexi_rto')
+            ->whereIn('emp_id', $employeeIds)
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
             ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
             ->orderBy('date', 'desc');

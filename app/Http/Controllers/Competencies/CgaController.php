@@ -28,32 +28,39 @@ class CgaController extends Controller
         $empId = $request->emp_id ?? auth()->user()->ipms_id;
         $today = now()->toDateString();
 
+        // Get latest designation (from mysql2)
         $latestDesignation = $conn2->table('career_path as c')
-        ->select('c.position_id as item_no')
-        ->where('type', 'Designation')
-        ->where('emp_id', $empId)
-        ->whereDate('start_date', '<=', $today)
-        ->where(function ($query) use ($today) {
-            $query->whereNull('end_date')
-                  ->orWhereDate('end_date', '>=', $today);
-        })
-        ->orderByDesc('start_date')
-        ->first();
+            ->select('c.position_id as item_no')
+            ->where('type', 'Designation')
+            ->where('emp_id', $empId)
+            ->whereDate('start_date', '<=', $today)
+            ->where(function ($query) use ($today) {
+                $query->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $today);
+            })
+            ->orderByDesc('start_date')
+            ->first();
 
+        // Build subquery for latest assignments (from mysql3)
         $latestAssignments = $conn3->table('tblemp_emp_item as eei')
-            ->select([
-                'eei.emp_id',
-                'epi.item_no',
-                'eei.from_date',
-                'epi.step',
-                DB::raw('ROW_NUMBER() OVER (PARTITION BY eei.emp_id ORDER BY eei.from_date DESC, epi.step DESC) as rn')
-            ])
-            ->leftJoin('tblemp_position_item as epi', 'eei.item_no', '=', 'epi.item_no')
+            ->select('eei.emp_id', 'eei.item_no')
+            ->join(DB::raw('
+                (
+                    SELECT emp_id, MAX(from_date) as max_from_date
+                    FROM tblemp_emp_item
+                    WHERE to_date IS NULL OR to_date = "0000-00-00"
+                    GROUP BY emp_id
+                ) as latest
+            '), function($join) {
+                $join->on('eei.emp_id', '=', 'latest.emp_id')
+                    ->on('eei.from_date', '=', 'latest.max_from_date');
+            })
             ->where(function ($query) {
                 $query->whereNull('eei.to_date')
                     ->orWhere('eei.to_date', '0000-00-00');
             });
 
+        // Get designation details (if found)
         $designation = null;
 
         if ($latestDesignation) {
@@ -76,6 +83,7 @@ class CgaController extends Controller
                 ->first();
         }
 
+        // Get employee info + join latest assignment
         $employee = $conn3->table('tblemployee as e')
             ->select([
                 'e.emp_id as value',
@@ -88,15 +96,16 @@ class CgaController extends Controller
                 'e.division_id',
             ])
             ->leftJoinSub($latestAssignments, 'latest_eei', function($join) {
-                $join->on('e.emp_id', '=', 'latest_eei.emp_id')
-                    ->where('latest_eei.rn', '=', 1);
+                $join->on('e.emp_id', '=', 'latest_eei.emp_id');
             })
             ->leftJoin('tblemp_position_item as epi', 'latest_eei.item_no', '=', 'epi.item_no')
             ->leftJoin('tblposition as p', 'p.position_id', '=', 'epi.position_id')
             ->where('e.emp_id', $empId)
             ->first();
 
+        if ($employee) {
             $employee->designation = $designation;
+        }
 
         return Inertia::render('Competencies/MyCga/index', [
             'employee' => $employee,

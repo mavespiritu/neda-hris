@@ -73,12 +73,12 @@ const AppSidebar = () => {
       url: "/my-profile",
       icon: UserRound,
     },
-    {
+    /* {
       title: "Search Jobs",
       url: "/jobs",
       icon: Search,
-    },
-    {
+    }, */
+    /* {
       title: "Recruitment",
       url: "#",
       icon: BriefcaseBusiness,
@@ -90,8 +90,8 @@ const AppSidebar = () => {
         { title: 'Onboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Handshake },
         { title: 'Offboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: FolderArchive },
       ],
-    },
-    {
+    }, */
+    /* {
       title: "Selection",
       url: "#",
       icon: BriefcaseBusiness,
@@ -123,14 +123,14 @@ const AppSidebar = () => {
         { title: 'Staff PDS', url: '/staff-pds', roles: ['HRIS_HR'] },
         { title: 'Staff 201', url: '/staff-201', roles: ['HRIS_HR'] },
       ],
-    },
+    }, */
     {
       title: "Flexiplace",
       url: "#",
       icon: History,
       roles: ['HRIS_Staff'],
       submenu: [
-        { title: 'Schedule', url: '/fwa/schedule', roles: ['HRIS_HR', 'HRIS_DC', 'HRIS_ADC'], icon: CalendarCheck },
+        { title: 'Schedule', url: '/fwa/schedule', roles: ['HRIS_Staff'], icon: CalendarCheck },
         { title: 'RTO', url: '/rto', roles: ['HRIS_Staff'], icon: Target },
         { title: 'DTR', url: '/fwa', roles: ['HRIS_Staff'], icon: History },
         { title: 'RAA', url: '/raa', roles: ['HRIS_Staff'], icon: Trophy },
@@ -149,7 +149,7 @@ const AppSidebar = () => {
         { title: 'Libraries', url: '/competencies', roles: ['HRIS_HR'], icon: Settings2 },
       ],
     },
-    {
+    /* {
       title: "Performance",
       url: "#",
       icon: ChartNoAxesCombined,
@@ -160,12 +160,12 @@ const AppSidebar = () => {
         { title: 'IPCR', url: '/review-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UserRound },
         { title: 'Libraries', url: '/competencies', roles: ['HRIS_HR'], icon: Settings2 },
       ],
-    },
+    }, */
     {
       title: "Settings",
       url: '/settings',
       icon: Cog,
-      roles: ['HRIS_HR', 'HRIS_Administrator']
+      roles: ['HRIS_HR', 'HRIS_Administrator', 'HRIS_Staff']
     },
   ]
 
