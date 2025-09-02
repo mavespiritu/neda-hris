@@ -34,6 +34,7 @@ class RtoController extends Controller
         $direction = $request->get('direction', 'asc');
         $search    = $request->input('search');
 
+        $hasStaffRole  = Auth::user()->hasRole('HRIS_Staff');
         $hasDCRole  = Auth::user()->hasRole('HRIS_DC');
         $hasADCRole = Auth::user()->hasRole('HRIS_ADC');
 
@@ -43,7 +44,7 @@ class RtoController extends Controller
             ->where('work_status', 'active')
             ->orderBy('lname')->orderBy('fname')->orderBy('mname');
 
-        if ($hasDCRole || $hasADCRole) {
+        if ($hasDCRole || $hasADCRole || $hasStaffRole) {
             $employeesQuery->where('division_id', auth()->user()->division);
         }
 
