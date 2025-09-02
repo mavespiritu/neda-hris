@@ -50,8 +50,11 @@ class RtoController extends Controller
 
         $employees = $employeesQuery->get()->keyBy('emp_id'); // key by emp_id for fast lookup
 
+        $employeeIds = $employees->keys()->all();
+
         // Step 2: Get flexi_rto from mysql2
         $targetsQuery = $conn2->table('flexi_rto')
+            ->whereIn('emp_id', $employeeIds)
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
             ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
             ->orderBy('date', 'desc');

@@ -165,7 +165,7 @@ const AppSidebar = () => {
       title: "Settings",
       url: '/settings',
       icon: Cog,
-      roles: ['HRIS_HR', 'HRIS_Administrator']
+      roles: ['HRIS_HR', 'HRIS_Administrator', 'HRIS_Staff']
     },
   ]
 
