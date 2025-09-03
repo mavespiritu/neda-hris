@@ -134,7 +134,7 @@ trait FetchFlexiplaceRecords
                 $recommendedPmTimeOut = Carbon::createFromFormat('H:i:s', $record->pm_time_out)
                     ->copy()
                     ->subSeconds($extraSeconds)
-                    ->format('H:i:s');
+                    ->format('g:i:s A');
             }
 
             return (object) array_merge((array) $record, $raa, $rto, [
