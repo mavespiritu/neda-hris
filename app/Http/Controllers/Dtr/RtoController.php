@@ -44,11 +44,15 @@ class RtoController extends Controller
             ->where('work_status', 'active')
             ->orderBy('lname')->orderBy('fname')->orderBy('mname');
 
-        if ($hasDCRole || $hasADCRole || $hasStaffRole) {
+        if ($hasDCRole || $hasADCRole) {
             $employeesQuery->where('division_id', auth()->user()->division);
         }
 
-        $employees = $employeesQuery->get()->keyBy('emp_id'); // key by emp_id for fast lookup
+        if ($hasStaffRole) {
+            $employeesQuery->where('emp_id', auth()->user()->ipms_id);
+        }
+
+        $employees = $employeesQuery->get()->keyBy('emp_id');
 
         $employeeIds = $employees->keys()->all();
 
