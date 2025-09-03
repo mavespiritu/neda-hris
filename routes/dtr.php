@@ -55,7 +55,8 @@ Route::middleware(['web', 'auth.any'])->group(function () {
         ->name('fwa.reports.index');
     Route::get('/fwa/reports/time-records', [FwaReportController::class, 'timeRecords'])
         ->name('fwa.reports.time-records');
-    Route::get('/fwa/reports/time-records/export', [FwaReportController::class, 'exportTimeRecords'])->name('fwa.reports.time-records.export');
+    Route::get('/fwa/reports/time-records/export/excel', [FwaReportController::class, 'exportExcelTimeRecords'])->name('fwa.reports.time-records.export-excel');
+    Route::get('/fwa/reports/time-records/export/word', [FwaReportController::class, 'exportWordTimeRecords'])->name('fwa.reports.time-records.export-word');
      
 });
 

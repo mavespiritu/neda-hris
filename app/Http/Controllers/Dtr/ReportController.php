@@ -10,9 +10,14 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use App\Exports\TimeRecordsExport;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\IOFactory;
+use App\Traits\FetchFlexiplaceRecords;
 
 class ReportController extends Controller
 {
+    use FetchFlexiplaceRecords;
+
     public function index(Request $request)
     {
         return Inertia::render('Dtr/Report/index');
@@ -20,66 +25,8 @@ class ReportController extends Controller
 
     public function timeRecords(Request $request)
     {
-        $conn3 = DB::connection('mysql3');
-        $date = $request->date ? Carbon::parse($request->date)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
-
-        $timeRecords = $conn3->table('tblemployee as e')
-            ->select(
-                'e.division_id as division',
-                DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')) as name"),
-                DB::raw('TIME(am.time_in) as am_time_in'),
-                DB::raw('TIME(am.time_out) as am_time_out'),
-                DB::raw('TIME(pm.time_in) as pm_time_in'),
-                DB::raw('TIME(pm.time_out) as pm_time_out'),
-                DB::raw("
-                    SEC_TO_TIME(
-                        GREATEST(
-                            0,
-                            TIMESTAMPDIFF(
-                                SECOND,
-                                am.time_in,
-                                CASE WHEN TIME(am.time_out) > '12:00:00' THEN CONCAT(DATE(am.time_out),' 12:00:00') ELSE am.time_out END
-                            )
-                            +
-                            TIMESTAMPDIFF(
-                                SECOND,
-                                CASE WHEN TIME(pm.time_in) < '13:00:00' THEN CONCAT(DATE(pm.time_in),' 13:00:00') ELSE pm.time_in END,
-                                pm.time_out
-                            )
-                        )
-                    ) AS total_hours
-                ")
-            )
-            ->leftJoinSub(function($query) use ($date) {
-                $query->from('tblactual_dtr')
-                    ->select(
-                        'emp_id', 
-                        'time_in', 
-                        'time_out'
-                    )
-                    ->where('time', 'AM')
-                    ->whereDate('date', $date);
-            }, 'am', function($join){
-                $join->on('am.emp_id', '=', 'e.emp_id');
-            })
-            ->leftJoinSub(function($query) use ($date) {
-                $query->from('tblactual_dtr')
-                    ->select(
-                        'emp_id', 
-                        'time_in', 
-                        'time_out'
-                    )
-                    ->where('time', 'PM')
-                    ->whereDate('date', $date);
-            }, 'pm', function($join){
-                $join->on('pm.emp_id', '=', 'e.emp_id');
-            })
-            ->where('e.work_status', 'active')
-            ->orderBy('e.division_id')
-            ->orderBy('e.lname')
-            ->orderBy('e.fname')
-            ->orderBy('e.mname')
-            ->get();
+        $date = $request->date ?? null;
+        $timeRecords = $this->fetchFlexiplaceRecords($date);
 
         return response()->json([
             'data' => [
@@ -88,10 +35,108 @@ class ReportController extends Controller
         ]);
     }
 
-    public function exportTimeRecords(Request $request)
+    public function exportExcelTimeRecords(Request $request)
     {
-        $date = $request->date ?? null;
+        return Excel::download(new TimeRecordsExport($request->date), 'flexiplace_time_records.xlsx');
+    }
 
-        return Excel::download(new TimeRecordsExport($date), 'flexiplace_time_records.xlsx');
+    public function exportWordTimeRecords(Request $request)
+    {
+        $date = $request->date ? Carbon::parse($request->date)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
+
+        $timeRecords = $this->fetchFlexiplaceRecords($date);
+
+        $phpWord = new PhpWord();
+        $section = $phpWord->addSection();
+        $section->addText("Date of Flexiplace: {$date}", ['size' => 12]);
+
+        $tableStyle = [
+            'borderSize' => 6,
+            'borderColor' => '000000',
+            'cellMargin' => 80
+        ];
+
+        $firstRowStyle = ['bgColor' => 'DDDDDD'];
+        $phpWord->addTableStyle('TimeRecordsTable', $tableStyle);
+        $table = $section->addTable('TimeRecordsTable');
+
+        $fontStyle = ['size' => 9]; // Define font size
+
+        // Header Row
+        $table->addRow();
+        $table->addCell(2000, ['vMerge' => 'restart'])->addText("Division", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(3000, ['vMerge' => 'restart'])->addText("Name", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(2000, ['gridSpan' => 2])->addText("Actual AM", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
+        $table->addCell(2000, ['gridSpan' => 2])->addText("Actual PM", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
+        $table->addCell(2000, ['vMerge' => 'restart'])->addText("Total Hours", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(2000, ['gridSpan' => 2])->addText("RTO", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
+        $table->addCell(2000, ['gridSpan' => 2])->addText("RAA", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
+        $table->addCell(2000, ['vMerge' => 'restart'])->addText("Adjusted PM Out", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(2000, ['vMerge' => 'restart'])->addText("Total Adjusted Hours Rendered", array_merge($fontStyle, ['bold' => true]));
+
+        // Second Header Row
+        $table->addRow();
+        $table->addCell(null, ['vMerge' => 'continue']);
+        $table->addCell(null, ['vMerge' => 'continue']);
+        $table->addCell()->addText("Time In", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell()->addText("Time Out", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell()->addText("Time In", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell()->addText("Time Out", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(null, ['vMerge' => 'continue']);
+        $table->addCell()->addText("Date Submitted", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell()->addText("Date Approved", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell()->addText("Date Submitted", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell()->addText("Date Approved", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(null, ['vMerge' => 'continue']);
+        $table->addCell(null, ['vMerge' => 'continue']);
+
+        // Data Rows
+        foreach ($timeRecords as $record) {
+            $table->addRow();
+            $table->addCell()->addText($record->division ?? '', $fontStyle);
+            $table->addCell()->addText($record->name ?? '', $fontStyle);
+            $table->addCell()->addText($record->am_time_in ?? '', $fontStyle);
+            $table->addCell()->addText($record->am_time_out ?? '', $fontStyle);
+            $table->addCell()->addText($record->pm_time_in ?? '', $fontStyle);
+            $table->addCell()->addText($record->pm_time_out ?? '', $fontStyle);
+            $table->addCell()->addText($record->total_hours ?? '', $fontStyle);
+            $table->addCell()->addText($record->rto_date_submitted ?? '', $fontStyle);
+            $table->addCell()->addText($record->rto_date_approved ?? '', $fontStyle);
+            $table->addCell()->addText($record->raa_date_submitted ?? '', $fontStyle);
+            $table->addCell()->addText($record->raa_date_approved ?? '', $fontStyle);
+            $table->addCell()->addText('', $fontStyle);
+            $table->addCell()->addText('', $fontStyle);
+        }
+
+        $section->addTextBreak(2);
+
+        $phpWord->addTableStyle('SignatureTable', [
+            'borderSize' => 0,
+            'borderColor' => 'FFFFFF',
+            'cellMargin' => 80
+        ]);
+        $signatureTable = $section->addTable('SignatureTable');
+
+        $signatureTable->addRow();
+        
+        $createSignatureCell = function($table, $title, $name) {
+            $cell = $table->addCell(3000);
+            $textRun = $cell->addTextRun(['alignment' => 'left']);
+            $textRun->addText($title);
+            $cell->addTextBreak(2); 
+            $textRun2 = $cell->addTextRun(['alignment' => 'left']);
+            $textRun2->addText($name);
+        };
+
+        $createSignatureCell($signatureTable, "Record Rectified by:", "HRU Personnel");
+        $createSignatureCell($signatureTable, "Certified Correct by:", "HRU PTL");
+        $createSignatureCell($signatureTable, "Noted by:", "SuAO/CAO");
+
+        // 🔹 Save & Download
+        $fileName = "time_records_{$date}.docx";
+        $tempFile = tempnam(sys_get_temp_dir(), 'word');
+        $phpWord->save($tempFile, 'Word2007');
+
+        return response()->download($tempFile, $fileName)->deleteFileAfterSend(true);
     }
 }

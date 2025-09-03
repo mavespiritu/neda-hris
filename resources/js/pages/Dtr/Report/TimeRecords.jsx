@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useForm, router } from '@inertiajs/react'
-import { Loader2 } from "lucide-react"
+import { Loader2, FileSpreadsheet, FileText, ChevronDown } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -9,9 +9,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import DatePicker from "@/components/DatePicker"
+import { formatDate } from "@/lib/utils.jsx"
 
 const TimeRecords = () => {
   const { data, setData } = useForm({
@@ -33,8 +40,13 @@ const TimeRecords = () => {
     }
   }
 
-  const handleGenerateReport = () => {
-    const url = route('fwa.reports.time-records.export', { date: data.date })
+  const handleGenerateExcelReport = () => {
+    const url = route('fwa.reports.time-records.export-excel', { date: data.date, type: 'excel' })
+    window.open(url, '_blank')
+  }
+
+    const handleGenerateWordReport = () => {
+    const url = route('fwa.reports.time-records.export-word', { date: data.date, type: 'word' })
     window.open(url, '_blank')
   }
 
@@ -68,14 +80,24 @@ const TimeRecords = () => {
               </div>
 
               {/* Generate Report Button */}
-              <Button
-                className="ml-4"
-                onClick={handleGenerateReport}
-                disabled={loading}
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Generate Report
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Generate Report <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleGenerateExcelReport}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
+                    Excel Report
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleGenerateWordReport}>
+                    <FileText className="mr-2 h-4 w-4 text-blue-600" />
+                    Word Report
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           {loading ? (
             <div className="flex justify-center items-center h-full">
@@ -93,12 +115,18 @@ const TimeRecords = () => {
                     <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">Actual AM</th>
                     <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">Actual PM</th>
                     <th rowSpan={2} className="border-t-0 border-r-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Total Hours Rendered</th>
+                    <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">RTO</th>
+                    <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">RAA</th>
                   </tr>
                   <tr>
                     <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Time In</th>
                     <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Time Out</th>
                     <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Time In</th>
                     <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Time Out</th>
+                    <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Date Submitted</th>
+                    <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Date Approved</th>
+                    <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Date Submitted</th>
+                    <th className="px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Date Approved</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -155,6 +183,34 @@ const TimeRecords = () => {
                         }`}
                       >
                         {r.total_hours || "-"}
+                      </td>
+                      <td
+                        className={`px-4 py-2 border-r-0 border-gray-200 border ${
+                          idx === data.timeRecords.length - 1 ? "border-b-0" : ""
+                        }`}
+                      >
+                        {r.rto_date_submitted ? formatDate(r.rto_date_submitted) : "-"}
+                      </td>
+                      <td
+                        className={`px-4 py-2 border-r-0 border-gray-200 border ${
+                          idx === data.timeRecords.length - 1 ? "border-b-0" : ""
+                        }`}
+                      >
+                        {r.rto_date_approved ? formatDate(r.rto_date_approved) : "-"}
+                      </td>
+                      <td
+                        className={`px-4 py-2 border-r-0 border-gray-200 border ${
+                          idx === data.timeRecords.length - 1 ? "border-b-0" : ""
+                        }`}
+                      >
+                        {r.raa_date_submitted ? formatDate(r.raa_date_submitted) : "-"}
+                      </td>
+                      <td
+                        className={`px-4 py-2 border-r-0 border-gray-200 border ${
+                          idx === data.timeRecords.length - 1 ? "border-b-0" : ""
+                        }`}
+                      >
+                        {r.raa_date_approved ? formatDate(r.raa_date_approved) : "-"}
                       </td>
                     </tr>
                   ))}
