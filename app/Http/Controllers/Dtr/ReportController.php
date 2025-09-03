@@ -12,6 +12,7 @@ use App\Exports\TimeRecordsExport;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\Style\Section;
 use App\Traits\FetchFlexiplaceRecords;
 
 class ReportController extends Controller
@@ -47,7 +48,9 @@ class ReportController extends Controller
         $timeRecords = $this->fetchFlexiplaceRecords($date);
 
         $phpWord = new PhpWord();
-        $section = $phpWord->addSection();
+        $section = $phpWord->addSection([
+            'orientation' => Section::ORIENTATION_LANDSCAPE
+        ]);
         $section->addText("Date of Flexiplace: {$date}", ['size' => 12]);
 
         $tableStyle = [
