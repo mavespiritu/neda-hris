@@ -122,7 +122,24 @@ trait FetchFlexiplaceRecords
                 'raa_date_approved'  => null,
             ]);
             
-            return (object) array_merge((array) $record, $raa, $rto);
+            $totalSeconds = 0;
+            if ($record->total_hours) {
+                $parts = explode(':', $record->total_hours);
+                $totalSeconds = ((int)$parts[0] * 3600) + ((int)$parts[1] * 60) + (int)$parts[2];
+            }
+
+            $recommendedPmTimeOut = null;
+            if ($totalSeconds > 28800 && $record->pm_time_out) { // Over 8 hours
+                $extraSeconds = $totalSeconds - 28800;
+                $recommendedPmTimeOut = Carbon::createFromFormat('H:i:s', $record->pm_time_out)
+                    ->copy()
+                    ->subSeconds($extraSeconds)
+                    ->format('H:i:s');
+            }
+
+            return (object) array_merge((array) $record, $raa, $rto, [
+                'recommended_pm_time_out' => $recommendedPmTimeOut,
+            ]);
         });
 
         return $records;

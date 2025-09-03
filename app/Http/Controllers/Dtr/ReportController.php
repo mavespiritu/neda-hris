@@ -107,7 +107,7 @@ class ReportController extends Controller
             $table->addCell()->addText($record->rto_date_approved ?? '', $fontStyle);
             $table->addCell()->addText($record->raa_date_submitted ?? '', $fontStyle);
             $table->addCell()->addText($record->raa_date_approved ?? '', $fontStyle);
-            $table->addCell()->addText('', $fontStyle);
+            $table->addCell()->addText($record->recommended_pm_time_out ?? '', $fontStyle);
             $table->addCell()->addText('', $fontStyle);
         }
 

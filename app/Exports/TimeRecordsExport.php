@@ -44,6 +44,7 @@ class TimeRecordsExport implements FromCollection, WithHeadings, WithEvents
             'RTO Approved',
             'RAA Submitted',
             'RAA Approved',
+            'Adjusted PM Out'
         ];
     }
 
