@@ -38,6 +38,7 @@ import {
   AlertDialogAction
 } from "@/components/ui/alert-dialog"
 import { Loader2 } from 'lucide-react'
+import Schedules from './Competencies/Schedules'
 
 
 const Competencies = () => {
@@ -231,72 +232,7 @@ const Competencies = () => {
             <span className="text-xs text-muted-foreground">Add or edit annual CGA submission periods.</span>
           </div>
           <div className="flex flex-col gap-2 flex-1 w-1/2 overflow-auto">
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                className="text-xs"
-                onClick={() => {
-                  reset()
-                  setEditSchedule(null)
-                  setShowScheduleDialog(true)
-                }}>
-                Add Schedule
-              </Button>
-            </div>
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader className="bg-muted text-xs">
-                  {table.getHeaderGroups().map(headerGroup => (
-                    <TableRow key={headerGroup.id}>
-                      {headerGroup.headers.map(header => (
-                        <TableHead key={header.id} className={cn("text-black", header.column.columnDef.meta?.className)}>
-                          {header.isPlaceholder ? null : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableHeader>
-                <TableBody>
-                  {table.getRowModel().rows.length ? (
-                    table.getRowModel().rows.map(row => (
-                      <TableRow
-                        key={row.id}
-                        data-state={row.getIsSelected() && "selected"}
-                        onMouseEnter={() => setHoveredRowId(row.id)}
-                        onMouseLeave={() => setHoveredRowId(null)}
-                      >
-                        {row.getVisibleCells().map(cell => (
-                          <TableCell
-                            key={cell.id}
-                            className={cell.column.columnDef.meta?.className}
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={table.getAllColumns().length} className="text-center">
-                        No schedules found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <PaginationControls
-              pageIndex={pageIndex}
-              pageCount={pageCount}
-              setPageIndex={setPageIndex}
-              selectedRowsLength={selectedRows.length}
-            />
+            <Schedules />
           </div>
         </div>
       </CardContent>

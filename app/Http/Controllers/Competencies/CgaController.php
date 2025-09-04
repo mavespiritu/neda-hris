@@ -48,21 +48,20 @@ class CgaController extends Controller
                 (
                     SELECT emp_id, MAX(from_date) as max_from_date
                     FROM tblemp_emp_item
-                    WHERE to_date IS NULL OR to_date = "0000-00-00"
+                    WHERE to_date IS NULL OR CAST(to_date AS CHAR) = "0000-00-00" 
                     GROUP BY emp_id
                 ) as latest
-            '), function($join) {
+            '), function ($join) {
                 $join->on('eei.emp_id', '=', 'latest.emp_id')
                     ->on('eei.from_date', '=', 'latest.max_from_date');
             })
             ->where(function ($query) {
                 $query->whereNull('eei.to_date')
-                    ->orWhere('eei.to_date', '0000-00-00');
+                    ->orWhereRaw("CAST(eei.to_date AS CHAR) = '0000-00-00'");
             });
 
         // Get designation details (if found)
         $designation = null;
-
         if ($latestDesignation) {
             $designation = $conn3->table('tblemp_emp_item as eei')
                 ->select([
@@ -76,7 +75,7 @@ class CgaController extends Controller
                 ->leftJoin('tblposition as p', 'p.position_id', '=', 'epi.position_id')
                 ->where(function ($query) {
                     $query->whereNull('eei.to_date')
-                        ->orWhere('eei.to_date', '0000-00-00');
+                        ->orWhereRaw("CAST(eei.to_date AS CHAR) = '0000-00-00'");
                 })
                 ->where('eei.item_no', $latestDesignation->item_no)
                 ->orderByDesc('eei.from_date')
@@ -95,7 +94,7 @@ class CgaController extends Controller
                 'epi.step',
                 'e.division_id',
             ])
-            ->leftJoinSub($latestAssignments, 'latest_eei', function($join) {
+            ->leftJoinSub($latestAssignments, 'latest_eei', function ($join) {
                 $join->on('e.emp_id', '=', 'latest_eei.emp_id');
             })
             ->leftJoin('tblemp_position_item as epi', 'latest_eei.item_no', '=', 'epi.item_no')

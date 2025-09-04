@@ -34,9 +34,14 @@ class RtoController extends Controller
         $direction = $request->get('direction', 'asc');
         $search    = $request->input('search');
 
-        $hasStaffRole  = Auth::user()->hasRole('HRIS_Staff');
-        $hasDCRole     = Auth::user()->hasRole('HRIS_DC');
-        $hasADCRole    = Auth::user()->hasRole('HRIS_ADC');
+        $rolePriorities = config('roles.priorities');
+
+        $userRoles = Auth::user()->roles->pluck('name')->toArray();
+        $highestRole = collect($userRoles)
+            ->mapWithKeys(fn($role) => [$role => $rolePriorities[$role] ?? 0])
+            ->sortDesc()
+            ->keys()
+            ->first();
 
         /**
          * 1. Employees for listing (filtered)
@@ -48,14 +53,27 @@ class RtoController extends Controller
                 'division_id'
             ])
             ->where('work_status', 'active')
-            ->orderBy('lname')->orderBy('fname')->orderBy('mname');
+            ->orderBy('lname')
+            ->orderBy('fname')
+            ->orderBy('mname');
 
-        if ($hasDCRole || $hasADCRole) {
-            $employeesQuery->where('division_id', auth()->user()->division);
-        }
-
-        if ($hasStaffRole) {
-            $employeesQuery->where('emp_id', auth()->user()->ipms_id);
+        switch ($highestRole) {
+            case 'HRIS_RD':
+                // RD sees all
+                break;
+            case 'HRIS_ARD':
+                // ARD sees all
+                break;
+            case 'HRIS_HR':
+                // HR sees all
+                break;
+            case 'HRIS_ADC':
+            case 'HRIS_DC':
+                $employeesQuery->where('division_id', Auth::user()->division);
+                break;
+            case 'HRIS_Staff':
+                $employeesQuery->where('emp_id', Auth::user()->ipms_id);
+                break;
         }
 
         $employees = $employeesQuery->get()->keyBy('emp_id');
