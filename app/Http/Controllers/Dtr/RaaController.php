@@ -1042,26 +1042,25 @@ class RaaController extends Controller
             return 'data:' . $mimeType . ';base64,' . base64_encode($binary);
         };
 
-        $rto = $conn2->table('flexi_rto as fr')
-        ->join($conn3->getDatabaseName() . '.tblemployee as e', 'fr.emp_id', '=', 'e.emp_id')
-        ->select([
-            'fr.*', $fullName, 'e.division_id', 'e.emp_id',
-        ])
-        ->where('fr.id', $id)
-        ->first();
+        $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
 
         if (!$rto) abort(404, 'RTO not found');
 
-        $raa = $conn2->table('flexi_raa as fr')
-            ->leftJoin('flexi_rto as ft', 'ft.id', '=', 'fr.rto_id')
-            ->join($conn3->getDatabaseName() . '.tblemployee as e', 'ft.emp_id', '=', 'e.emp_id')
-            ->select([
-                'fr.*', $fullName, 'e.division_id', 'e.emp_id',
-            ])
-            ->where('ft.id', $rto->id)
+        $employee = $conn3->table('tblemployee')
+            ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+            ->where('emp_id', $rto->emp_id)
             ->first();
 
+        $rto->name = $employee->name ?? null;
+        $rto->division_id   = $employee->division_id ?? null;
+
+        $raa = $conn2->table('flexi_raa')->where('flexi_raa.rto_id', $rto->id)->first();
+
         if (!$raa) abort(404, 'RAA not found');
+
+        $raa->name = $employee->name ?? null;
+        $raa->division_id   = $employee->division_id ?? null;
+        $raa->emp_id   = $employee->emp_id ?? null;
 
         $outputs = $conn2->table('flexi_target')
         ->where('rto_id', $raa->rto_id)
@@ -1100,7 +1099,7 @@ class RaaController extends Controller
 
         $supervisorInfo = $supervisorEmpId
             ? $conn3->table('tblemployee as e')
-                ->select(['e.emp_id', $fullName, 'e.division_id'])
+                ->select(['e.emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'e.division_id'])
                 ->where('e.work_status', 'active')
                 ->where('e.emp_id', $supervisorEmpId)
                 ->first()
@@ -1122,7 +1121,7 @@ class RaaController extends Controller
 
         $approverName = $approverInfo
             ? $conn3->table('tblemployee as e')
-                ->select(['e.emp_id', $fullName, 'e.division_id'])
+                ->select(['e.emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'e.division_id'])
                 ->where(['e.emp_id' => $approverInfo->acted_by, 'e.work_status' => 'active'])
                 ->first()?->name
             : $conn2->table('settings')->where('title', 'Agency Sub-Head')->value('value');
