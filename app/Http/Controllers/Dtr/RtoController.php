@@ -35,12 +35,18 @@ class RtoController extends Controller
         $search    = $request->input('search');
 
         $hasStaffRole  = Auth::user()->hasRole('HRIS_Staff');
-        $hasDCRole  = Auth::user()->hasRole('HRIS_DC');
-        $hasADCRole = Auth::user()->hasRole('HRIS_ADC');
+        $hasDCRole     = Auth::user()->hasRole('HRIS_DC');
+        $hasADCRole    = Auth::user()->hasRole('HRIS_ADC');
 
-        // Step 1: Get employees from mysql3
+        /**
+         * 1. Employees for listing (filtered)
+         */
         $employeesQuery = $conn3->table('tblemployee')
-            ->select(['emp_id', DB::raw('concat(lname, ", ", fname, " ", mname) as name'), 'division_id'])
+            ->select([
+                'emp_id',
+                DB::raw('concat(lname, ", ", fname, " ", mname) as name'),
+                'division_id'
+            ])
             ->where('work_status', 'active')
             ->orderBy('lname')->orderBy('fname')->orderBy('mname');
 
@@ -53,10 +59,22 @@ class RtoController extends Controller
         }
 
         $employees = $employeesQuery->get()->keyBy('emp_id');
-
         $employeeIds = $employees->keys()->all();
 
-        // Step 2: Get flexi_rto from mysql2
+        /**
+         * 2. Separate query: ALL employees (for acted_by lookup)
+         */
+        $allEmployees = $conn3->table('tblemployee')
+            ->select([
+                'emp_id',
+                DB::raw('concat(lname, ", ", fname, " ", mname) as name')
+            ])
+            ->get()
+            ->keyBy('emp_id');
+
+        /**
+         * 3. Get flexi_rto records
+         */
         $targetsQuery = $conn2->table('flexi_rto')
             ->whereIn('emp_id', $employeeIds)
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
@@ -64,32 +82,37 @@ class RtoController extends Controller
             ->orderBy('date', 'desc');
 
         $targets = $targetsQuery->paginate(20);
-
         $targetIds = $targets->pluck('id')->all();
 
-        // Step 3: Get submission_history for these targets
+        /**
+         * 4. Histories
+         */
         $histories = $conn2->table('submission_history')
             ->where('model', 'RTO')
             ->whereIn('model_id', $targetIds)
             ->orderBy('date_acted', 'desc')
             ->get()
-            ->groupBy('model_id'); // group by RTO id
+            ->groupBy('model_id');
 
-        // Step 4: Get flexi_target outputs
+        /**
+         * 5. Outputs
+         */
         $outputs = $conn2->table('flexi_target')
             ->whereIn('rto_id', $targetIds)
             ->get()
             ->groupBy('rto_id');
 
-        // Step 5: Merge all data in PHP
-        $targets->getCollection()->transform(function ($item) use ($employees, $histories, $outputs) {
+        /**
+         * 6. Transform Data
+         */
+        $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $histories, $outputs) {
             $item->employee_name = $employees[$item->emp_id]->name ?? null;
 
             $latestHistory = $histories[$item->id][0] ?? null;
             if ($latestHistory) {
                 $item->status        = $latestHistory->status;
                 $item->acted_by      = $latestHistory->acted_by;
-                $item->acted_by_name = $employees[$latestHistory->acted_by]->name ?? null;
+                $item->acted_by_name = $allEmployees[$latestHistory->acted_by]->name ?? null; // 🔹 Use full list
                 $item->remarks       = $latestHistory->remarks;
                 $item->date_acted    = $latestHistory->date_acted;
             } else {
@@ -100,14 +123,19 @@ class RtoController extends Controller
                 $item->date_acted    = null;
             }
 
-            $item->isLocked = !($item->emp_id == auth()->user()->ipms_id && (!$item->status || !in_array($item->status, ["Endorsed", "Approved", "Disapproved", "Submitted"])));
+            $item->isLocked = !(
+                $item->emp_id == auth()->user()->ipms_id &&
+                (!$item->status || !in_array($item->status, ["Endorsed", "Approved", "Disapproved", "Submitted"]))
+            );
 
             $item->outputs = $outputs[$item->id] ?? [];
 
             return $item;
         });
 
-        // Step 6: Compute Fridays for date picker
+        /**
+         * 7. Fridays for Date Picker
+         */
         $fridays = [];
         $now = Carbon::now();
         $months = [
@@ -127,7 +155,10 @@ class RtoController extends Controller
 
         return Inertia::render('Dtr/Rto/index', [
             'data' => [
-                'employees' => $employees->map(fn($emp) => ['value' => $emp->emp_id, 'label' => $emp->name])->values(),
+                'employees' => $employees->map(fn($emp) => [
+                    'value' => $emp->emp_id,
+                    'label' => $emp->name
+                ])->values(),
                 'dates'     => $fridays,
                 'targets'   => $targets,
                 'filters'   => $request->only(['employee', 'date', 'sort', 'direction', 'search']),
