@@ -166,7 +166,7 @@ class RaaController extends Controller
 
         $targets = $targetsQuery->paginate(20);
 
-            $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $conn2) {
+        $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $conn2) {
             $item->employee_name     = $employees[$item->emp_id]->name ?? null;
             $item->rto_acted_by_name = $allEmployees[$item->rto_acted_by]->name ?? null;
             $item->raa_acted_by_name = $allEmployees[$item->raa_acted_by]->name ?? null;
@@ -223,7 +223,7 @@ class RaaController extends Controller
                 'employees' => $employees->map(fn ($emp) => [
                     'value' => $emp->emp_id,
                     'label' => $emp->name,
-                ]),
+                ])->values(),
                 'dates'   => $fridays,
                 'targets' => $targets,
                 'filters' => $request->only(['employee', 'date', 'sort', 'direction', 'search']),
