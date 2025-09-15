@@ -80,17 +80,44 @@ class RaaController extends Controller
                 break;
         }
 
-        $employees = $employeesQuery->get();
+        $employees = $employeesQuery->get()->keyBy('emp_id');
+        $employeeIds = $employees->keys()->all();
 
-        // Latest submission_history subqueries (same as before)
-        $latestHistoryRTO = DB::raw("(SELECT sh1.* FROM submission_history sh1 INNER JOIN (SELECT model_id, MAX(date_acted) as latest_date FROM submission_history WHERE model = 'RTO' GROUP BY model_id) sh2 ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date WHERE sh1.model = 'RTO') as sh_rto");
+        $allEmployees = $conn3->table('tblemployee')
+            ->select([
+                'emp_id',
+                DB::raw('concat(lname, ", ", fname, " ", mname) as name')
+            ])
+            ->get()
+            ->keyBy('emp_id');
 
-        $latestHistoryRAA = DB::raw("(SELECT sh1.* FROM submission_history sh1 INNER JOIN (SELECT model_id, MAX(date_acted) as latest_date FROM submission_history WHERE model = 'RAA' GROUP BY model_id) sh2 ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date WHERE sh1.model = 'RAA') as sh_raa");
+        $latestHistoryRTO = DB::raw("(SELECT sh1.* 
+            FROM submission_history sh1 
+            INNER JOIN (
+                SELECT model_id, MAX(date_acted) as latest_date 
+                FROM submission_history 
+                WHERE model = 'RTO' 
+                GROUP BY model_id
+            ) sh2 
+            ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date 
+            WHERE sh1.model = 'RTO'
+        ) as sh_rto");
 
-        // Step 1: Fetch RTOs + RAA + latest submission history from mysql2
+        $latestHistoryRAA = DB::raw("(SELECT sh1.* 
+            FROM submission_history sh1 
+            INNER JOIN (
+                SELECT model_id, MAX(date_acted) as latest_date 
+                FROM submission_history 
+                WHERE model = 'RAA' 
+                GROUP BY model_id
+            ) sh2 
+            ON sh1.model_id = sh2.model_id AND sh1.date_acted = sh2.latest_date 
+            WHERE sh1.model = 'RAA'
+        ) as sh_raa");
+
         $targetsQuery = $conn2->table('flexi_rto as rto')
             ->leftJoin($latestHistoryRTO, 'sh_rto.model_id', '=', 'rto.id')
-            ->leftJoin($conn2->getDatabaseName().'.flexi_raa as raa', 'raa.rto_id', '=', 'rto.id')
+            ->leftJoin('flexi_raa as raa', 'raa.rto_id', '=', 'rto.id')
             ->leftJoin($latestHistoryRAA, 'sh_raa.model_id', '=', 'raa.id')
             ->select([
                 'rto.*',
@@ -110,15 +137,13 @@ class RaaController extends Controller
                         ELSE true
                     END
                 ) as isLocked'),
-            ]);
+            ])
+            ->whereIn('rto.emp_id', $employeeIds)
+            ->where('sh_rto.status', 'Approved')
+            ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
+            ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')));
 
-        // Filters
-        if ($request->filled('emp_id')) {
-            $targetsQuery->where('rto.emp_id', $request->emp_id);
-        }
-        if ($request->filled('date')) {
-            $targetsQuery->whereDate('rto.date', Carbon::parse($request->date)->format('Y-m-d'));
-        }
+
         if ($search) {
             $targetsQuery->where(function($query) use ($search) {
                 $query->where('sh_raa.status', 'like', "%{$search}%")
@@ -138,54 +163,14 @@ class RaaController extends Controller
         } else {
             $targetsQuery->orderBy('rto.date', 'desc');
         }
-        
-        switch ($highestRole) {
-            case 'HRIS_RD':
-                // RD sees all
-                break;
-            case 'HRIS_ARD':
-                // ARD sees all
-                break;
-            case 'HRIS_HR':
-                // HR sees all
-                break;
-            case 'HRIS_ADC':
-            case 'HRIS_DC':
-        
-                break;
-            case 'HRIS_Staff':
-                $targetsQuery->where('rto.emp_id', auth()->user()->ipms_id);
-                break;
-        }
 
-        $targetsQuery->where('sh_rto.status', 'Approved');
         $targets = $targetsQuery->paginate(20);
 
-        // Step 2: Collect all employee IDs needed for mapping
-        $empIds = collect();
-        foreach ($targets->items() as $item) {
-            $empIds->push($item->emp_id, $item->rto_acted_by, $item->raa_acted_by);
-        }
-        $empIds = $empIds->filter()->unique();
+            $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $conn2) {
+            $item->employee_name     = $employees[$item->emp_id]->name ?? null;
+            $item->rto_acted_by_name = $allEmployees[$item->rto_acted_by]->name ?? null;
+            $item->raa_acted_by_name = $allEmployees[$item->raa_acted_by]->name ?? null;
 
-        // Step 3: Fetch employees from mysql3
-        $employeesMap = $conn3->table('tblemployee')
-            ->whereIn('emp_id', $empIds)
-            ->get()
-            ->keyBy('emp_id');
-
-        // Step 4: Map employees back to targets
-        $targets->getCollection()->transform(function ($item) use ($employeesMap, $conn2) {
-            $emp = $employeesMap[$item->emp_id] ?? null;
-            $item->employee_name = $emp ? "{$emp->lname}, {$emp->fname} {$emp->mname}" : null;
-
-            $rtoActor = $employeesMap[$item->rto_acted_by] ?? null;
-            $item->rto_acted_by_name = $rtoActor ? "{$rtoActor->lname}, {$rtoActor->fname} {$rtoActor->mname}" : null;
-
-            $raaActor = $employeesMap[$item->raa_acted_by] ?? null;
-            $item->raa_acted_by_name = $raaActor ? "{$raaActor->lname}, {$raaActor->fname} {$raaActor->mname}" : null;
-
-            // Attach outputs + accomplishments
             $item->outputs = $conn2->table('flexi_target')
                 ->where('rto_id', $item->id)
                 ->select('id', 'output')
@@ -200,12 +185,12 @@ class RaaController extends Controller
                                 ->where(['model' => 'RAA', 'itemId' => $acc->id])
                                 ->get()
                                 ->map(fn($file) => [
-                                    'id' => $file->id,
+                                    'id'       => $file->id,
                                     'filename' => $file->name,
-                                    'type' => $file->type,
-                                    'hash' => $file->hash,
-                                    'size' => $file->size,
-                                    'path' => route('files.download', $file->id),
+                                    'type'     => $file->type,
+                                    'hash'     => $file->hash,
+                                    'size'     => $file->size,
+                                    'path'     => route('files.download', $file->id),
                                 ]);
                             $acc->files = $files;
                             return $acc;
