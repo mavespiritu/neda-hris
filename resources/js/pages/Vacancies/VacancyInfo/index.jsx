@@ -71,25 +71,44 @@ const VacancyInfo = () => {
           <p className="text-muted-foreground text-sm">You can find all the details about this vacancy here.</p>
       </div>
       <div className="flex flex-col gap-4 border rounded-lg p-4">
-        <h3 className="font-bold text-lg">Competency-Based Job Description</h3>
+        <h3 className="font-bold text-lg">
+          {vacancy.appointment_status === 'Permanent'
+            ? 'Competency-Based Job Description'
+            : 'Job Description'}
+        </h3>
         <section className="space-y-3">
+          <InfoRow label="Reference No:" value={vacancy.reference_no} />
+          <InfoRow label="Publication Type:" value={vacancy.type} />
           <InfoRow label="Status of Appointment:" value={vacancy.appointment_status} />
           <InfoRow label="Position Title:" value={vacancy.position_description} />
           <InfoRow label="Salary Grade:" value={vacancy.sg} />
-          <InfoRow label="Item Number:" value={vacancy.item_no} />
+          {vacancy.appointment_status === 'Permanent' && (
+            <InfoRow label="Item Number:" value={vacancy.item_no} />
+          )}
           <InfoRow label="Area of Assignment:" value={vacancy.division} />
-          <InfoRow label="Reports to:" value={vacancy.reports_to} />
-          <InfoRow label="Positions Supervised:" value={vacancy.positions_supervised} />
-          <VacancyClassification classification={vacancy.classification} />
+          {vacancy.appointment_status === 'Permanent' && (
+            <InfoRow label="Reports to:" value={vacancy.reports_to} />
+          )}
+          {vacancy.appointment_status === 'Permanent' && (
+            <InfoRow label="Positions Supervised:" value={vacancy.positions_supervised} />
+          )}
+          {vacancy.appointment_status === 'Permanent' && (
+            <VacancyClassification classification={vacancy.classification} />
+          )}
         </section>
         <h4 className="font-bold">A. Qualification Guide</h4>
-        <span className="font-medium text-sm">CSC-Prescribed QS</span>
-        <section className="space-y-3">
-          <InfoRow label="Education:" value={vacancy.prescribed_education} />
-          <InfoRow label="Experience:" value={vacancy.prescribed_experience} />
-          <InfoRow label="Training:" value={vacancy.prescribed_training} />
-          <InfoRow label="Eligibility:" value={vacancy.prescribed_eligibility} />
-        </section>
+        {vacancy.appointment_status === 'Permanent' && (
+          <>
+            <span className="font-medium text-sm">CSC-Prescribed QS</span>
+            <section className="space-y-3">
+              <InfoRow label="Education:" value={vacancy.prescribed_education} />
+              <InfoRow label="Experience:" value={vacancy.prescribed_experience} />
+              <InfoRow label="Training:" value={vacancy.prescribed_training} />
+              <InfoRow label="Eligibility:" value={vacancy.prescribed_eligibility} />
+            </section>
+          </>    
+        )}
+        
         <span className="font-medium text-sm">Preferred Qualifications</span>
         <section className="space-y-3">
           <InfoRow label="Education:" value={vacancy.preferred_education} />
@@ -128,41 +147,45 @@ const VacancyInfo = () => {
             dangerouslySetInnerHTML={{ __html: vacancy.responsibility }}
           />
         </div>
-        <h4 className="font-bold">E. Competency Requirements</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start"> 
-          {Object.entries(compTypeHeaders).map(([type, header]) => {
-            const filtered = competencies.filter(c => c.comp_type === type)
+        {vacancy.appointment_status === 'Permanent' && (
+          <>
+            <h4 className="font-bold">E. Competency Requirements</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start"> 
+              {Object.entries(compTypeHeaders).map(([type, header]) => {
+                const filtered = competencies.filter(c => c.comp_type === type)
 
-            return (
-              <div key={type} className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">{header}</TableHead>
-                      <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">Level</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.length > 0 ? (
-                      filtered.map((c) => (
-                        <TableRow key={c.value}>
-                          <TableCell className="px-4 py-2 text-sm font-medium">{c.competency}</TableCell>
-                          <TableCell className="px-4 py-2 text-sm text-center font-medium">{c.level}</TableCell>
+                return (
+                  <div key={type} className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">{header}</TableHead>
+                          <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">Level</TableHead>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={2} className="px-4 py-2 italic text-muted-foreground text-sm text-center font-medium">
-                          No competencies available.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )
-          })}
-        </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filtered.length > 0 ? (
+                          filtered.map((c) => (
+                            <TableRow key={c.value}>
+                              <TableCell className="px-4 py-2 text-sm font-medium">{c.competency}</TableCell>
+                              <TableCell className="px-4 py-2 text-sm text-center font-medium">{c.level}</TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={2} className="px-4 py-2 italic text-muted-foreground text-sm text-center font-medium">
+                              No competencies available.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )
+              })}
+            </div>  
+          </>
+        )}
       </div>
     </div>
   )

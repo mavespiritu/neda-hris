@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { store } from "./store"
-import { User, Briefcase, Clock, CheckCircle, ThumbsDown, Repeat, ChevronLeft } from "lucide-react"
+import { User, Briefcase, Clock, CheckCircle, ThumbsDown, Repeat, ChevronLeft, Calendar } from "lucide-react"
 import StatusBadge from '@/components/StatusBadge'
 import { Button } from "@/components/ui/button"
 import SubmissionCompetencies from "./SubmissionCompetencies"
@@ -51,20 +51,26 @@ const SelectedSubmission = () => {
         <h3 className="font-bold text-lg">Submission Details</h3>
         <p className="text-muted-foreground text-sm">Review the submission and its competencies' ratings and proposed trainings here.</p>
       </div>
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 text-base font-semibold">
-          <User className="w-4 h-4 text-gray-500" />
-          <span>{selectedSubmission.name}</span>
+      <div className="flex flex-col md:flex-row justify-between w-full gap-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-base font-semibold">
+            <User className="w-4 h-4 text-gray-500" />
+            <span>{selectedSubmission.name ?? ""}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <Briefcase className="w-4 h-4 text-gray-500" />
+            <span>{selectedSubmission.position ?? ""}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <span>CY {selectedSubmission.year ?? ""}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Clock className="w-4 h-4 text-gray-500" />
+            <span>{selectedSubmission.date_submitted}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <Briefcase className="w-4 h-4 text-gray-500" />
-          <span>{selectedSubmission.position}</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Clock className="w-4 h-4 text-gray-500" />
-          <span>{selectedSubmission.date_submitted}</span>
-        </div>
-        <StatusBadge status={selectedSubmission.status} />
+        <StatusBadge status={selectedSubmission.status ?? "Submitted"} />
       </div>
       <Tabs value={currentTab} onValueChange={setCurrentTab}>
           <TabsList className="w-full justify-start gap-4">

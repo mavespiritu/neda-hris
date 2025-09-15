@@ -89,9 +89,7 @@ class CompetencyController extends Controller
 
         $competencies = $competencies->paginate(20)->withQueryString();
 
-        return Inertia::render('Competencies/Competency/index', [
-            'competencies' => $competencies,
-        ]);
+        return response()->json($competencies);
     }
 
     /**
@@ -100,7 +98,6 @@ class CompetencyController extends Controller
     public function store(Request $request)
     {
         $conn2 = DB::connection('mysql2');
-        $conn3 = DB::connection('mysql3');
 
         $request->validate([
             'competency' => 'required',
@@ -126,6 +123,8 @@ class CompetencyController extends Controller
         }
 
         try {
+            $conn2->beginTransaction();
+
             $data = [
                 'competency' => $request->input('competency'),
                 'comp_type' => $request->input('comp_type'),
@@ -134,6 +133,8 @@ class CompetencyController extends Controller
 
             $conn2->table('competency')->insert($data);
 
+            $conn2->commit();
+
             return redirect()->back()->with([
                 'status' => 'success',
                 'title' => 'Success!',
@@ -141,7 +142,7 @@ class CompetencyController extends Controller
             ]);
 
         } catch (Exception $e) {
-
+            $conn2->rollBack();
             Log::error('Error creating competency: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -191,6 +192,8 @@ class CompetencyController extends Controller
         }
 
         try {
+            $conn2->beginTransaction();
+
             $data = [
                 'competency' => $request->input('competency'),
                 'comp_type' => $request->input('comp_type'),
@@ -199,6 +202,8 @@ class CompetencyController extends Controller
 
             $conn2->table('competency')->where('comp_id', $id)->update($data);
 
+            $conn2->commit();
+
             return redirect()->back()->with([
                 'status' => 'success',
                 'title' => 'Success!',
@@ -206,6 +211,7 @@ class CompetencyController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error updating competency: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -224,7 +230,11 @@ class CompetencyController extends Controller
         $conn2 = DB::connection('mysql2');
 
         try {
+            $conn2->beginTransaction();
+
             $deleted = $conn2->table('competency')->where('comp_id', $id)->delete();
+
+            $conn2->commit();
 
             if ($deleted) {
                 return redirect()->back()->with([
@@ -241,6 +251,7 @@ class CompetencyController extends Controller
             }
 
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error deleting competency: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -256,7 +267,11 @@ class CompetencyController extends Controller
         $conn2 = DB::connection('mysql2');
 
         try {
+            $conn2->beginTransaction();
+
             $deleted = $conn2->table('competency')->whereIn('comp_id', $request->input('ids'))->delete();
+
+            $conn2->commit();
 
             if ($deleted) {
                 return redirect()->back()->with([
@@ -273,6 +288,7 @@ class CompetencyController extends Controller
             }
 
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error bulk deleting competencies: ' . $e->getMessage());
 
             return redirect()->back()->with([

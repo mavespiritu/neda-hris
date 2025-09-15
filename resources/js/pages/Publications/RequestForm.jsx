@@ -92,8 +92,8 @@ const RequestForm = () => {
         >
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Request For Publication Form</DialogTitle>
-                    <DialogDescription>Accomplish this form to add/edit request for publication.</DialogDescription>
+                    <DialogTitle>Edit Publication</DialogTitle>
+                    <DialogDescription>Fill-up all required fields.</DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit}>

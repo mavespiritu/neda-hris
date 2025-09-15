@@ -1,554 +1,378 @@
 import PageTitle from "@/components/PageTitle"
-import { useState, useEffect, useMemo } from 'react'
-import { useHasRole, useHasPermission, useCanViewResource } from '@/hooks/useAuth'
-import { useToast } from "@/hooks/use-toast"
-import { Badge } from "@/components/ui/badge"
-import { Link } from '@inertiajs/react'
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState, useEffect, useMemo } from "react"
+import { useHasRole } from "@/hooks/useAuth"
+import { Head, usePage, router, useForm } from "@inertiajs/react"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogClose
+  } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import PaginationControls from "@/components/PaginationControls"
-import {
-    Table,
-    TableBody,
-    TableCaption,
-    TableCell,
-    TableFooter,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { flexRender } from "@tanstack/react-table"
-import { parse, format, isValid } from 'date-fns'
-import { 
-    Search, 
-    ThumbsUp, 
-    Plus, 
-    ThumbsDown, 
-    Trash2, 
-    Pencil, 
-    Send, 
-    Undo2,
-} from 'lucide-react'
-import { store } from './store'
-import { cn } from "@/lib/utils"
-import { useTable } from '@/hooks/useTable'
-import { usePage } from '@inertiajs/react'
+import { formatDate } from "@/lib/utils.jsx"
+import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
+import Filter from "./Filter"
+import useCrudTable from "@/hooks/useCrudTable"
+import StatusBadge from '@/components/StatusBadge'
+import { useToast } from "@/hooks/use-toast"
+import { Label } from "@/components/ui/label"
+import RichTextEditor from "@/components/RichTextEditor"
+
+const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Recruitment', href: '#' },
+    { label: 'Vacancies', href: '/vacancies' },
+]
 
 const Vacancies = () => {
 
     const { toast } = useToast()
 
-    const breadcrumbItems = [
-        { label: 'Home', href: '/' },
-        { label: 'RSP', href: '#' },
-        { label: 'Vacancies', href: '/vacancies' },
-    ]
+    const appointmentStatuses = useMemo(() => [
+        { label: 'Permanent', value: 'Permanent'},
+        { label: 'Casual', value: 'Casual'},
+        { label: 'Contractual', value: 'Contractual'},
+        { label: 'Contract of Service', value: 'Contract of Service'},
+        { label: 'Job Order', value: 'Job Order'},
+        { label: 'Temporary', value: 'Temporary'},
+    ], [])
 
-    const { vacancies } = usePage().props
+    const divisions = useMemo(() => [
+        { value: 'DRD', label: 'Development Research, Communication, and Advocacy Division', },
+        { value: 'FAD', label: 'Finance and Administrative Division'},
+        { value: 'ORD', label: 'Office of the Regional Director'},
+        { value: 'PMED', label: 'Monitoring and Evaluation Division'},
+        { value: 'PDIPBD', label: 'Project Development, Investment Programming and Budgeting Division'},
+        { value: 'PFPD', label: 'Policy Formulation and Planning Division'},
+    ], [])
 
-    console.log(usePage().props)
+    const { auth: { user }, data: { vacancies } } = usePage().props
 
-    const {
-        data,
-        current_page,
-        last_page: pageCount,
-        total,
-        per_page: perPage,
-    } = vacancies
+    const canSelectVacancy = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
 
-    const canViewPage = useHasPermission('HRIS_vacancies.view-vacancies')
-    const canViewOne = useHasPermission('HRIS_vacancies.view-vacancy')
-    const canCreate = useHasPermission('HRIS_vacancies.create-vacancy')
-    const canUpdate = useHasPermission('HRIS_vacancies.update-vacancy')
-    const canDelete = useHasPermission('HRIS_vacancies.delete-vacancy')
-    const canApprove = useHasPermission('HRIS_vacancies.approve-vacancy')
-    const canDisapprove = useHasPermission('HRIS_vacancies.disapprove-vacancy')
-    const canSubmit = useHasPermission('HRIS_vacancies.submit-vacancy')
+    const [confirmAction, setConfirmAction] = useState(null)
+    const [selectedRow, setSelectedRow] = useState(null)
+    
+    const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+        remarks: "",
+    })
 
-    const {
-        setSelectedItem,
-        deleteVacancy,
-        deleteVacancies,
-        approveVacancies,
-        disapproveVacancies
-    } = store()
+    const handleAction = (action, row) => {
+        setConfirmAction(action)
+        setSelectedRow(row)
+    }
 
-    const [hoveredRowId, setHoveredRowId] = useState(null)
-    const [showSearch, setShowSearch] = useState(false)
+    const performAction = (e) => {
+
+        e.preventDefault()
+
+        if (!confirmAction || !selectedRow) return
+
+        const id = selectedRow.original.id
+
+        const actionMap = {
+            Submit: {
+                route: "vacancies.submit",
+                notification: "notification.submit-vacancy",
+            },
+            Approve: {
+                route: "vacancies.approve",
+                notification: "notification.approve-vacancy",
+            },
+            "Needs Revision": {
+                route: "vacancies.return",
+                notification: "notification.return-vacancy",
+            },
+            Disapprove: {
+                route: "vacancies.disapprove",
+                notification: "notification.disapprove-vacancy",
+            },
+        }
+
+        const { route: actionRoute, notification } = actionMap[confirmAction] || {}
+
+        if (!actionRoute) return
+
+        post(route(actionRoute, id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast({
+                    title: "Success!",
+                    description: `${confirmAction} successful!`,
+                })
+
+                if (["Endorse", "Approve", "Needs Revision", "Disapprove"].includes(confirmAction)) {
+                    router.post(route(notification, { id, userId: user.ipms_id }))
+                } else {
+                    router.post(route(notification, id))
+                }
+
+                reset()
+                setConfirmAction(null)
+                setSelectedRow(null)
+            },
+        })
+    }
 
     const columns = useMemo(() => [
         {
-            id: 'select',
-            header: ({ table }) => (
-                <Checkbox
-                checked={table.getIsAllRowsSelected()}
-                onCheckedChange={() => table.toggleAllPageRowsSelected()}
-                className="peer border-neutral-400 dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-                />
-            ),
-            meta: {
-                className: "w-[5%] text-center",
-            },
-            cell: ({ row }) => (
-                <Checkbox
-                checked={row.getIsSelected()}
-                onCheckedChange={() => row.toggleSelected()}
-                className="peer border-neutral-400 dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-                />
-            ),
-        },
-        {
-            header: "#",
-            cell: ({ row }) => {
-                return (row.index + 1) + ((current_page - 1) * perPage)
-            },
+            header: "Ref No.",
+            accessorKey: "reference_no",
+            meta: { enableSorting: true },
         },
         {
             header: "Division",
             accessorKey: "division",
+            meta: { enableSorting: true },
         },
         {
             header: "Appointment Status",
             accessorKey: "appointment_status",
+            meta: { enableSorting: true },
         },
         {
             header: "Position",
+            accessorKey: "position_description",
             cell: ({ row }) => {
                 const { position_description, item_no, appointment_status } = row.original
 
                 return (
-                    <div>
-                        {position_description}
-                        {appointment_status === 'Permanent' && (
-                            <>
-                                <br />
-                                ({item_no})
-                            </>
+                    <div className="flex flex-col gap-1">
+                        <span>{position_description}</span>
+                        {appointment_status === 'Permanent' && <span>({item_no})</span>}
+                    </div>
+                )
+            },
+            meta: { enableSorting: true },
+        },
+        {
+            header: "SG / Monthly Salary",
+            accessorKey: "monthly_salary",
+            cell: ({ row }) => {
+                const sg = row.original.sg
+                const salary = row.original.monthly_salary
+                return (
+                    <span>{sg} / {parseFloat(salary).toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    })}</span>
+                )
+            },
+            meta: { enableSorting: true },
+        },
+        {
+            header: "Created by",
+            accessorKey: "creator",
+            cell: ({ row }) => {
+                const createdBy = row.original.created_by
+                const creator = row.original.creator
+                const dateCreated = row.original.date_created
+
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium mt-1">
+                            {createdBy === user.ipms_id ? "You" : creator}
+                        </span>
+                        {dateCreated && (
+                            <span className="text-xs text-gray-400">
+                                Date: {formatDate(dateCreated)}
+                            </span>
+                        )}
+                    </div>
+                )
+            },
+            meta: { enableSorting: true },
+        },
+        /* {
+            header: "Status",
+            accessorKey: "status",
+            meta: { enableSorting: true, className: "w-[15%]" },
+            cell: ({ row }) => {
+                const status = row.original.status
+                const actedBy = row.original.acted_by
+                const actedByName = row.original.acted_by_name
+                const dateActed = row.original.date_acted
+                const remarks = row.original.remarks
+                return (
+                    <div className="flex flex-col gap-1">
+                        <StatusBadge status={status} />
+                        {actedBy && (
+                            <span className="text-xs text-gray-400 mt-1">
+                                By: {actedBy === user.ipms_id ? "You" : actedByName}
+                            </span>
+                        )}
+                        {dateActed && (
+                            <span className="text-xs text-gray-400">
+                                Date: {formatDate(dateActed)}
+                            </span>
+                        )}
+                        {remarks && (
+                            <span className="text-xs text-gray-400">
+                                Remarks: 
+                                <div
+                                    dangerouslySetInnerHTML={{ __html: remarks }}
+                                />
+                            </span>
                         )}
                     </div>
                 )
             }
-        },
-        {
-            header: "Salary Grade",
+        }, */
+        /* {
+            header: "Actions",
             cell: ({ row }) => {
-                return row.original.sg
-            }
-        },
-        {
-            header: "Monthly Salary",
-            cell: ({ row }) => {
-                const salary = row.original.monthly_salary
-                return parseFloat(salary).toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                })
-            }
-        },
-        {
-            header: "Last Action",
-            accessorKey: "creator",
-            cell: ({ row }) => {
-              const actor = row.original.actor
-              const actedAt = row.original.date_acted
-              const date = actedAt ? new Date(actedAt) : null
-              const formattedDate = date ? format(date, 'MMMM d, yyyy') : ''
-          
-              return (
-                <div className="flex flex-col">
-                  <Badge className="w-fit inline-flex mb-1">{row.original.status}</Badge>
-                  <span className="font-medium">{actor}</span>
-                  {formattedDate && (
-                    <span className="text-xs italic text-muted-foreground">{formattedDate}</span>
-                  )}
-                </div>
-              )
-            },
-        },
-        {
-            id: "actions",
-            header: "",
-            cell: ({ row }) => {
-              const isHovered = row.id === hoveredRowId
-              return (
-                <div className="flex gap-2 justify-end items-center w-full">
-                  <div
-                    className={`flex transition-opacity duration-150 ${
-                      isHovered ? "opacity-100" : "opacity-0"
-                    }`}
-                  >
-                    <Link
-                        href={route("vacancies.edit", row.original.id)}
-                        onClick={() => setSelectedItem(row.original)}
-                        className="h-8 w-8 p-0 flex items-center justify-center hover:bg-muted rounded"
-                        >
-                        <Pencil className="h-4 w-4" />
-                    </Link>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the vacancy.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="border-0">
-                            Cancel
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive text-white hover:bg-destructive/90"
-                            onClick={() => {
-                                deleteVacancy({
-                                    id: row.original.id,
-                                    form, 
-                                    toast
-                                })
-                            }}
-                          >
-                            Yes, delete it
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    </div>
-            
-                    <Link
-                        href={route('vacancies.show', row.original.id)}
-                        className="h-8 gap-2 text-xs inline-flex items-center justify-center rounded-md px-3 py-1 bg-primary text-white hover:bg-primary/90 transition"
-                    >
-                        View
-                    </Link>
-                </div>
-              )
-            },
-        }
-          
-    ], [hoveredRowId])
+            const { props } = usePage()
+            const roles = props.auth.user?.roles || [] 
+            const status = row.original.status
 
-    const {
-        table,
-        form,
-        search,
-        setSearch,
-        pageIndex,
-        setPageIndex,
-        selectedRows
-    } = useTable({
-        data,
-        pageCount,
-        pageSize: 10,
-        currentPage: current_page,
-        searchQuery: '',
+            let actions = []
+
+            if ([null, "Draft", "Needs Revision"].includes(status) && roles.includes("HRIS_ADC", "HRIS_DC", "HRIS_HR")) {
+                actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
+            }
+            if (status === "Submitted" && roles.some(r => ["HRIS_ARD", "HRIS_HR"].includes(r))) {
+                actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
+                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
+            }
+            if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_HR"].includes(r))) {
+                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+            }
+
+            if (actions.length === 0) return null
+
+            return (
+                <div className="flex flex-col gap-2">
+                {actions.map((action, i) => (
+                    <Button
+                    key={i}
+                    size="xs"
+                    variant="link"
+                    title={action.label}
+                    onClick={() => handleAction(action.label, row)}
+                    className={`text-xs flex justify-start ${action.label === 'Disapprove' && 'text-red-500'}`}
+                    >
+                        {action.icon}
+                        {action.label}
+                    </Button>
+                ))}
+                </div>
+            )
+            }
+        } */
+    ], [])
+
+    const [filters, setFilters] = useState({})
+
+    const { 
+        TableView,
+        isFormOpen,
+        isFilterOpen,
+        isViewOpen,
+        formMode,
+        selectedItem,
+        handleCloseForm,
+        handleCloseFilter,
+        } = useCrudTable({
+        columns,
         routeName: route('vacancies.index'),
-        columns
+        initialData: vacancies,
+        filters,
+        options: {
+            enableAdd: true,
+            enableEdit: true,
+            enableView: false,
+            enableViewAsLink: true,
+            enableDelete: true, 
+            enableBulkDelete: true,
+            enableSearching: true,
+            enableFiltering: true,
+            enableRowSelection: row => !row.original.isLocked || canSelectVacancy,
+            enableGenerateReport: true,
+            canModify: canSelectVacancy
+        },
+        endpoints: {
+            viewEndpoint: (id) => route('vacancies.show', id),
+            addEndpoint: route('vacancies.create'),
+            editEndpoint: (id) => route('vacancies.edit', id),
+            deleteEndpoint: (id) => route('vacancies.destroy', id),
+            //generateReportEndpoint: (id) => route('vacancies.generate', id),
+            bulkDeleteEndpoint: route('vacancies.bulk-destroy'),
+            /* bulkSubmitEndpoint: route('rto.bulk-submit'),
+            bulkEndorseEndpoint: route('rto.bulk-endorse'),
+            bulkApproveEndpoint: route('rto.bulk-approve'),
+            bulkDisapproveEndpoint: route('rto.bulk-disapprove'), */
+        },
     })
 
-    const selectedStatuses = selectedRows.map(row => row.original.status)
-
-    const canAllowSubmit = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Draft', 'Changes Requested'].includes(status))
-    const canAllowApprove = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Ready for Approval', 'Submitted'].includes(status))
-    const canAllowDisapprove = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Submitted'].includes(status))
-    const canAllowDelete = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Draft'].includes(status))
-    const canAllowRequestChanges = selectedStatuses.length > 0 && selectedStatuses.every(status => ['Ready for Approval', 'Submitted'].includes(status))
-
     return (
-        <div className="flex flex-col gap-4">
-            <PageTitle pageTitle="Vacancies" description="Request publication of vacant positions in this page." breadcrumbItems={breadcrumbItems} />
-
-            <div className="w-full flex items-center gap-1">
-                <Link
-                    href={route('vacancies.create')}
-                >
-                    <Button
-                        variant=""
-                        className="flex items-center rounded-md disabled:opacity-50"
-                        size="sm"
-                    >
-                        <Plus className="h-6 w-6" />
-                        <span className="text-xs">New Vacancy</span>
-                    </Button>
-                </Link>
-                {!showSearch && (
-                    <Button
-                        variant="ghost"
-                        className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
-                        size="sm"
-                        onClick={() => setShowSearch(true)}
-                    >
-                        <Search className="h-6 w-6" />
-                        <span className="text-xs">Search</span>
-                    </Button>
-                )}
-
-                {showSearch && (
-                    <div className="relative px-2">
-                        <Search className="absolute left-4 top-2.5 h-3 w-3 text-muted-foreground" />
-                        <Input
-                            autoFocus
-                            placeholder="Type to search..."
-                            type="search"
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value)
-                                setPageIndex(0)
-                            }}
-                            onBlur={() => setShowSearch(false)}
-                            className="pl-8 w-full max-w-xs text-sm rounded h-8"
-                        />
-                    </div>
-                )}
-
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            className="flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-50"
-                            disabled={!canAllowDelete}
-                            size="sm"
-                        >
-                        <Trash2 className="h-8 w-8" />
-                        <span className="text-xs">Delete</span>
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Bulk Deletion</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete the selected vacancies. This action cannot be undone.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-destructive text-white hover:bg-destructive/90"
-                            onClick={() => {
-                                deleteVacancies({
-                                    form,
-                                    toast,
-                                })
-                            }}
-                        >
-                            Yes, delete it
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                        variant="ghost"
-                        className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
-                        size="sm"
-                        disabled={!canAllowSubmit}
-                        >
-                        <Send className="h-8 w-8" />
-                        <span className="text-xs">Submit</span>
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Submit Vacancies</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will notify the reviewer to review your submission.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                            //sendDraftsForApproval({ toast })
-                            }}
-                        >
-                            Confirm
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                        variant="ghost"
-                        className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
-                        size="sm"
-                        disabled={!canAllowRequestChanges}
-                        >
-                        <Undo2 className="h-8 w-8" />
-                        <span className="text-xs">Request Changes</span>
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Request changes for vacancies</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will notify the sender to revise the submitted vacancies.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                            //sendDraftsForApproval({ toast })
-                            }}
-                        >
-                            Confirm
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            className="flex items-center justify-center hover:bg-muted disabled:opacity-50"
-                            disabled={!canAllowApprove}
-                            size="sm"
-                        >
-                        <ThumbsUp className="h-8 w-8" />
-                        <span className="text-xs">Approve</span>
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Approval</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently approve the selected publication requests. This action cannot be undone.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                                approveVacancies({
-                                    form,
-                                    toast,
-                                })
-                            }}
-                        >
-                            Continue
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            className="flex items-center justify-center rounded-md hover:bg-muted disabled:opacity-50"
-                            disabled={!canAllowDisapprove}
-                            size="sm"
-                        >
-                        <ThumbsDown className="h-8 w-8" />
-                        <span className="text-xs">Disapprove</span>
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Bulk Disapproval</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently disapprove the selected vacancies. This action cannot be undone.
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel className="border-0">Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                                disapproveVacancies({
-                                    form,
-                                    toast,
-                                })
-                            }}
-                        >
-                            Continue
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </div>
-
-            <span className="text-sm font-medium">
-                {!data || data.length === 0 ? (
-                    <>Showing 0 items</>
-                    ) : (
-                    <>
-                        Showing {(pageIndex * perPage) + 1} - {Math.min((pageIndex + 1) * perPage, total)} of {total} items
-                    </>
-                )}
-            </span>
-            
-            <div className="border rounded-lg">
-                <Table>
-                    <TableHeader className="bg-gray-100">
-                    {table.getHeaderGroups().map(headerGroup => (
-                        <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map(header => (
-                            <TableHead key={header.id} className="px-4 py-2 font-medium text-gray-700">
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            </TableHead>
-                        ))}
-                        </TableRow>
-                    ))}
-                    </TableHeader>
-                    <TableBody className="font-medium">
-                        {data?.length > 0 ? (
-                            table.getRowModel().rows.map((row) => (
-                                <TableRow 
-                                    key={row.id}
-                                    onMouseEnter={() => setHoveredRowId(row.id)}
-                                    onMouseLeave={() => setHoveredRowId(null)}
-                                    className={cn(
-                                        "transition hover:bg-muted/50",
-                                        row.getIsSelected() && "bg-muted"
-                                    )}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={columns.length} className="p-4 text-center">
-                                    No data found.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-
-            <PaginationControls
-                pageIndex={pageIndex}
-                pageCount={pageCount}
-                setPageIndex={setPageIndex}
-                selectedRowsLength={selectedRows.length}
+        <div className="h-full flex flex-col">
+            <Head title="Vacancies" />
+            <PageTitle 
+                pageTitle="Vacancies" 
+                description="Manage information about your requested vacancies here." 
+                breadcrumbItems={breadcrumbItems} 
             />
 
+            <TableView />
+            {isFilterOpen && (
+                <Filter
+                    open={isFilterOpen}
+                    onClose={handleCloseFilter}
+                    onApply={(appliedFilters) => setFilters(appliedFilters)}
+                    initialValues={filters}
+                    divisions={divisions}
+                    appointmentStatuses={appointmentStatuses}
+                />
+            )}
+            <Dialog 
+                open={!!confirmAction}
+                onOpenChange={(open) => {
+                if (!open) {
+                    setConfirmAction(null)
+                    reset() 
+                    clearErrors()
+                }
+            }}    
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm {confirmAction}</DialogTitle>
+                        <DialogDescription>
+                        Are you sure you want to <b>{confirmAction}</b> this vacancy?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={performAction}>
+                        {(confirmAction === "Needs Revision" || confirmAction === "Disapprove") && (
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="description">Remarks</Label>
+                                <RichTextEditor 
+                                    name="remarks" 
+                                    onChange={(value => setData('remarks', value))}
+                                    isInvalid={errors.remarks}
+                                    id="remarks"
+                                    value={data.remarks}
+                                />
+                                {errors?.remarks && <span className="text-red-500 text-xs">{errors.remarks}</span>}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 mt-4">
+                            <Button variant="ghost" onClick={() => setConfirmAction(null)}>Cancel</Button>
+                            <Button type="submit" disabled={processing}>
+                                {processing ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <span>Please wait</span>
+                                    </>
+                                ) : 'Submit'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

@@ -1,20 +1,26 @@
 import PageTitle from "@/components/PageTitle"
 import useCrudTable from "@/hooks/useCrudTable"
-import { usePage } from '@inertiajs/react'
-import { useState, useMemo } from "react"
+import { useForm } from '@inertiajs/react'
+import { useState, useEffect, useMemo } from "react"
 import Form from "./Form"
 import Filter from "./Filter"
 import { useHasRole } from "@/hooks/useAuth"
-
-const breadcrumbItems = [
-    { label: 'Home', href: '/' },
-    { label: 'Competencies', href: '#' },
-    { label: 'Libraries', href: '#' },
-    { label: 'Competencies', href: '/competencies' },
-]
+import { store } from './store'
+import { Loader2 } from "lucide-react"
 
 const index = () => {
-    const { competencies } = usePage().props
+
+    const {
+        competencies,
+        setCompetencies,
+        fetchCompetencies
+    } = store()
+
+    const [filters, setFilters] = useState({})
+
+    useEffect(() => {
+        fetchCompetencies()
+    }, [])
 
     const canModify = useHasRole(["HRIS_HR"])
 
@@ -36,7 +42,7 @@ const index = () => {
         },
     ], [])
 
-    const [filters, setFilters] = useState({})
+    console.log(competencies)
 
     const { 
         TableView,
@@ -47,11 +53,21 @@ const index = () => {
         selectedItem,
         handleCloseForm,
         handleCloseFilter,
+        reloadTable
      } = useCrudTable({
         columns,
         routeName: route('competencies.index'),
-        initialData: competencies,
+        initialData: competencies.data,
         filters,
+        responseType: "json",
+        onJsonResponse: (response) => {
+            setCompetencies((old) => ({
+                ...old,
+                data: response,
+                isLoading: false,
+                error: null
+            }))
+        },
         options: {
             enableAdd: true,
             enableEdit: true,
@@ -75,15 +91,26 @@ const index = () => {
             <PageTitle
                 pageTitle="Competencies"
                 description="Manage library of competencies here."
-                breadcrumbItems={breadcrumbItems}
             />
-            <TableView />
+            <div className="overflow-x-auto">
+                <div className="relative">
+                {competencies.isLoading && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                    </div>
+                )}
+                <TableView />
+                </div>
+            </div>
             {isFormOpen && (
                 <Form
                     open={isFormOpen}
                     mode={formMode}
                     data={selectedItem}
-                    onClose={handleCloseForm}
+                    onClose={() => {
+                        handleCloseForm()
+                        reloadTable()
+                    }}
                 />
             )}
             {isFilterOpen && (

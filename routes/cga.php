@@ -80,4 +80,6 @@ Route::middleware(['web', 'auth.any'])->group(function () {
     Route::get('/cga/{id}/gap-analysis', [CgaController::class, 'getGapAnalysis'])->name('cga.gap-analysis');
 
     Route::post('/cga/gap-analysis', [CgaController::class, 'storeGapAnalysis'])->name('cga.gap-analysis.store');
+
+    Route::get('/cga/libraries', [CgaController::class, 'getLibraries'])->name('cga.libraries');
 });

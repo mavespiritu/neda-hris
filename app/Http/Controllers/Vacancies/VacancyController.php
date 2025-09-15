@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Arr;
+use App\Notifications\Vacancies\NotifyStaffOfVacancyApproval;
 
 class VacancyController extends Controller
 {
@@ -29,102 +30,129 @@ class VacancyController extends Controller
 
     public function index(Request $request)
     {
-        /* Gate::authorize('view-index', 
-            'vacancies',
-            [
-                'allowed_roles' => ['RD', 'ARD', 'OIC-RD', 'OIC-ARD', 'HRIS_HR', 'HRIS_DC'],
-                'required_permission' => 'HRIS_vacancies.view-vacancies',
-            ]
-        ); */
-
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
-        $search = $request->input('search', '');
-        $matchingEmployeeIDs = collect();
+        $sort      = $request->get('sort');
+        $direction = strtolower($request->get('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $search    = $request->input('search', '');
 
-        if (!empty($search)) {
-            $matchingEmployeeIDs = $conn3->table('tblemployee')
-                ->where(function ($query) use ($search) {
-                    $query->where(DB::raw("CONCAT(fname, ' ', lname)"), 'like', '%' . $search . '%');
-                })
-                ->pluck('emp_id');
+        $sortable = [
+            'division' => DB::raw('division'),
+            'appointment_status' => DB::raw('appointment_status'),       
+            'position_description' => DB::raw('position_description'),             
+            'sg' => DB::raw('sg'),             
+            'monthly_salary' => DB::raw('monthly_salary'),            
+        ];
+
+        $searchable = [
+            'reference_no',
+            'creator',
+            'division',
+            'appointment_status',
+            'position',
+            'position_description',
+            'sg',
+            'monthly_salary',
+        ];
+
+        $filterable = [
+            'division' => 'v.division',
+            'appointment_status' => 'v.appointment_status',
+            'sg' => 'v.sg',
+        ];
+        
+        $vacanciesQuery = $conn2->table('vacancy as v')
+        ->select([
+            'v.*',
+        ]);
+
+        // filtering
+        foreach ($filterable as $param => $column) {
+            if ($request->filled($param)) {
+                $vacanciesQuery->where($column, $request->input($param));
+            }
         }
 
-        $latestStatus = $conn2->table('status_logs as vs1')
-        ->select(
-            'vs1.model_id as status_vacancy_id',
-            'vs1.status as current_status',
-            'vs1.acted_by as latest_acted_by',
-            'vs1.date_acted as date_acted'
-        )
-        ->join(DB::raw('(
-            SELECT model_id, MAX(id) as max_id 
-            FROM status_logs 
-            WHERE model = "Vacancy"
-            GROUP BY model_id
-        ) as vs2'), function ($join) {
-            $join->on('vs1.model_id', '=', 'vs2.model_id')
-                ->on('vs1.id', '=', 'vs2.max_id');
-        })
-        ->where('vs1.model', 'Vacancy');
+        // sorting
+        if ($sort && isset($sortable[$sort]) && in_array(strtolower($direction), ['asc', 'desc'])) {
+            $vacanciesQuery->orderBy($sortable[$sort], $direction);
+        }
 
-        $vacancies = $conn2->table('vacancy')
-            ->leftJoinSub($latestStatus, 'vs', function ($join) {
-                $join->on('vacancy.id', '=', 'vs.status_vacancy_id');
-            })
-            ->when($search, function ($query) use ($search, $matchingEmployeeIDs) {
-                $query->where(function ($q) use ($search, $matchingEmployeeIDs) {
-                    $q->where('item_no', 'like', '%' . $search . '%')
-                    ->orWhere('division', 'like', '%' . $search . '%')
-                    ->orWhere('position', 'like', '%' . $search . '%')
-                    ->orWhere('position_description', 'like', '%' . $search . '%')
-                    ->orWhere('sg', 'like', '%' . $search . '%')
-                    ->orWhere('date_created', 'like', '%' . $search . '%')
-                    ->orWhere('vs.current_status', 'like', '%' . $search . '%');
+        $vacancies = $vacanciesQuery->orderBy('v.id', 'desc')->paginate(20);
 
-                    if ($matchingEmployeeIDs->isNotEmpty()) {
-                        $q->orWhereIn('vacancy.created_by', $matchingEmployeeIDs);
-                        $q->orWhereIn('vacancy.requested_by', $matchingEmployeeIDs);
-                        $q->orWhereIn('vs.latest_acted_by', $matchingEmployeeIDs);
-                    }
-                });
-            })
-            ->select(
-                'vacancy.*', 
-                'vs.current_status as status', 
-                'vs.date_acted', 
-                'vs.latest_acted_by'
-            )
-            ->orderBy('vacancy.id', 'desc')
-            ->paginate(20);
+        $vacancyIDs = $vacancies->pluck('id')->toArray();
 
-        // Collect employee IDs for display
-        $allIDs = $vacancies->pluck('created_by')
-            ->merge($vacancies->pluck('updated_by'))
-            ->merge($vacancies->pluck('latest_acted_by'))
-            ->unique()
-            ->values();
+        $creatorIDs = $vacancies->pluck('created_by')->unique()->values();
 
-        $employees = $conn3->table('tblemployee')
-            ->whereIn('emp_id', $allIDs)
+        $employees = $conn3->table('tblemployee as e')
+        ->select([
+            'e.emp_id',
+            DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')) as name"),
+        ])
+        ->get()
+        ->keyBy('emp_id');
+
+        $histories = $conn2->table('submission_history')
+            ->where('model', 'Vacancy')
+            ->whereIn('model_id', $vacancyIDs)
+            ->orderBy('date_acted', 'desc')
             ->get()
-            ->keyBy('emp_id')
-            ->map(function ($employee) {
-                return (object)[
-                    'name' => $employee->fname . ' ' . $employee->lname,
-                ];
-            });
+            ->groupBy('model_id');
 
-        // Attach names
-        $vacancies->getCollection()->transform(function ($pub) use ($employees) {
-            $pub->creator = $employees->get($pub->created_by)->name ?? null;
-            $pub->actor = $employees->get($pub->latest_acted_by)->name ?? null;
-            return $pub;
+        $vacancies->getCollection()->transform(function ($vacancy) use ($histories, $employees) {
+            $vacancy->creator = $employees->get($vacancy->created_by)->name ?? null;
+
+            $latestHistory = $histories->get($vacancy->id, collect())->first();
+
+            $vacancy->creator = $employees->get($vacancy->created_by)->name ?? null;
+            $vacancy->status = $latestHistory->status ?? null;
+            $vacancy->acted_by = $latestHistory->acted_by ?? null;
+            $vacancy->acted_by_name = $latestHistory ? $employees->get($latestHistory->acted_by)->name ?? null : null;
+            $vacancy->date_acted = $latestHistory->date_acted ?? null;
+            $vacancy->remarks = $latestHistory->remarks ?? null;
+
+            return $vacancy;
         });
 
+        if ($sort === 'creator') {
+            $sorted = $vacancies->getCollection()->sortBy(
+                fn($v) => $v->creator ?? '',
+                SORT_REGULAR,
+                $direction === 'desc'
+            );
+            $vacancies->setCollection($sorted->values());
+        }
+
+        if ($sort === 'status') {
+            $sorted = $vacancies->getCollection()->sortBy(
+                fn($v) => $v->status ?? '',
+                SORT_REGULAR,
+                $direction === 'desc'
+            );
+            $vacancies->setCollection($sorted->values());
+        }
+
+        if ($search) {
+            $searchLower = strtolower($search);
+
+            $vacancies->setCollection(
+                $vacancies->getCollection()->filter(function ($vacancy) use ($searchable, $searchLower) {
+                    foreach ($searchable as $field) {
+                        if (str_contains(strtolower($vacancy->{$field} ?? ''), $searchLower)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })->values()
+            );
+
+        }
+
         return Inertia::render('Vacancies/index', [
-            'vacancies' => $vacancies,
+            'data' => [
+                'vacancies' => $vacancies,
+            ],
         ]);
     }
 
@@ -246,6 +274,7 @@ class VacancyController extends Controller
         $conn2 = DB::connection('mysql2');
 
         $validator = Validator::make($request->all(), [
+            'type' => 'required',
             'appointment_status' => 'required',
             'item_no' => 'required_if:appointment_status,Permanent',
             'position_description' => 'required_unless:appointment_status,Permanent',
@@ -269,6 +298,7 @@ class VacancyController extends Controller
             'output' => 'required',
             'responsibility' => 'required',
         ], [
+            'type.required' => 'The type is required.',
             'appointment_status.required' => 'The status of appointment is required.',
             'item_no.required_if' => 'The plantilla item no. is required when appointment status is Permanent.',
             'position_description.required_unless' => 'The position is required unless appointment status is Permanent.',
@@ -296,10 +326,31 @@ class VacancyController extends Controller
         $validator->validate();
 
         try{
+            
+            $conn2->beginTransaction();
+
+            $year = Carbon::now()->year;
+
+            $lastReferenceNo = $conn2->table('vacancy')
+            ->whereYear('date_created', $year) 
+            ->orderByDesc('id') 
+            ->first();
+
+            $nextReferenceNo = '001'; 
+
+            if ($lastReferenceNo) {
+                $lastRefNum = explode('-', $lastReferenceNo->reference_no)[0];
+                $nextReferenceNo = str_pad((int)$lastRefNum + 1, 3, '0', STR_PAD_LEFT);
+            }
+    
+            $referenceNo = $year . '-' . $nextReferenceNo;
+
             $data = $request->all();
 
             $data = Arr::except($data, ['competencies']);
             
+            $data['reference_no'] = $referenceNo;
+            $data['status'] = 'Open';
             $data['step'] = 1;
             $data['created_by'] = Auth::user()->ipms_id;
             $data['date_created'] = now();
@@ -307,15 +358,6 @@ class VacancyController extends Controller
 
             $vacancy = $conn2->table('vacancy')
             ->insertGetId($data);
-
-            $conn2->table('status_logs')
-            ->insert([
-                'model_id' => $vacancy,
-                'model' => 'Vacancy',
-                'status' => 'Draft',
-                'acted_by' => Auth::user()->ipms_id,
-                'date_acted' => Carbon::now()->format('Y-m-d H:i:s'),
-            ]);
 
             if($request->competencies){
                 foreach($request->competencies as $type => $competencies){
@@ -331,6 +373,8 @@ class VacancyController extends Controller
                 }
             }
 
+            $conn2->commit();
+
             return redirect()->route('vacancies.index')->with([
                 'status' => 'success',
                 'title' => 'Success!',
@@ -338,7 +382,7 @@ class VacancyController extends Controller
             ]);
 
         } catch (\Exception $e) {
-
+            $conn2->rollBack();
             Log::error('Failed to save vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -386,6 +430,7 @@ class VacancyController extends Controller
         $conn2 = DB::connection('mysql2');
 
         $validator = Validator::make($request->all(), [
+            'type' => 'required',
             'appointment_status' => 'required',
             'item_no' => 'required_if:appointment_status,Permanent',
             'position_description' => 'required_unless:appointment_status,Permanent',
@@ -409,6 +454,7 @@ class VacancyController extends Controller
             'output' => 'required',
             'responsibility' => 'required',
         ], [
+            'type.required' => 'The type is required.',
             'appointment_status.required' => 'The status of appointment is required.',
             'item_no.required_if' => 'The plantilla item no. is required when appointment status is Permanent.',
             'position_description.required_unless' => 'The position is required unless appointment status is Permanent.',
@@ -436,6 +482,9 @@ class VacancyController extends Controller
         $validator->validate();
 
         try {
+
+            $conn2->beginTransaction();
+
             $data = $request->all();
 
             $data = Arr::except($data, ['competencies']);
@@ -464,12 +513,15 @@ class VacancyController extends Controller
                 }
             }
 
+            $conn2->commit();
+
             return redirect()->route('vacancies.index')->with([
                 'status' => 'success',
                 'title' => 'Success!',
                 'message' => 'Vacancy updated successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to update vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -485,14 +537,19 @@ class VacancyController extends Controller
         $conn2 = DB::connection('mysql2');
 
         try {
+
+            $conn2->beginTransaction();
+
             $conn2->table('vacancy')
                 ->where('id', $id)
                 ->delete();
 
-            $conn2->table('status_logs')
+            $conn2->table('submission_history')
                 ->where('model_id', $id)
                 ->where('model', 'Vacancy')
                 ->delete();
+
+            $conn2->commit();
 
             return redirect()->route('vacancies.index')->with([
                 'status' => 'success',
@@ -500,6 +557,7 @@ class VacancyController extends Controller
                 'message' => 'Vacancy deleted successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to delete request: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -517,14 +575,19 @@ class VacancyController extends Controller
         $ids = $request->input('ids');
 
         try {
+
+            $conn2->beginTransaction();
+
             $conn2->table('vacancy')
                 ->whereIn('id', $ids)
                 ->delete();
 
-            $conn2->table('status_logs')
+            $conn2->table('submission_history')
                 ->whereIn('model_id', $ids)
                 ->where('model', 'Vacancy')
                 ->delete();
+
+            $conn2->commit();
 
             return redirect()->back()->with([
                 'status' => 'success',
@@ -532,6 +595,7 @@ class VacancyController extends Controller
                 'message' => 'Vacancies deleted successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to delete vacancies: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -542,188 +606,264 @@ class VacancyController extends Controller
         }
     }
 
-    public function bulkApprove(Request $request)
+    public function submit($id)
     {
+
         $conn2 = DB::connection('mysql2');
 
-        $ids = $request->input('ids');
+        try {
+
+            $conn2->beginTransaction();
+
+            $vacancy = $conn2->table('vacancy')->where('id', $id)->first();
+
+            if (!$vacancy) {
+                abort(404, 'Vacancy not found');
+            }
+
+            $conn2->table('submission_history')->insert([
+                'model' => 'Vacancy',
+                'model_id' => $id,
+                'status' => 'Submitted',
+                'acted_by' => auth()->user()->ipms_id,
+                'date_acted' => now(),
+            ]);
+
+            $conn2->commit();
+
+        } catch (\Exception $e) {
+            $conn2->rollBack();
+            Log::error('Error submitting vacancy: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh!',
+                'message' => 'An error occurred while submitting vacancy. Please try again.'
+            ]);
+        }
+    }
+
+    public function approve($id)
+    {
+
+        $conn2 = DB::connection('mysql2');
 
         try {
+
+            $conn2->beginTransaction();
+
+            $vacancy = $conn2->table('vacancy')->where('id', $id)->first();
+
+            if (!$vacancy) {
+                abort(404, 'Vacancy not found');
+            }
+
+            $conn2->table('submission_history')->insert([
+                'model' => 'Vacancy',
+                'model_id' => $id,
+                'status' => 'Approved',
+                'acted_by' => auth()->user()->ipms_id,
+                'date_acted' => now(),
+            ]);
             
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Vacancy',
-                        'status' => 'Approved',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
+            $conn2->commit();
 
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Vacancies approved successfully.'
-            ]);
         } catch (\Exception $e) {
-            Log::error('Failed to approve vacancies: ' . $e->getMessage());
+            $conn2->rollBack();
+            Log::error('Error approving vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
                 'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while approving the vacancies. Please try again.'
+                'title' => 'Uh oh!',
+                'message' => 'An error occurred while approving vacancy. Please try again.'
             ]);
         }
     }
 
-    public function bulkDisapprove(Request $request)
+    public function approveViaEmail($token)
     {
         $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
+        $conn3 = DB::connection('mysql3');
+        $conn4 = DB::connection('mysql4');
 
         try {
+
+            $link = $conn4->table('email_links')->where('token', $token)->first();
             
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Publication',
-                        'status' => 'Disapproved',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
+            if (!$link) {
+                abort(404, 'Invalid link.');
             }
 
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Vacancies approved successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to approve vacancies: ' . $e->getMessage());
+            if (now()->greaterThan($link->expires_at)) {
+                return Inertia::render('ThankYou', [
+                    'message' => 'This link has expired.'
+                ]);
+            }
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while approving the vacancies. Please try again.'
+            if ($link->is_used) {
+                return Inertia::render('ThankYou', [
+                    'message' => 'This link has already been used.'
+                ]);
+            }
+            
+            $vacancy = $conn2->table('vacancy')->where('id', $link->model_id)->first();
+
+            if (!$vacancy) {
+                abort(404, 'Vacancy not found');
+            }
+
+            $user = User::find($link->user_id);
+
+            if (!$user) {
+                abort(404, 'User not found');
+            }
+
+            $conn2->table('submission_history')->insert([
+                'model' => 'Vacancy',
+                'model_id' => $vacancy->id,
+                'status' => 'Approved',
+                'acted_by' => $user->ipms_id,
+                'date_acted' => now(),
+            ]);
+
+            $conn4->table('email_links')
+            ->where('token', $token)
+            ->update(['is_used' => true]);
+
+
+            $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $vacancy->created_by)
+            ->first();
+
+            if (!$staff) {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Staff record not found.'
+                ]);
+            }
+
+            $submitter = User::where('ipms_id', $vacancy->created_by)->first();
+
+            if ($submitter) {
+                $payload = [
+                    'vacancy_id' => $vacancy->id,
+                    'approver_id' => $user->ipms_id,
+                ];
+
+                Notification::sendNow($submitter, new NotifyStaffOfVacancyApproval($payload));
+            }
+
+            // Audit log (optional)
+            Log::info("Vacancy {$vacancy->id} approved via email by user {$user->email}");
+
+            return Inertia::render('ThankYou', [
+                'message' => 'You have successfully approved the vacancy.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Failed email approval for vacancy: " . $e->getMessage());
+            
+            return Inertia::render('ThankYou', [
+                'message' => 'Something went wrong. Please contact the ICT Unit.',
             ]);
         }
     }
 
-    public function bulkSubmit(Request $request)
+    public function disapprove($id, Request $request)
     {
+
         $conn2 = DB::connection('mysql2');
 
-        $ids = $request->input('ids');
+        $request->validate(
+            [
+                'remarks' => 'required|string|max:1000',
+            ],
+            [
+                'remarks.required' => 'Remarks are required to disapprove an RTO.',
+                'remarks.string'   => 'Remarks must be a valid text.',
+                'remarks.max'      => 'Remarks cannot exceed 1000 characters.',
+            ]
+        );
 
         try {
 
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Vacancy',
-                        'status' => 'Submitted',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
+            $conn2->beginTransaction();
+
+            $vacancy = $conn2->table('vacancy')->where('id', $id)->first();
+
+            if (!$vacancy) {
+                abort(404, 'Vacancy not found');
             }
 
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Vacancies submitted successfully.'
+            $conn2->table('submission_history')->insert([
+                'model' => 'Vacancy',
+                'model_id' => $id,
+                'status' => 'Disapproved',
+                'acted_by' => auth()->user()->ipms_id,
+                'date_acted' => now(),
+                'remarks' => $request->remarks
             ]);
+
+            $conn2->commit();
+
         } catch (\Exception $e) {
-            Log::error('Failed to send vacancies for approval: ' . $e->getMessage());
+            $conn2->rollBack();
+            Log::error('Error disapproving vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
                 'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while submitting vacancies. Please try again.'
+                'title' => 'Uh oh!',
+                'message' => 'An error occurred while disapproving vacancy. Please try again.'
             ]);
         }
     }
 
-    public function bulkRequestForChanges(Request $request)
+    public function return($id, Request $request)
     {
+
         $conn2 = DB::connection('mysql2');
 
-        $ids = $request->input('ids');
+        $request->validate(
+            [
+                'remarks' => 'required|string|max:1000',
+            ],
+            [
+                'remarks.required' => 'Remarks are required to return an RTO.',
+                'remarks.string'   => 'Remarks must be a valid text.',
+                'remarks.max'      => 'Remarks cannot exceed 1000 characters.',
+            ]
+        );
 
         try {
 
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Vacancy',
-                        'status' => 'Changes Requested',
-                        'remarks' => $request->remarks,
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
+            $conn2->beginTransaction();
+
+            $vacancy = $conn2->table('vacancy')->where('id', $id)->first();
+
+            if (!$vacancy) {
+                abort(404, 'Vacancy not found');
             }
 
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Request for changes on vacancies submitted successfully.'
+            $conn2->table('submission_history')->insert([
+                'model' => 'Vacancy',
+                'model_id' => $id,
+                'status' => 'Needs Revision',
+                'acted_by' => auth()->user()->ipms_id,
+                'date_acted' => now(),
+                'remarks' => $request->remarks
             ]);
+
+            $conn2->commit();
+
         } catch (\Exception $e) {
-            Log::error('Failed to request changes for vacancies: ' . $e->getMessage());
+            $conn2->rollBack();
+            Log::error('Error returning vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
                 'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while requesting changes for vacancies. Please try again.'
-            ]);
-        }
-    }
-
-    public function bulkReadyForApproval(Request $request)
-    {
-        $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
-
-        try {
-
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Vacancy',
-                        'status' => 'Ready for Approval',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
-
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Vacancies ready for approval submitted successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to submit vacancies ready for approval: ' . $e->getMessage());
-
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while submitting vacancies ready for approval. Please try again.'
+                'title' => 'Uh oh!',
+                'message' => 'An error occurred while returning vacancy. Please try again.'
             ]);
         }
     }
@@ -1096,5 +1236,56 @@ class VacancyController extends Controller
                 'message' => 'Something went wrong while deleting the question.'
             ]);
         }
+    }
+
+    public function getVacancies()
+    {
+        $conn2 = DB::connection('mysql2');
+
+        $vacancies = $conn2->table('vacancy')
+            ->select(
+                'vacancy.id as value',
+                DB::raw("
+                    CONCAT(
+                        '[RF#: ',vacancy.reference_no,'] ',vacancy.division, ': ', vacancy.position_description,
+                        CASE
+                            WHEN vacancy.appointment_status = 'Permanent' THEN CONCAT(' (', vacancy.item_no, ')')
+                            ELSE ''
+                        END
+                    ) as label
+                ")
+            )
+            ->orderBy('vacancy.division', 'asc')
+            ->orderBy('vacancy.position', 'asc')
+            ->orderBy('vacancy.item_no', 'asc')
+            ->get();
+
+        return response()->json($vacancies);
+    }
+
+    public function getVacancyDetails($id)
+    {
+        $conn2 = DB::connection('mysql2');
+
+        $vacancy = $conn2->table('vacancy')
+            ->where('id', $id)
+            ->first();
+
+        $competencies = $conn2->table('vacancy_competencies as vc')
+            ->leftJoin('competency as c', 'vc.competency_id', '=', 'c.comp_id')
+            ->where('vc.vacancy_id', $id)
+            ->select(
+                'c.comp_id as id',
+                'c.competency',
+                'vc.level',
+                'vc.comp_type'
+            )
+            ->orderBy('vc.comp_type', 'asc')
+            ->orderBy('c.competency', 'asc')
+            ->get();
+
+        $vacancy->competencies = $competencies;
+
+        return response()->json($vacancy);
     }
 }

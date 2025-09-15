@@ -192,7 +192,8 @@ const MyCga = () => {
                 </nav>
               </div>
             </div>
-            <Alert className={`hidden lg:block ${isSubmissionWindowOpen ? 'border-green-500' : 'border-red-500'}`}>
+
+            {/* <Alert className={`hidden lg:block ${isSubmissionWindowOpen ? 'border-green-500' : 'border-red-500'}`}>
               <AlertCircleIcon className="h-4 w-4" />
               
               <div className="flex flex-col gap-1">
@@ -217,7 +218,15 @@ const MyCga = () => {
                     <span>Review Submission</span>
                   </Button>
                 )}
-            </Alert>
+            </Alert> */}
+
+            <Button 
+              className="mt-2 w-full flex items-center gap-2"
+              onClick={() => setCurrentTab('Review')}
+            >
+              <Send className="size-4" />
+              <span>Review Submission</span>
+            </Button>
           </div>
 
           {/* Main Content */}

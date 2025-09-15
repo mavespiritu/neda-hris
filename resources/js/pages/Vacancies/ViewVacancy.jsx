@@ -95,10 +95,10 @@ const ViewVacancy = () => {
 
     const breadcrumbItems = [
         { label: 'Home', href: '/' },
-        { label: 'RSP', href: '#' },
+        { label: 'Recruitment', href: '#' },
         { label: 'Vacancies', href: route('vacancies.index') },
         {
-            label: `Vacancy Info: ${vacancy.position_description}${vacancy.item_no ? ` (${vacancy.item_no})` : ''}`,
+            label: `Vacancy Info: [RF#: ${vacancy.reference_no}] ${vacancy.position}${vacancy.item_no ? ` (${vacancy.item_no})` : ''}`,
             href: route('vacancies.show', vacancy.id)
         }
     ]
@@ -208,7 +208,7 @@ const ViewVacancy = () => {
         </div>
       </div>
 
-      <PageTitle pageTitle={`Vacancy Info: ${vacancy.position_description}${vacancy.item_no ? ` (${vacancy.item_no})` : ''}`} description="Manage the vacancy info here." breadcrumbItems={breadcrumbItems}/>
+      <PageTitle pageTitle={`Vacancy Info: [RF#: ${vacancy.reference_no}] ${vacancy.position}${vacancy.item_no ? ` (${vacancy.item_no})` : ''}`} description="Manage the vacancy info here." breadcrumbItems={breadcrumbItems}/>
 
       <div className="flex flex-col md:flex-row gap-4">
 

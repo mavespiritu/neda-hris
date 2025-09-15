@@ -23,6 +23,7 @@ export const store = create((set, get) => ({
     activeCompetencyType: null,
 
     initialValues: {
+        type: "New",
         appointment_status: "",
         item_no: "",
         position_description: "",
@@ -55,6 +56,12 @@ export const store = create((set, get) => ({
     },
 
     positions: {
+        data: [],
+        isLoading: false,
+        error: null,
+    },
+
+    vacancyOptions: {
         data: [],
         isLoading: false,
         error: null,

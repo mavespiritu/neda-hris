@@ -18,11 +18,13 @@ use App\Notifications\NotifyStaffOfGapAnalysisEndorsement;
 use App\Notifications\NotifySupervisorOfGapAnalysisEndorsement;
 use App\Notifications\NotifyStaffOfGapAnalysisApproval;
 use App\Notifications\NotifyStaffOfGapAnalysisDisapproval;
+
 use App\Notifications\NotifySupervisorOfRtoSubmission;
 use App\Notifications\NotifyArdOfRtoEndorsement;
 use App\Notifications\NotifyStaffOfRtoApproval;
 use App\Notifications\NotifyStaffOfRtoDisapproval;
 use App\Notifications\NotifyStaffOfRtoReturn;
+
 use App\Notifications\NotifySupervisorOfRaaSubmission;
 use App\Notifications\NotifyArdOfRaaEndorsement;
 use App\Notifications\NotifyStaffOfRaaApproval;

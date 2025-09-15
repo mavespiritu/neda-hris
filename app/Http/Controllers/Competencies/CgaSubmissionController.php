@@ -26,19 +26,22 @@ class CgaSubmissionController extends Controller
         $conn3 = DB::connection('mysql3');
 
         $user = Auth::user();
-        $hasDCRole = $user->hasRole('HRIS_DC');
-        $hasADCRole = $user->hasRole('HRIS_ADC');
+        $rolePriorities = config('roles.priorities');
+        $userRoles = Auth::user()->roles->pluck('name')->toArray();
+        $highestRole = collect($userRoles)
+            ->mapWithKeys(fn($role) => [$role => $rolePriorities[$role] ?? 0])
+            ->sortDesc()
+            ->keys()
+            ->first();
 
         $search = trim($request->input('search', ''));
 
-        // Get positions list
         $positions = $conn3->table('tblemp_position_item as epi')
             ->join('tblposition as p', 'p.position_id', '=', 'epi.position_id')
             ->select('epi.item_no', 'p.post_description')
             ->get()
             ->pluck('post_description', 'item_no');
 
-        // Prepare employee query
         $employeeQuery = $conn3->table('tblemployee as e')
             ->select([
                 DB::raw('CAST(e.emp_id AS CHAR) as emp_id'),
@@ -46,14 +49,20 @@ class CgaSubmissionController extends Controller
             ])
             ->where('e.work_status', 'Active');
 
-        if ($hasDCRole || $hasADCRole) {
-            $userInfo = $conn3->table('tblemployee')
-                ->where('emp_id', $user->ipms_id)
-                ->first();
-
-            if ($userInfo) {
-                $employeeQuery->where('e.division_id', $userInfo->division_id);
-            }
+        switch ($highestRole) {
+            case 'HRIS_RD':
+                // RD sees all
+                break;
+            case 'HRIS_ARD':
+                // ARD sees all
+                break;
+            case 'HRIS_HR':
+                // HR sees all
+                break;
+            case 'HRIS_ADC':
+            case 'HRIS_DC':
+                $employeeQuery->where('e.division_id', auth()->user()->division);
+                break;
         }
 
         // Execute employee query
@@ -79,6 +88,7 @@ class CgaSubmissionController extends Controller
             ->select([
                 'scr.id',
                 'scr.emp_id',
+                'scr.year',
                 'scr.position_id',
                 DB::raw("DATE_FORMAT(date_created, '%M %d, %Y %h:%i:%s %p') as date_submitted"),
                 'scr.status',
@@ -446,4 +456,135 @@ class CgaSubmissionController extends Controller
         }
     }
 
+    public function getSubmissionSummary()
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $currentYear = now()->year;
+        $years = range($currentYear, $currentYear - 4);
+
+        // 🔹 1. Load positions
+        $positions = $conn3->table('tblemp_position_item as epi')
+            ->join('tblposition as p', 'p.position_id', '=', 'epi.position_id')
+            ->select('epi.item_no', 'p.post_description')
+            ->get()
+            ->pluck('post_description', 'item_no');
+
+        // 🔹 2. Get latest submissions per emp_id per year (full data)
+        $submissions = $conn2->table('staff_competency_review as scr')
+            ->select([
+                'scr.id',
+                'scr.emp_id',
+                'scr.year',
+                'scr.position_id',
+                DB::raw("DATE_FORMAT(scr.date_created, '%M %d, %Y %h:%i:%s %p') as date_submitted"),
+                'scr.status',
+                'scr.acted_by',
+                'scr.endorsed_by',
+                DB::raw("DATE_FORMAT(scr.date_acted, '%M %d, %Y %h:%i:%s %p') as date_acted"),
+                DB::raw("DATE_FORMAT(scr.date_endorsed, '%M %d, %Y %h:%i:%s %p') as date_endorsed"),
+                'scr.date_created', // keep raw for sorting
+            ])
+            ->whereIn('scr.year', $years)
+            ->whereRaw('scr.id = (
+                SELECT MAX(scr2.id)
+                FROM staff_competency_review scr2
+                WHERE scr2.emp_id = scr.emp_id
+                AND scr2.year = scr.year
+            )')
+            ->get();
+
+        // 🔹 3. Get latest status per submission
+        $latestHistories = $conn2->table('submission_history as sh1')
+            ->select('sh1.id', 'sh1.model_id', 'sh1.status')
+            ->where('sh1.model', 'CGA')
+            ->whereIn('sh1.model_id', $submissions->pluck('id'))
+            ->whereRaw('sh1.id = (
+                SELECT MAX(sh2.id) FROM submission_history sh2
+                WHERE sh2.model = sh1.model AND sh2.model_id = sh1.model_id
+            )')
+            ->get()
+            ->keyBy('model_id');
+
+        // 🔹 4. Attach status, position, and name to submissions
+        $employeesData = $conn3->table('tblemployee as e')
+            ->select([
+                DB::raw('CAST(e.emp_id AS CHAR) as emp_id'),
+                DB::raw('CONCAT(e.lname, ", ", e.fname, " ", e.mname) as name'),
+            ])
+            ->where('e.work_status', 'Active')
+            ->get()
+            ->pluck('name', 'emp_id');
+
+        $submissions->transform(function ($submission) use ($latestHistories, $positions, $employeesData) {
+            $submission->latest_status = $latestHistories[$submission->id]->status ?? $submission->status ?? null;
+            $submission->position = $positions[$submission->position_id] ?? null;
+            $submission->name = $employeesData[$submission->emp_id] ?? null;
+            return $submission;
+        });
+
+        // 🔹 5. Index submissions by emp_id-year
+        $submissionsByEmpYear = $submissions->groupBy(function ($s) {
+            return $s->emp_id . '-' . $s->year;
+        });
+
+        // 🔹 6. Employees with role restriction
+        $rolePriorities = config('roles.priorities');
+        $highestRole = collect(Auth::user()->roles->pluck('name'))
+            ->mapWithKeys(fn($role) => [$role => $rolePriorities[$role] ?? 0])
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        $employees = $conn3->table('tblemployee as e')
+            ->select(
+                'e.emp_id',
+                DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', 
+                    IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname,1),'. '), '')
+                ) as name"),
+                'e.division_id as division'
+            )
+            ->where('e.work_status', 'active')
+            ->orderBy('division')
+            ->orderBy('name');
+
+        switch ($highestRole) {
+            case 'HRIS_ADC':
+            case 'HRIS_DC':
+                $employees->where('division_id', Auth::user()->division);
+                break;
+        }
+
+        $employees = $employees->get();
+
+        // 🔹 7. Attach submissions object (full data) to employees
+        $employees->transform(function ($emp) use ($submissionsByEmpYear, $years) {
+            $emp->submissions = collect($years)->mapWithKeys(function ($year) use ($submissionsByEmpYear, $emp) {
+                $key = $emp->emp_id . '-' . $year;
+                $submission = $submissionsByEmpYear->get($key)?->first();
+                return [
+                    $year => $submission ? [
+                        'id' => $submission->id,
+                        'status' => $submission->latest_status,
+                        'date_created' => $submission->date_created,
+                        'date_submitted' => $submission->date_submitted,
+                        'position' => $submission->position,
+                        'name' => $submission->name,
+                        'year' => $submission->year,
+                        'acted_by' => $submission->acted_by,
+                        'endorsed_by' => $submission->endorsed_by,
+                        'date_acted' => $submission->date_acted,
+                        'date_endorsed' => $submission->date_endorsed,
+                    ] : null,
+                ];
+            });
+            return $emp;
+        });
+
+        return response()->json([
+            'employees' => $employees,
+            'years' => $years,
+        ]);
+    }
 }

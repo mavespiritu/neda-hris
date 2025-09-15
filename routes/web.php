@@ -86,6 +86,7 @@ require __DIR__.'/auth.php';
 require __DIR__ . '/cga.php';
 require __DIR__ . '/cga.submissions.php';
 require __DIR__ . '/competency.php';
+require __DIR__ . '/competencies.indicator.php';
 
 require __DIR__ . '/my-cga.php';
 require __DIR__ . '/review-cga.php';

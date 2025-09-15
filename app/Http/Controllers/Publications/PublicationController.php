@@ -32,99 +32,141 @@ class PublicationController extends Controller
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
-        $search = $request->input('search', '');
-        $matchingEmployeeIDs = collect();
+        $sort      = $request->get('sort');
+        $direction = strtolower($request->get('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $search    = $request->input('search', '');
 
-        if (!empty($search)) {
-            $matchingEmployeeIDs = $conn3->table('tblemployee')
-                ->where(function ($query) use ($search) {
-                    $query->where(DB::raw("CONCAT(fname, ' ', lname)"), 'like', '%' . $search . '%');
-                })
-                ->pluck('emp_id');
+        $sortable = [
+            'reference_no' => DB::raw('reference_no'),
+            'date_published' => DB::raw('date_published'),       
+            'date_closed' => DB::raw('date_closed'),             
+            'is_public' => DB::raw('is_public'),                   
+        ];
+
+        $searchable = [
+            'reference_no',
+            'date_published',
+            'date_published',
+            'creator',
+        ];
+
+        $filterable = [
+            'is_public' => 'is_public',
+        ];
+
+        $publicationsQuery = $conn2->table('publication as p')
+        ->select([
+            'p.*',
+        ]);
+
+        foreach ($filterable as $param => $column) {
+            if ($request->filled($param)) {
+                $publicationsQuery->where($column, $request->input($param));
+            }
         }
+
+        if ($sort && isset($sortable[$sort]) && in_array(strtolower($direction), ['asc', 'desc'])) {
+            $publicationsQuery->orderBy($sortable[$sort], $direction);
+        }
+
+        $publications = $publicationsQuery->orderBy('p.id', 'desc')->paginate(20);
+
+        $publicationIDs = $publications->pluck('id')->all();
 
         $vacancyCounts = $conn2->table('publication_vacancies')
         ->select('publication_id', DB::raw('COUNT(*) as vacancy_count'))
-        ->groupBy('publication_id');
+        ->whereIn('publication_id', $publicationIDs)
+        ->groupBy('publication_id')
+        ->pluck('vacancy_count', 'publication_id');
 
-        $latestStatus = $conn2->table('status_logs as vs1')
-        ->select(
-            'vs1.model_id as status_publication_id',
-            'vs1.status as current_status',
-            'vs1.acted_by as latest_acted_by',
-            'vs1.date_acted as date_acted'
-        )
-        ->join(DB::raw('(
-            SELECT model_id, MAX(id) as max_id 
-            FROM status_logs 
-            WHERE model = "Publication"
-            GROUP BY model_id
-        ) as vs2'), function ($join) {
-            $join->on('vs1.model_id', '=', 'vs2.model_id')
-                ->on('vs1.id', '=', 'vs2.max_id');
-        })
-        ->where('vs1.model', 'Publication');
+        $creatorIDs = $publications->pluck('created_by')->unique()->values();
 
-        $publications = $conn2->table('publication')
-            ->leftJoinSub($latestStatus, 'vs', function ($join) {
-                $join->on('publication.id', '=', 'vs.status_publication_id');
-            })
-            ->leftJoinSub($vacancyCounts, 'vc', function ($join) {
-                $join->on('publication.id', '=', 'vc.publication_id');
-            })
-            ->when($search, function ($query) use ($search, $matchingEmployeeIDs) {
-                $query->where(function ($q) use ($search, $matchingEmployeeIDs) {
-                    $q->where('reference_no', 'like', '%' . $search . '%')
-                    ->orWhere('date_published', 'like', '%' . $search . '%')
-                    ->orWhere('date_closed', 'like', '%' . $search . '%')
-                    ->orWhere('time_closed', 'like', '%' . $search . '%');
-
-                    if ($matchingEmployeeIDs->isNotEmpty()) {
-                        $q->orWhereIn('publication.created_by', $matchingEmployeeIDs);
-                        $q->orWhereIn('publication.updated_by', $matchingEmployeeIDs);
-                        $q->orWhereIn('vs.latest_acted_by', $matchingEmployeeIDs);
-                    }
-                });
-            })
-            ->select(
-                'publication.*', 
-                'vs.current_status as status', 
-                'vs.date_acted', 
-                'vs.latest_acted_by',
-                DB::raw('COALESCE(vc.vacancy_count, 0) as vacancy_count')
-            )
-            ->orderBy('publication.id', 'desc')
-            ->paginate(20);
-
-        $allIDs = $publications->pluck('created_by')
-        ->merge($publications->pluck('updated_by'))
-        ->merge($publications->pluck('latest_acted_by'))
-        ->unique()
-        ->values();
-
-        $employees = $conn3->table('tblemployee')
-        ->whereIn('emp_id', $allIDs)
+        $employees = $conn3->table('tblemployee as e')
+        ->select([
+            'e.emp_id',
+            DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '.'), '')) as name"),
+        ])
         ->get()
-        ->keyBy('emp_id')
-        ->map(function ($employee) {
-            return (object)[
-                'name' => $employee->fname . ' ' . $employee->lname,
-            ];
+        ->keyBy('emp_id');
+
+        $publications->getCollection()->transform(function ($publication) use ($employees, $vacancyCounts) {
+            $publication->creator = $employees->get($publication->created_by)->name ?? null;
+            $publication->vacancy_count = $vacancyCounts[$publication->id] ?? 0;
+            
+            if (!empty($publication->date_closed)) {
+                $closingDateTime = Carbon::parse($publication->date_closed . ' ' . ($publication->time_closed ?? '23:59:59'));
+
+                if (Carbon::now()->greaterThan($closingDateTime)) {
+                    $publication->status = 'Closed';
+                } else {
+                    $publication->status = $publication->is_public ? 'Published' : 'Draft';
+                }
+            } else {
+                $publication->status = $publication->is_public ? 'Published' : 'Draft';
+            }
+
+            return $publication;
         });
 
-        $publications->getCollection()->transform(function ($pub) use ($employees) {
-            $pub->creator = $employees->get($pub->created_by)->name ?? null;
-            $pub->updater = $employees->get($pub->updated_by)->name ?? null;
-            $pub->actor = $employees->get($pub->latest_acted_by)->name ?? null;
-            return $pub;
-        });
+        if ($request->filled('status')) {
+            $publications->setCollection(
+                $publications->getCollection()->filter(function ($publication) use ($status) {
+                    return $publication->status === $$request->input('status');
+                })->values()
+            );
+        }
+
+        if ($sort === 'creator') {
+            $sorted = $publications->getCollection()->sortBy(
+                fn($p) => $p->creator ?? '',
+                SORT_REGULAR,
+                $direction === 'desc'
+            );
+            $publications->setCollection($sorted->values());
+        }
+
+        if ($sort === 'vacancy_count') {
+            $sorted = $publications->getCollection()->sortBy(
+                fn($p) => $p->vacancy_count ?? '',
+                SORT_REGULAR,
+                $direction === 'desc'
+            );
+            $publications->setCollection($sorted->values());
+        }
+
+        if ($sort === 'status') {
+            $sorted = $publications->getCollection()->sortBy(
+                fn($p) => $p->status ?? '',
+                SORT_REGULAR,
+                $direction === 'desc'
+            );
+            $publications->setCollection($sorted->values());
+        }
+
+        if ($search) {
+            $searchLower = strtolower($search);
+
+            $publications->setCollection(
+                $publications->getCollection()->filter(function ($publication) use ($searchable, $searchLower) {
+                    foreach ($searchable as $field) {
+                        if (str_contains(strtolower($publication->{$field} ?? ''), $searchLower)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })->values()
+            );
+
+        }
 
         return Inertia::render('Publications/index', [
-            'publications' => $publications,
+            'data' => [
+                'publications' => $publications,
+            ],
         ]);
     }
 
-    public function show($id, Request $request)
+    /* public function show($id, Request $request)
     {
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
@@ -289,6 +331,108 @@ class PublicationController extends Controller
             'agencyAddress' => $agencyAddress ? $agencyAddress->value : '',
             'requirements' => $requirements
         ]);
+    } */
+
+    public function show($id, Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $publication = $conn2->table('publication')->where('id', $id)->first();
+        if (!$publication) {
+            abort(404, 'Page not found.');
+        }
+
+        if (!empty($publication->date_closed)) {
+            $closingDateTime = Carbon::parse($publication->date_closed . ' ' . ($publication->time_closed ?? '23:59:59'));
+            if (Carbon::now()->greaterThan($closingDateTime)) {
+                $publication->status = 'Closed';
+            } else {
+                $publication->status = $publication->is_public ? 'Published' : 'Draft';
+            }
+        } else {
+            $publication->status = $publication->is_public ? 'Published' : 'Draft';
+        }
+
+        $sort      = $request->get('sort');
+        $direction = strtolower($request->get('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $search    = $request->input('search', '');
+
+        $sortable = [
+            'reference_no' => DB::raw('reference_no'),
+            'division' => DB::raw('division'),
+            'appointment_status' => DB::raw('appointment_status'),       
+            'position_description' => DB::raw('position_description'),             
+            'sg' => DB::raw('sg'),             
+            'monthly_salary' => DB::raw('monthly_salary'),            
+        ];
+
+        $searchable = [
+            'reference_no',
+            'division',
+            'appointment_status',
+            'position',
+            'position_description',
+            'sg',
+            'monthly_salary',
+        ];
+
+        $filterable = [
+            'division' => 'v.division',
+            'appointment_status' => 'v.appointment_status',
+            'sg' => 'v.sg',
+        ];
+
+        $vacanciesQuery = $conn2->table('publication_vacancies as pv')
+        ->join('vacancy as v', 'pv.vacancy_id', '=', 'v.id')
+        ->select([
+            'pv.id as id',     
+            'v.id as vacancy_id',  
+            'v.reference_no as reference_no',  
+            'v.position',
+            'v.position_description',
+            'v.item_no',
+            'v.division',
+            'v.appointment_status',
+            'v.sg',
+            'v.monthly_salary',
+        ])
+        ->where('pv.publication_id', $publication->id);
+
+        foreach ($filterable as $param => $column) {
+            if ($request->filled($param)) {
+                $vacanciesQuery->where($column, $request->input($param));
+            }
+        }
+
+        if ($sort && isset($sortable[$sort]) && in_array(strtolower($direction), ['asc', 'desc'])) {
+            $vacanciesQuery->orderBy($sortable[$sort], $direction);
+        }
+
+        $vacancies = $vacanciesQuery->orderBy('pv.id', 'desc')->paginate(20);
+
+        if ($search) {
+            $searchLower = strtolower($search);
+
+            $vacancies->setCollection(
+                $vacancies->getCollection()->filter(function ($vacancy) use ($searchable, $searchLower) {
+                    foreach ($searchable as $field) {
+                        if (str_contains(strtolower($vacancy->{$field} ?? ''), $searchLower)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })->values()
+            );
+
+        }
+
+        return Inertia::render('Publications/View', [
+            'data' => [
+                'publication' => $publication,
+                'vacancies' => $vacancies,
+            ],
+        ]);
     }
 
     public function store(Request $request)
@@ -298,12 +442,11 @@ class PublicationController extends Controller
         $validator = Validator::make($request->all(), [
             'date_published' => 'required|date',
             'date_closed' => 'required|date',
-            'time_closed' => ['required', 'date_format:H:i'],
+            'time_closed' => ['required'],
         ], [
             'date_published.required' => 'The posting date is required.',
             'date_closed.required' => 'The closing date is required.',
             'time_closed.required' => 'The closing time is required.',
-            'time_closed.date_format' => 'The time must be in the format HH:MM AM|PM',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -318,6 +461,8 @@ class PublicationController extends Controller
         $validator->validate();
 
         try{
+
+            $conn2->beginTransaction();
 
             $year = Carbon::now()->year;
 
@@ -345,14 +490,7 @@ class PublicationController extends Controller
                 'date_created' => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
 
-            $conn2->table('status_logs')
-            ->insert([
-                'model_id' => $publication,
-                'model' => 'Publication',
-                'status' => 'Draft',
-                'acted_by' => Auth::user()->ipms_id,
-                'date_acted' => Carbon::now()->format('Y-m-d H:i:s'),
-            ]);
+            $conn2->commit();
 
             return redirect()->route('publications.show', $publication)->with([
                 'status' => 'success',
@@ -361,7 +499,7 @@ class PublicationController extends Controller
             ]);
 
         } catch (\Exception $e) {
-
+            $conn2->rollBack();
             Log::error('Failed to save request: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -380,12 +518,11 @@ class PublicationController extends Controller
         $validator = Validator::make($request->all(), [
             'date_published' => 'required|date',
             'date_closed' => 'required|date',
-            'time_closed' => ['required', 'date_format:H:i'],
+            'time_closed' => ['required'],
         ], [
             'date_published.required' => 'The posting date is required.',
             'date_closed.required' => 'The closing date is required.',
             'time_closed.required' => 'The closing time is required.',
-            'time_closed.date_format' => 'The time must be in the format HH:MM AM|PM',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -400,6 +537,9 @@ class PublicationController extends Controller
         $validator->validate();
 
         try {
+
+            $conn2->beginTransaction();
+
             $conn2->table('publication')
                 ->where('id', $id)
                 ->update([
@@ -410,12 +550,15 @@ class PublicationController extends Controller
                     'date_updated' => Carbon::now()->format('Y-m-d H:i:s'),
                 ]);
 
+            $conn2->commit();
+
             return redirect()->back()->with([
                 'status' => 'success',
                 'title' => 'Success!',
                 'message' => 'Request updated successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to update request: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -431,14 +574,38 @@ class PublicationController extends Controller
         $conn2 = DB::connection('mysql2');
 
         try {
-            $conn2->table('publication')
+            $conn2->beginTransaction();
+
+            $publication = $conn2->table('publication')
                 ->where('id', $id)
+                ->first();
+
+            if (!$publication) {
+                abort(404, 'Page not found.');
+            }
+
+            $vacancies = $conn2->table('publication_vacancies')
+                ->where('publication_id', $publication->id)
+                ->pluck('vacancy_id')
+                ->toArray();
+
+            if (!empty($vacancies)) {
+                $conn2->table('vacancy')
+                    ->whereIn('id', $vacancies)
+                    ->update([
+                        'status' => 'Open',
+                    ]);
+            }
+
+            $conn2->table('publication_vacancies')
+                ->where('publication_id', $publication->id)
                 ->delete();
 
-            $conn2->table('status_logs')
-                ->where('model_id', $id)
-                ->where('model', 'Publication')
+            $conn2->table('publication')
+                ->where('id', $publication->id)
                 ->delete();
+
+            $conn2->commit();
 
             return redirect()->route('publications.index')->with([
                 'status' => 'success',
@@ -464,14 +631,29 @@ class PublicationController extends Controller
         $ids = $request->input('ids');
 
         try {
+
+            $conn2->beginTransaction();
+
+            $vacancies = $conn2->table('publication_vacancies')
+                ->whereIn('publication_id', $ids)
+                ->pluck('vacancy_id')
+                ->toArray();
+
+            if (!empty($vacancies)) {
+                $conn2->table('vacancy')
+                    ->whereIn('id', $vacancies)
+                    ->update(['status' => 'Open']);
+            }
+
+            $conn2->table('publication_vacancies')
+                ->whereIn('publication_id', $ids)
+                ->delete();
+
             $conn2->table('publication')
                 ->whereIn('id', $ids)
                 ->delete();
 
-            $conn2->table('status_logs')
-                ->whereIn('model_id', $ids)
-                ->where('model', 'Publication')
-                ->delete();
+            $conn2->commit();
 
             return redirect()->back()->with([
                 'status' => 'success',
@@ -479,6 +661,7 @@ class PublicationController extends Controller
                 'message' => 'Request(s) deleted successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to delete request(s): ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -489,229 +672,22 @@ class PublicationController extends Controller
         }
     }
 
-    public function bulkApprove(Request $request)
-    {
-        $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
-
-        try {
-
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Publication',
-                        'status' => 'Approved',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
-
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Request(s) approved successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to approve request(s): ' . $e->getMessage());
-
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while approving the request(s). Please try again.'
-            ]);
-        }
-    }
-
-    public function bulkDisapprove(Request $request)
-    {
-        $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
-
-        try {
-
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Publication',
-                        'status' => 'Disapproved',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
-
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Request(s) approved successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to approve request(s): ' . $e->getMessage());
-
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while approving the request(s). Please try again.'
-            ]);
-        }
-    }
-
-    public function bulkSubmit(Request $request)
-    {
-        $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
-
-        try {
-
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Publication',
-                        'status' => 'Submitted',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
-
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Request for publications submitted successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to submit request for publications: ' . $e->getMessage());
-
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while submitting request for publications. Please try again.'
-            ]);
-        }
-    }
-
-    public function bulkRequestForChanges(Request $request)
-    {
-        $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
-
-        try {
-
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Publication',
-                        'status' => 'Changes Requested',
-                        'remarks' => $request->remarks,
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
-
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Request for changes on publications submitted successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to request changes for publications: ' . $e->getMessage());
-
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while requesting changes for publications. Please try again.'
-            ]);
-        }
-    }
-
-    public function bulkReadyForApproval(Request $request)
-    {
-        $conn2 = DB::connection('mysql2');
-
-        $ids = $request->input('ids');
-
-        try {
-
-            if(!empty($ids)){
-                foreach($ids as $id){
-                    $conn2->table('status_logs')
-                    ->insert([
-                        'model_id' => $id,
-                        'model' => 'Publication',
-                        'status' => 'Ready for Approval',
-                        'acted_by' => Auth::user()->ipms_id,
-                        'date_acted' => Carbon::now()->format('Y-m-d'),
-                    ]);
-                }
-            }
-
-            return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Request for publications ready for approval submitted successfully.'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to submit request for publications ready for approval: ' . $e->getMessage());
-
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while submitting request for publications ready for approval. Please try again.'
-            ]);
-        }
-    }
-
     public function getVacancies($id, Request $request)
     {
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
-        $existingVacancies = $conn2->table('publication_vacancies')
+        /* $existingVacancies = $conn2->table('publication_vacancies')
             ->where('publication_id', $id)
             ->pluck('vacancy_id')
-            ->toArray();
-
-        $latestStatus = $conn2->table('status_logs as vs1')
-        ->select(
-            'vs1.model_id as status_vacancy_id',
-            'vs1.status as current_status',
-            'vs1.acted_by as latest_acted_by',
-            'vs1.date_acted as date_acted'
-        )
-        ->join(DB::raw('(
-            SELECT model_id, MAX(id) as max_id 
-            FROM status_logs 
-            WHERE model = "Vacancy"
-            GROUP BY model_id
-        ) as vs2'), function ($join) {
-            $join->on('vs1.model_id', '=', 'vs2.model_id')
-                ->on('vs1.id', '=', 'vs2.max_id');
-        })
-        ->where('vs1.model', 'Vacancy');
+            ->toArray(); */
 
         $vacancies = $conn2->table('vacancy')
-            ->leftJoinSub($latestStatus, 'vs', function ($join) {
-                $join->on('vacancy.id', '=', 'vs.status_vacancy_id');
-            })
             ->select(
                 'vacancy.id as value',
                 DB::raw("
                     CONCAT(
-                        vacancy.division, ': ', vacancy.position_description,
+                        '[RF#: ',vacancy.reference_no,'] ',vacancy.division, ': ', vacancy.position_description,
                         CASE
                             WHEN vacancy.appointment_status = 'Permanent' THEN CONCAT(' (', vacancy.item_no, ')')
                             ELSE ''
@@ -719,12 +695,8 @@ class PublicationController extends Controller
                     ) as label
                 ")
             )
-            ->whereNotIn('vacancy.id', $existingVacancies);
-        
-        if($request->status){
-            $vacancies = $vacancies->where('vs.current_status', $request->status);
-        }
-            $vacancies = $vacancies
+            //->whereNotIn('vacancy.id', $existingVacancies)
+            ->where('vacancy.status', 'Open')
             ->orderBy('vacancy.division', 'asc')
             ->orderBy('vacancy.position', 'asc')
             ->orderBy('vacancy.item_no', 'asc')
@@ -747,6 +719,8 @@ class PublicationController extends Controller
 
         try{
 
+            $conn2->beginTransaction();
+
             $conn2->table('publication_vacancies')
             ->insert([
                 'publication_id' => $id,
@@ -755,14 +729,22 @@ class PublicationController extends Controller
                 'date_created' => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
 
+            $conn2->table('vacancy')
+            ->where('id', $request->vacancy_id)
+            ->update([
+                'status' => 'Close',
+            ]);
+
+            $conn2->commit();
+
             return redirect()->back()->with([
                 'status' => 'success',
                 'title' => 'Success!',
                 'message' => 'Vacancy included successfully.'
             ]);
-
+            
         } catch (\Exception $e) {
-
+            $conn2->rollBack();
             Log::error('Failed to include vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -778,10 +760,14 @@ class PublicationController extends Controller
         $conn2 = DB::connection('mysql2');
 
         try {
+
+            $conn2->beginTransaction();
+
             $conn2->table('publication_vacancies')
-                ->where('publication_id', $id)
-                ->where('vacancy_id', $request->id)
+                ->where('id', $id)
                 ->delete();
+
+            $conn2->commit();
 
             return redirect()->back()->with([
                 'status' => 'success',
@@ -789,6 +775,7 @@ class PublicationController extends Controller
                 'message' => 'Vacancy removed successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to remove vacancy: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -806,10 +793,15 @@ class PublicationController extends Controller
         $ids = $request->input('ids');
 
         try {
+
+            $conn2->beginTransaction();
+
             $conn2->table('publication_vacancies')
                 ->where('publication_id', $id)
-                ->whereIn('vacancy_id', $ids)
+                ->whereIn('id', $ids)
                 ->delete();
+
+            $conn2->commit();
 
             return redirect()->back()->with([
                 'status' => 'success',
@@ -817,6 +809,7 @@ class PublicationController extends Controller
                 'message' => 'Vacancies removed successfully.'
             ]);
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Failed to remove vacancies: ' . $e->getMessage());
 
             return redirect()->back()->with([

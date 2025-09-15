@@ -17,4 +17,6 @@ Route::middleware(['web', 'auth.any'])->group(function () {
     Route::post('/cga/review/{id}/disapprove', [CgaSubmissionController::class, 'disapprove'])->name('cga.review.disapprove-submission');
 
     Route::get('/cga/review/{id}/history', [CgaSubmissionController::class, 'getSubmissionHistory'])->name('cga.review.history');
+
+    Route::get('/cga/review/summary', [CgaSubmissionController::class, 'getSubmissionSummary'])->name('cga.review.summary');
 });

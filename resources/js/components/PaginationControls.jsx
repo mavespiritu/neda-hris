@@ -38,7 +38,7 @@ const PaginationControls = ({
   const visiblePages = getVisiblePageNumbers()
 
   return (
-    <div className="flex justify-between items-center flex-wrap gap-2 mt-4">
+    <div className="flex justify-between items-center flex-wrap gap-2 mt-2">
     
       <div className="flex items-center gap-2">
         {/* Previous Button */}

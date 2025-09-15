@@ -12,8 +12,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
 } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 
 export default function TimePicker({
   label,
@@ -25,7 +25,7 @@ export default function TimePicker({
   disabled = false,
   displayFormat = "h:mm a",
   returnFormat = "HH:mm",
-  showSeconds = false
+  showSeconds = false,
 }) {
   const [selectedTime, setSelectedTime] = useState(
     value ? parse(value, returnFormat, new Date()) : null
@@ -36,10 +36,19 @@ export default function TimePicker({
     if (value) {
       try {
         const baseDate = new Date()
-        const parsedTime = parse(value, returnFormat, baseDate)
+        let parsedTime
+
+        if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+          parsedTime = parse(value, "HH:mm:ss", baseDate)
+        } else if (/^\d{2}:\d{2}$/.test(value)) {
+          parsedTime = parse(value, "HH:mm", baseDate)
+        } else {
+          parsedTime = parse(value, returnFormat, baseDate)
+        }
+
         setSelectedTime(parsedTime)
       } catch (error) {
-        console.error("Invalid time format:", error)
+        console.error("Invalid time format:", value, error)
       }
     }
   }, [value, returnFormat])
@@ -57,7 +66,6 @@ export default function TimePicker({
     }
 
     setSelectedTime(newTime)
-
     if (onTimeChange) {
       onTimeChange(format(newTime, returnFormat))
     }
@@ -66,6 +74,47 @@ export default function TimePicker({
   const hours = Array.from({ length: 24 }, (_, i) => i)
   const minutes = Array.from({ length: 60 }, (_, i) => i)
   const seconds = Array.from({ length: 60 }, (_, i) => i)
+
+  // helper to render a combo input+dropdown
+  const renderTimeField = (type, max, values) => {
+    const current =
+      selectedTime &&
+      (type === "hour"
+        ? selectedTime.getHours()
+        : type === "minute"
+        ? selectedTime.getMinutes()
+        : selectedTime.getSeconds())
+
+    return (
+      <div className="flex items-center border rounded-md w-[90px]">
+        <Input
+          type="text"
+          value={current?.toString().padStart(2, "0") ?? ""}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, "")
+            if (val !== "" && val >= 0 && val < max) {
+              handleTimeChange(type, val)
+            }
+          }}
+          className="flex-1 px-2 h-9 text-sm border-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          placeholder={type === "hour" ? "HH" : type === "minute" ? "MM" : "SS"}
+        />
+        <Select
+          onValueChange={(val) => handleTimeChange(type, val)}
+          value={current?.toString() ?? ""}
+        >
+          <SelectTrigger className="h-9 w-8 justify-center p-0 border-0 shadow-none" />
+          <SelectContent side="bottom" align="start" className="max-h-[200px] overflow-y-auto">
+            {values.map((num) => (
+              <SelectItem key={num} value={num.toString()} className="text-sm">
+                {num.toString().padStart(2, "0")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("flex flex-col space-y-2", className)}>
@@ -78,71 +127,32 @@ export default function TimePicker({
             className={cn(
               "flex items-center justify-between w-full text-left font-normal",
               !selectedTime && "text-gray-400 font-medium",
-              invalidMessage && "border-destructive focus-visible:ring-destructive"
+              invalidMessage &&
+                "border-destructive focus-visible:ring-destructive"
             )}
           >
-            {selectedTime ? format(selectedTime, displayFormat) : <span>{placeholder}</span>}
+            {selectedTime ? (
+              format(selectedTime, displayFormat)
+            ) : (
+              <span>{placeholder}</span>
+            )}
             <Clock className="ml-2 h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-4" align="start">
+        <PopoverContent
+          className="w-auto p-4 max-w-[95vw] overflow-hidden"
+          align="start"
+          sideOffset={4}
+        >
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-center space-x-2">
-              {/* Hour */}
-              <Select
-                value={selectedTime ? selectedTime.getHours().toString() : "0"}
-                onValueChange={(val) => handleTimeChange("hour", val)}
-              >
-                <SelectTrigger className="h-9 w-[70px]">
-                  <SelectValue placeholder="Hour" />
-                </SelectTrigger>
-                <SelectContent position="popper" className="max-h-[200px]">
-                  {hours.map((hour) => (
-                    <SelectItem key={hour} value={hour.toString()} className="text-sm">
-                      {hour.toString().padStart(2, "0")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <span className="text-center">:</span>
-
-              {/* Minute */}
-              <Select
-                value={selectedTime ? selectedTime.getMinutes().toString() : "0"}
-                onValueChange={(val) => handleTimeChange("minute", val)}
-              >
-                <SelectTrigger className="h-9 w-[70px]">
-                  <SelectValue placeholder="Min" />
-                </SelectTrigger>
-                <SelectContent position="popper" className="max-h-[200px]">
-                  {minutes.map((minute) => (
-                    <SelectItem key={minute} value={minute.toString()} className="text-sm">
-                      {minute.toString().padStart(2, "0")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Second (optional) */}
+              {renderTimeField("hour", 24, hours)}
+              <span>:</span>
+              {renderTimeField("minute", 60, minutes)}
               {showSeconds && (
                 <>
-                  <span className="text-center">:</span>
-                  <Select
-                    value={selectedTime ? selectedTime.getSeconds().toString() : "0"}
-                    onValueChange={(val) => handleTimeChange("second", val)}
-                  >
-                    <SelectTrigger className="h-9 w-[70px]">
-                      <SelectValue placeholder="Sec" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="max-h-[200px]">
-                      {seconds.map((second) => (
-                        <SelectItem key={second} value={second.toString()} className="text-sm">
-                          {second.toString().padStart(2, "0")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <span>:</span>
+                  {renderTimeField("second", 60, seconds)}
                 </>
               )}
             </div>
@@ -177,7 +187,9 @@ export default function TimePicker({
           </div>
         </PopoverContent>
       </Popover>
-      {invalidMessage && <p className="text-sm text-destructive mt-1">{invalidMessage}</p>}
+      {invalidMessage && (
+        <p className="text-xs text-destructive mt-1">{invalidMessage}</p>
+      )}
     </div>
   )
 }

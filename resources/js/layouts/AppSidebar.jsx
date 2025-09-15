@@ -78,19 +78,19 @@ const AppSidebar = () => {
       url: "/jobs",
       icon: Search,
     }, */
-    /* {
+    {
       title: "Recruitment",
       url: "#",
       icon: BriefcaseBusiness,
-      roles: ['HRIS_HR'],
+      roles: ['HRIS_HR', 'HRIS_DC', 'HRIS_ADC'],
       submenu: [
-        { title: 'Positions', url: '/vacancies', roles: ['HRIS_HR'], icon: IdCard },
-        { title: 'Vacancies', url: '/vacancies', roles: ['HRIS_HR'], icon: ClipboardList },
+        { title: 'Vacancies', url: '/vacancies', roles: ['HRIS_HR', 'HRIS_DC'], icon: ClipboardList },
         { title: 'Publications', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Pin },
+        /* { title: 'Positions', url: '/vacancies', roles: ['HRIS_HR'], icon: IdCard },
         { title: 'Onboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Handshake },
-        { title: 'Offboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: FolderArchive },
+        { title: 'Offboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: FolderArchive }, */
       ],
-    }, */
+    },
     /* {
       title: "Selection",
       url: "#",
@@ -144,9 +144,9 @@ const AppSidebar = () => {
       roles: ['HRIS_Staff'],
       submenu: [
         { title: 'Gap Analysis', url: route('cga.index'), roles: ['HRIS_Staff'], icon: Brain },
-        { title: 'Submissions', url: '/review-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: Send },
-        { title: 'Comparisons', url: '/compare-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: GitCompare },
-        { title: 'Libraries', url: '/competencies', roles: ['HRIS_HR'], icon: Settings2 },
+        { title: 'Submissions', url: route('cga.review'), roles: ['HRIS_HR', 'HRIS_DC'], icon: Send },
+        /* { title: 'Comparisons', url: '/compare-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: GitCompare }, */
+        { title: 'Libraries', url: route('cga.libraries'), roles: ['HRIS_HR'], icon: Settings2 },
       ],
     },
     /* {
@@ -165,7 +165,7 @@ const AppSidebar = () => {
       title: "Settings",
       url: '/settings',
       icon: Cog,
-      roles: ['HRIS_HR', 'HRIS_Administrator', 'HRIS_Staff']
+      roles: ['HRIS_Staff']
     },
   ]
 
@@ -195,7 +195,7 @@ const AppSidebar = () => {
                         {item.submenu ? (
                           <CollapsibleTrigger asChild>
                             <SidebarMenuButton asChild title={!open ? item.title : undefined}>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 w-full">
                                 <item.icon />
                                 {open && <span className="font-medium text-sm">{item.title}</span>}
                                 {item.submenu && (
@@ -205,8 +205,12 @@ const AppSidebar = () => {
                             </SidebarMenuButton>
                           </CollapsibleTrigger>
                         ) : (
+                          // 🔥 FIX: Make entire row clickable
                           <SidebarMenuButton asChild title={!open ? item.title : undefined}>
-                            <Link href={item.url} className={`flex items-center gap-2 ${url === item.url ? 'bg-muted' : ''}`}>
+                            <Link
+                              href={item.url}
+                              className={`flex items-center gap-2 w-full ${url === item.url ? 'bg-muted' : ''}`}
+                            >
                               <item.icon />
                               {open && <span className="font-medium text-sm">{item.title}</span>}
                             </Link>
@@ -218,12 +222,14 @@ const AppSidebar = () => {
                               {item.submenu
                                 .filter(isVisible)
                                 .map((subitem) => (
+                                  // 🔥 FIX: Make submenu row clickable
                                   <SidebarMenuButton
                                     key={subitem.title}
+                                    asChild
                                     title={!open ? subitem.title : undefined}
                                     className={`font-medium ${url === subitem.url ? 'bg-muted' : ''}`}
                                   >
-                                    <Link href={subitem.url} className="flex items-center gap-2">
+                                    <Link href={subitem.url} className="flex items-center gap-2 w-full">
                                       {(subitem.icon ?? Folder) && (
                                         <span className="flex items-center gap-2">
                                           {React.createElement(subitem.icon ?? Folder, { className: "size-4" })}

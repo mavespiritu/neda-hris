@@ -1788,6 +1788,7 @@ class CgaController extends Controller
         $submissions = $conn2->table('staff_competency_review as scr')
             ->select(
                 'scr.id',
+                'scr.year',
                 DB::raw("DATE_FORMAT(date_created, '%M %d, %Y %h:%i:%s %p') as dateCreated"),
                 'scr.emp_id',
                 'scr.position_id',
@@ -2252,6 +2253,7 @@ class CgaController extends Controller
         try {
 
             $reviewId = $conn2->table('staff_competency_review')->insertGetId([
+                'year' => $request->year,
                 'date_created' => $dateCreated,
                 'emp_id' => $empId,
                 'position_id' => $positionId
@@ -2465,5 +2467,10 @@ class CgaController extends Controller
                 'message' => 'An error occurred while storing the gap analysis. Please try again.'
             ]);
         }
+    }
+
+    public function getLibraries()
+    {
+        return Inertia::render('Competencies/Libraries/index');
     }
 }

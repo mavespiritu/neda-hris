@@ -27,8 +27,8 @@ class RtoController extends Controller
 {
     public function index(Request $request)
     {
-        $conn2 = DB::connection('mysql2'); // flexi_rto, flexi_target, submission_history
-        $conn3 = DB::connection('mysql3'); // tblemployee
+        $conn2 = DB::connection('mysql2'); 
+        $conn3 = DB::connection('mysql3'); 
 
         $sort      = $request->get('sort');
         $direction = $request->get('direction', 'asc');
@@ -479,6 +479,8 @@ class RtoController extends Controller
 
         try {
 
+            $conn2->beginTransaction();
+
             $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
 
             if (!$rto) {
@@ -493,7 +495,10 @@ class RtoController extends Controller
                 'date_acted' => now(),
             ]);
 
+            $conn2->commit();
+
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error submitting RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -511,6 +516,8 @@ class RtoController extends Controller
 
         try {
 
+            $conn2->beginTransaction();
+
             $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
 
             if (!$rto) {
@@ -525,7 +532,10 @@ class RtoController extends Controller
                 'date_acted' => now(),
             ]);
 
+            $conn2->commit();
+
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error endorsing RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -632,6 +642,8 @@ class RtoController extends Controller
 
         try {
 
+            $conn2->beginTransaction();
+
             $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
 
             if (!$rto) {
@@ -645,8 +657,11 @@ class RtoController extends Controller
                 'acted_by' => auth()->user()->ipms_id,
                 'date_acted' => now(),
             ]);
+            
+            $conn2->commit();
 
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error approving RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -776,6 +791,8 @@ class RtoController extends Controller
 
         try {
 
+            $conn2->beginTransaction();
+
             $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
 
             if (!$rto) {
@@ -791,7 +808,10 @@ class RtoController extends Controller
                 'remarks' => $request->remarks
             ]);
 
+            $conn2->commit();
+
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error disapproving RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -820,6 +840,8 @@ class RtoController extends Controller
 
         try {
 
+            $conn2->beginTransaction();
+
             $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
 
             if (!$rto) {
@@ -835,7 +857,10 @@ class RtoController extends Controller
                 'remarks' => $request->remarks
             ]);
 
+            $conn2->commit();
+
         } catch (\Exception $e) {
+            $conn2->rollBack();
             Log::error('Error returning RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([

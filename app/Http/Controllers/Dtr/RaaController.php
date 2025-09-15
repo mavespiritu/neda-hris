@@ -40,8 +40,14 @@ class RaaController extends Controller
             'date'          => 'rto.date',               
         ];
 
-        $hasDCRole  = Auth::user()->hasRole('HRIS_DC');
-        $hasADCRole = Auth::user()->hasRole('HRIS_ADC');
+        $rolePriorities = config('roles.priorities');
+
+        $userRoles = Auth::user()->roles->pluck('name')->toArray();
+        $highestRole = collect($userRoles)
+            ->mapWithKeys(fn($role) => [$role => $rolePriorities[$role] ?? 0])
+            ->sortDesc()
+            ->keys()
+            ->first();
 
         // Employees (for dropdown filter)
         $employeesQuery = $conn3->table('tblemployee')
@@ -55,8 +61,23 @@ class RaaController extends Controller
             ->orderBy('fname')
             ->orderBy('mname');
 
-        if ($hasDCRole || $hasADCRole) {
-            $employeesQuery->where('division_id', auth()->user()->division);
+        switch ($highestRole) {
+            case 'HRIS_RD':
+                // RD sees all
+                break;
+            case 'HRIS_ARD':
+                // ARD sees all
+                break;
+            case 'HRIS_HR':
+                // HR sees all
+                break;
+            case 'HRIS_ADC':
+            case 'HRIS_DC':
+                $employeesQuery->where('division_id', Auth::user()->division);
+                break;
+            case 'HRIS_Staff':
+                $employeesQuery->where('emp_id', Auth::user()->ipms_id);
+                break;
         }
 
         $employees = $employeesQuery->get();
@@ -117,9 +138,24 @@ class RaaController extends Controller
         } else {
             $targetsQuery->orderBy('rto.date', 'desc');
         }
-
-        if (!$hasDCRole && !$hasADCRole) {
-            $targetsQuery->where('rto.emp_id', auth()->user()->ipms_id);
+        
+        switch ($highestRole) {
+            case 'HRIS_RD':
+                // RD sees all
+                break;
+            case 'HRIS_ARD':
+                // ARD sees all
+                break;
+            case 'HRIS_HR':
+                // HR sees all
+                break;
+            case 'HRIS_ADC':
+            case 'HRIS_DC':
+        
+                break;
+            case 'HRIS_Staff':
+                $targetsQuery->where('rto.emp_id', auth()->user()->ipms_id);
+                break;
         }
 
         $targetsQuery->where('sh_rto.status', 'Approved');

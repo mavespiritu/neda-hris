@@ -28,16 +28,6 @@ Route::middleware(['web', 'auth.any'])->group(function () {
 
     Route::post('/publications/bulk-destroy', [PublicationController::class, 'bulkDestroy'])->name('publications.bulk-destroy');
 
-    Route::post('/publications/bulk-approve', [PublicationController::class, 'bulkApprove'])->name('publications.bulk-approve');
-
-    Route::post('/publications/bulk-disapprove', [PublicationController::class, 'bulkDisapprove'])->name('publications.bulk-disapprove');
-
-    Route::post('/publications/bulk-submit', [PublicationController::class, 'bulkSubmit'])->name('publications.bulk-submit');
-
-    Route::post('/publications/bulk-request-for-changes', [PublicationController::class, 'bulkRequestForChanges'])->name('publications.bulk-request-for-changes');
-
-    Route::post('/publications/bulk-ready-for-approval', [PublicationController::class, 'bulkReadyForApproval'])->name('publications.bulk-ready-for-approval');
-
     Route::patch('/publications/{id}/toggle-visibility', [PublicationController::class, 'toggleVisibility'])->name('publications.toggle-visibility');
 });
 

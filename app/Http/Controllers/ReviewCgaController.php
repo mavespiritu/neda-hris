@@ -190,7 +190,6 @@ class ReviewCgaController extends Controller
         return response()->json($competencies);
     }
 
-
     public function showCompetencyForReview($id, Request $request)
     {
         $conn2 = DB::connection('mysql2');

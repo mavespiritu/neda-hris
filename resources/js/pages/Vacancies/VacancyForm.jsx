@@ -11,10 +11,12 @@ import SingleComboBox from "@/components/SingleComboBox"
 import TextInput from "@/components/TextInput"
 import AmountInput from "@/components/AmountInput"
 import RichTextEditor from "@/components/RichTextEditor"
-import { usePage } from '@inertiajs/react'
-import { Loader2 } from "lucide-react"
+import { usePage, Link } from '@inertiajs/react'
+import { Loader2, Copy } from "lucide-react"
 import IntegerInput from "@/components/IntegerInput"
 import CompetencyForm from "./CompetencyForm"
+import CBJDForm from "./CBJDForm"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Table,
   TableBody,
@@ -32,6 +34,9 @@ const VacancyForm = () => {
     const { toast } = useToast()
     
     const { vacancy } = usePage().props
+
+    const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false)
+    const [selectedVacancyId, setSelectedVacancyId] = useState(null)
 
     const classifications = useMemo(() => [
       { value: "Executive", label: "Executive" },
@@ -121,6 +126,56 @@ const VacancyForm = () => {
       })
     }
 
+    const handleCopyVacancy = (vacancy) => {
+
+      const groupedCompetencies = {
+        organizational: [],
+        leadership: [],
+        functional: [],
+      }
+
+      ;(vacancy.competencies || []).forEach(c => {
+        if (c.comp_type === "org") groupedCompetencies.organizational.push(c)
+        else if (c.comp_type === "lead") groupedCompetencies.leadership.push(c)
+        else if (c.comp_type === "func") groupedCompetencies.functional.push(c)
+      })
+
+
+      setData((prev) => ({
+        ...prev,
+        appointment_status: vacancy.appointment_status,
+        item_no: vacancy.item_no,
+        position: vacancy.position || "",
+        position_description: vacancy.position_description || "",
+        sg: vacancy.sg || "",
+        step: vacancy.step || "",
+        monthly_salary: vacancy.monthly_salary || "",
+        division: vacancy.division || "",
+        reports_to: vacancy.reports_to || "",
+        positions_supervised: vacancy.positions_supervised || "",
+        classification: vacancy.classification || "",
+        prescribed_eligibility: vacancy.prescribed_eligibility || "",
+        prescribed_education: vacancy.prescribed_education || "",
+        prescribed_experience: vacancy.prescribed_experience || "",
+        prescribed_training: vacancy.prescribed_training || "",
+        preferred_eligibility: vacancy.preferred_eligibility || "",
+        preferred_education: vacancy.preferred_education || "",
+        preferred_experience: vacancy.preferred_experience || "",
+        preferred_training: vacancy.preferred_training || "",
+        preferred_skills: vacancy.preferred_skills || "",
+        examination: vacancy.examination || "",
+        summary: vacancy.summary || "",
+        output: vacancy.output || "",
+        responsibility: vacancy.responsibility || "",
+        competencies: groupedCompetencies,
+      }))
+
+      toast({
+        title: "Copied!",
+        description: "CBJD has been copied into the form.",
+      })
+    }
+
     const renderCompetencyTable = (type, label) => (
       <div>
         <span className="text-sm font-medium">{label}</span>
@@ -185,10 +240,39 @@ const VacancyForm = () => {
         <form onSubmit={handleSubmit}>
           <Card>
               <CardHeader>
+                <div className="flex justify-between items-center">
                   <CardTitle className="text-lg">Vacancy Form</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCopyDialogOpen(true)}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy CBJD
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
               <div className="grid gap-y-4">
+                  <div className="flex flex-col md:grid md:grid-cols-[30%_70%] items-start md:items-center gap-y-1 md:gap-x-2">
+                      <Label className="text-sm mb-1 md:mb-0">Publication Type</Label>
+                      <RadioGroup
+                        value={data.type}
+                        onValueChange={(val) => setData("type", val)}
+                        className="flex gap-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="New" id="New" />
+                          <Label className="text-sm" htmlFor="New">New</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Republication" id="Republication" />
+                          <Label className="text-sm" htmlFor="Republication">Republication</Label>
+                        </div>
+                      </RadioGroup>
+                        {errors?.type && <span className="text-red-500 text-xs">{errors.type}</span>}
+                  </div>
                   <div className="flex flex-col md:grid md:grid-cols-[30%_70%] items-start md:items-center gap-y-1 md:gap-x-2">
                       <Label className="text-sm mb-1 md:mb-0">Status of Appointment</Label>
                       <div className="w-full">
@@ -602,7 +686,11 @@ const VacancyForm = () => {
               </div>
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
-                  <Button variant="ghost">Cancel</Button>
+                  <Link href={route('vacancies.index')}>
+                      <Button variant="ghost" type="button">
+                        Cancel
+                      </Button>
+                    </Link>
                   <Button type="submit" disabled={processing}>
                     {processing ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
                     {data.id ? "Update" : "Submit"}
@@ -615,6 +703,11 @@ const VacancyForm = () => {
             onClose={closeCompetencyForm} 
             data={data}
             setData={setData}
+          /> 
+          <CBJDForm
+            open={isCopyDialogOpen}
+            onClose={() => setIsCopyDialogOpen(false)}
+            onApply={handleCopyVacancy}
           /> 
         </form>
     )

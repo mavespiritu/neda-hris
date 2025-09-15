@@ -10,18 +10,9 @@ import { Label } from "@/components/ui/label"
 import RichTextEditor from "@/components/RichTextEditor"
 import FileUpload from "@/components/FileUpload"
 import { 
-    Search, 
-    ThumbsUp, 
     Plus, 
-    ThumbsDown, 
     Trash2, 
-    Pencil, 
     ChevronLeft, 
-    Printer, 
-    Settings, 
-    ChevronDown,
-    Eye,
-    EyeOff,
     Loader2 
 } from 'lucide-react'
 

@@ -93,21 +93,21 @@ const VacancyForm = ({id}) => {
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Include Vacancy Form</DialogTitle>
-                    <DialogDescription>Accomplish this form to include vacancy for publication.</DialogDescription>
+                    <DialogTitle>Add Vacant Position</DialogTitle>
+                    <DialogDescription>Accomplish this form to include vacant position on the publication.</DialogDescription>
                 </DialogHeader>
                 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="flex flex-col gap-2">
-                        <Label>Vacancy</Label>
+                        <Label>Vacant Position</Label>
                         <SingleComboBox 
                             items={vacancies} 
                             onChange={(value) => {
                                 setData("vacancy_id", value)
                             }}
                             invalidMessage={errors.vacancy_id}
-                            placeholder="Select vacancy"
-                            name="vacancy"
+                            placeholder="Select vacant position"
+                            name="vacant position"
                             id="vacancy_id"
                             value={data.vacancy_id}
                             width="w-[460px]"

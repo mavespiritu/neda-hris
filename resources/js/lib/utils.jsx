@@ -36,18 +36,27 @@ export function formatTime(time) {
 }
 
 export function formatTime12(time) {
-  if (!time) return "-- : -- --" 
+  if (!time) return "-- : -- --"
 
-  const date = new Date(time)
+  let date
 
-  if (isNaN(date.getTime())) {
-    return '-- : -- --'
+  if (typeof time === "string" && /^\d{2}:\d{2}(:\d{2})?$/.test(time)) {
+    // Handle "HH:mm" or "HH:mm:ss"
+    const [hours, minutes, seconds = "0"] = time.split(":")
+    date = new Date()
+    date.setHours(Number(hours), Number(minutes), Number(seconds), 0)
+  } else {
+    // Try to parse as full datetime
+    date = new Date(time)
   }
 
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+  if (isNaN(date.getTime())) {
+    return "-- : -- --"
+  }
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: true,
   })
 }

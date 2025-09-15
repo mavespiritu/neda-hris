@@ -57,15 +57,14 @@ const TimeRecords = () => {
 
   return (
     <div>
-      <Card className="flex flex-col h-full">
+      <Card className="grid grid-rows-[auto,1fr] h-[calc(100vh-155px)]">
         <CardHeader className="space-y-2 pb-4">
           <CardTitle className="text-lg">Time Records</CardTitle>
           <CardDescription className="text-sm">
             Apply filters available and generate reports
           </CardDescription>
         </CardHeader>
-
-        <CardContent className="flex-1 overflow-auto border-t p-4 relative">
+        <CardContent className="grid grid-rows-[1fr] overflow-auto border-t p-4">
           <div className="space-y-4">
           {/* Date filter + Button */}
             <div className="flex items-end justify-between mb-4">
@@ -104,7 +103,7 @@ const TimeRecords = () => {
               <Loader2 className="animate-spin w-4 h-4 text-gray-500" />
             </div>
           ) : data.timeRecords.length === 0 ? (
-            <p className="text-center text-sm">No records found</p>
+            <div className="text-center text-sm flex items-center justify-center h-[80%]">No records found</div>
           ) : (
             <div className="border rounded-lg overflow-auto">
               <table className="min-w-full text-left border-collapse">

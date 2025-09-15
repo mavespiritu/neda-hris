@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useTable } from '@/hooks/useTable'
 import { usePage } from '@inertiajs/react'
-import { User, Briefcase, Clock, ChevronRight } from 'lucide-react'
+import { User, Briefcase, Clock, ChevronRight, Calendar } from 'lucide-react'
 import PaginationControls from '@/components/PaginationControls'
 import StatusBadge from '@/components/StatusBadge'
 import { Input } from "@/components/ui/input"
@@ -88,25 +88,29 @@ const SubmissionList = () => {
                     selectedSubmission?.id === submission.id ? 'bg-muted' : 'bg-white'
                 }`}
                 >
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start mb-2">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm font-semibold">
                         <User className="w-4 h-4 text-gray-500" />
-                        <span>{submission.name}</span>
+                        <span>{submission.name ?? ""}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <Briefcase className="w-3.5 h-3.5 text-gray-500" />
-                        <span>{submission.position}</span>
+                        <span>{submission.position ?? ""}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                        <span>CY {submission.year ?? ""}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Clock className="w-3.5 h-3.5 text-gray-500" />
-                        <span>{submission.date_submitted}</span>
-                      </div>
-                      <div className="pt-1">
-                        <StatusBadge status={submission.status} />
+                        <span>{submission.date_submitted ?? ""}</span>
                       </div>
                     </div>
                     <ChevronRight className="w-4 h-4 mt-1 text-gray-400" />
+                  </div>
+                  <div className="flex justify-end">
+                    <StatusBadge status={submission.status ?? "Submitted"} />
                   </div>
                 </div>
               ))

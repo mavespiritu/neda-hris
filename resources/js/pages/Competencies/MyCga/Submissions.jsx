@@ -123,29 +123,29 @@ const Submissions = () => {
     {
         header: "Submissions",
         cell: ({ row }) => {
-          const { position, position_id, date_created, status } = row.original
+          const { year, position, position_id, date_created, status } = row.original
 
           const formatted = formatDateWithTime(date_created)
           const [datePart, timePart] = formatted.split(/ (?=\d{2}:\d{2}:\d{2})/)
 
           return (
-            <div className="flex flex-col md:flex-row gap-4 justify-between">
-                <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-4 w-full">
+                <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
                     <span className="text-sm leading-tight">{position}</span>
                     </div>
                     <div className="flex items-center gap-2">
                     <Calendar className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
-                    <span className="text-xs">{datePart}</span>
+                    <span className="text-xs">CY {year}</span>
                     </div>
                     <div className="flex items-center gap-2">
                     <Clock className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
-                    <span className="text-xs">{timePart}</span>
+                    <span className="text-xs">{datePart} {timePart}</span>
                     </div>
                 </div>
 
-                <StatusBadge status={status} />
+                <div className="flex justify-end"><StatusBadge status={status} /></div>
             </div>
           )
         },

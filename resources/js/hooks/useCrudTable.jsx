@@ -1,13 +1,12 @@
 import React, { useState, useCallback, useMemo, useRef } from "react"
-import { flexRender } from "@tanstack/react-table"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
-import { useTable } from "@/hooks/useTable"
-import PaginationControls from "@/components/PaginationControls"
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,11 +18,41 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuGroup,DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Filter as FilterIcon, Pencil, Trash2, Wrench, ChevronsUpDown, ChevronUp, ChevronDown, ArrowUp, ArrowDown, CircleX, Printer } from "lucide-react"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger, 
+  DropdownMenuLabel, 
+  DropdownMenuGroup,
+  DropdownMenuSeparator 
+} from "@/components/ui/dropdown-menu"
+import { 
+  Plus, 
+  Search, 
+  Filter as FilterIcon, 
+  Pencil, 
+  Trash2, 
+  Wrench, 
+  ChevronsUpDown, 
+  ChevronUp, 
+  ChevronDown, 
+  ArrowUp, 
+  ArrowDown, 
+  CircleX, 
+  Printer 
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useTable } from "@/hooks/useTable"
+import PaginationControls from "@/components/PaginationControls"
 import { useDebounce } from "use-debounce"
 import { router } from "@inertiajs/react"
 import { useToast } from "@/hooks/use-toast"
+import { flexRender } from "@tanstack/react-table"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function useCrudTable({
   columns,
@@ -36,9 +65,33 @@ export default function useCrudTable({
   onJsonResponse = null,
 }) {
   const { toast } = useToast()
-  const { enableAdd, enableEdit, enableDelete, enableView, enableViewAsLink, enableSearching, enableFiltering, enableBulkDelete, enableRowSelection, enableGenerateReport, canModify } = options
-  const { data, current_page: currentPage, last_page: pageCount, per_page: perPage } = initialData
-  const { editEndpoint, deleteEndpoint, generateReportEndpoint, bulkDeleteEndpoint } = endpoints
+  const { 
+    enableAdd, 
+    enableEdit, 
+    enableDelete, 
+    enableView, 
+    enableViewAsLink, 
+    enableSearching, 
+    enableFiltering, 
+    enableBulkDelete, 
+    enableRowSelection, 
+    enableGenerateReport, 
+    canModify 
+  } = options
+  const { 
+    data, 
+    current_page: currentPage, 
+    last_page: pageCount, 
+    per_page: perPage 
+  } = initialData
+  const { 
+    viewEndpoint,
+    addEndpoint, 
+    editEndpoint, 
+    deleteEndpoint, 
+    generateReportEndpoint, 
+    bulkDeleteEndpoint 
+  } = endpoints
 
   const [hoveredRowId, setHoveredRowId] = useState(null)
   const [formMode, setFormMode] = useState("add")
@@ -100,7 +153,7 @@ export default function useCrudTable({
             ),
             cell: ({ row }) => {
 
-              if(!(enableEdit && (!row.original.isLocked || canModify))){
+              if(!((!row.original.isLocked || canModify))){
                 return null
               }
 
@@ -157,10 +210,24 @@ export default function useCrudTable({
       },
     ]
 
-    return [...selectionColumn, ...rowNumberColumn, ...columns, ...actionsColumn]
+    return [
+      ...selectionColumn, 
+      ...rowNumberColumn, 
+      ...columns, 
+      ...actionsColumn
+    ]
   }, [columns, enableRowSelection, currentPage, perPage, hoveredRowId, handleEdit])
 
-  const { table, form, search, setSearch, pageIndex, setPageIndex, selectedRows } = useTable({
+  const { 
+    table, 
+    form, 
+    search, 
+    setSearch, 
+    pageIndex, 
+    setPageIndex, 
+    selectedRows,
+    reloadTable 
+  } = useTable({
     data,
     pageSize: perPage || 20,
     currentPage,
@@ -171,9 +238,10 @@ export default function useCrudTable({
     state: { rowSelection },
     onRowSelectionChange: setRowSelection,
     enableRowSelection,
-    onJsonResponse: (response) => {
+    /* onJsonResponse: (response) => {
       onJsonResponse?.((old) => ({ ...old, data: response, isLoading: false, error: null }))
-    },
+    }, */
+    onJsonResponse
   })
 
   const [debouncedSearch] = useDebounce(search, 500)
@@ -184,6 +252,7 @@ export default function useCrudTable({
         preserveScroll: true,
         onSuccess: () => {
           toast({ title: "Deleted!", description: "Item was successfully deleted." })
+          reloadTable()
         },
         onError: () => {
           toast({ title: "Error", description: "Failed to delete item.", variant: "destructive" })
@@ -206,6 +275,7 @@ export default function useCrudTable({
           title: "Success!",
           description: "The items were deleted successfully.",
         })
+        reloadTable()
       },
       onError: () => {
         toast({
@@ -290,7 +360,13 @@ export default function useCrudTable({
                         type="button"
                         size="sm"
                         className="h-8 gap-2 text-xs inline-flex items-center justify-center rounded-md px-3 py-1 bg-primary text-white hover:bg-primary/90 transition"
-                        onClick={() => router.visit(`/your-route/${row.original.id}`)}
+                        onClick={() => {
+                          const endpoint = 
+                            typeof viewEndpoint === "function" 
+                              ? viewEndpoint(row.original) 
+                              : viewEndpoint;
+                          router.visit(endpoint)
+                        }}
                       >
                         View
                       </Button>
@@ -359,7 +435,7 @@ export default function useCrudTable({
       } = view.current
 
       return (
-        <div className="grid grid-rows-[auto,1fr,auto] h-screen flex-1 overflow-hidden gap-4">
+        <div className="grid grid-rows-[auto,1fr,auto] min-h-[calc(100vh-250px)] max-h-screen flex-1 overflow-hidden gap-2">
           <div className="flex justify-between gap-4">
             <div className="flex-1 gap-2 p-1">
               {enableSearching && (
@@ -411,11 +487,22 @@ export default function useCrudTable({
               )}
               
               {enableAdd && (
-                <Button type="button" onClick={handleAdd}>
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden md:block">Add New</span>
-                </Button>
-              )}
+                  addEndpoint
+                  ? (
+                    <Button
+                      type="button"
+                      onClick={() => router.visit(addEndpoint)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden md:block">Add New</span>
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={handleAdd}>
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden md:block">Add New</span>
+                    </Button>
+                  )
+                )}
             </div>
           </div>
 
@@ -499,6 +586,13 @@ export default function useCrudTable({
             </div>
           </ScrollArea>
 
+          <PaginationControls
+            pageIndex={pageIndex}
+            pageCount={pageCount}
+            setPageIndex={setPageIndex}
+            selectedRowsLength={selectedRowsLength}
+          />
+
           <AlertDialog open={!!deleteMode} onOpenChange={() => setDeleteMode(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -530,13 +624,6 @@ export default function useCrudTable({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-
-          <PaginationControls
-            pageIndex={pageIndex}
-            pageCount={pageCount}
-            setPageIndex={setPageIndex}
-            selectedRowsLength={selectedRowsLength}
-          />
         </div>
       )
     }
@@ -552,5 +639,6 @@ export default function useCrudTable({
     handleCloseForm,
     handleCloseFilter,
     handleCloseView,
+    reloadTable
   }
 }

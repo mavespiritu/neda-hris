@@ -279,7 +279,8 @@ const Indicator = ({
         setSearch,
         pageIndex,
         setPageIndex,
-        selectedRows
+        selectedRows,
+        reloadTable
     } = useTable({
         data,
         pageCount,
@@ -490,6 +491,7 @@ const Indicator = ({
                         setSelectedEvidence(null)
                         setSelectedEvidenceType(null)
                         closeEvidenceForm()
+                        //reloadTable()
                     }} 
                 />
             )}
@@ -501,6 +503,7 @@ const Indicator = ({
                         setSelectedEvidence(null)
                         setSelectedEvidenceType(null)
                         closeEvidenceForm()
+                        //reloadTable()
                     }}  
                 />
             )}
@@ -512,6 +515,7 @@ const Indicator = ({
                         setSelectedEvidence(null)
                         setSelectedEvidenceType(null)
                         closeEvidenceForm()
+                        //reloadTable()
                     }} 
                 />
             )}
@@ -523,6 +527,7 @@ const Indicator = ({
                         setSelectedEvidence(null)
                         setSelectedEvidenceType(null)
                         closeEvidenceForm()
+                        //reloadTable()
                     }} 
                 />
             )}

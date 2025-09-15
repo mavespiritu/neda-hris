@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\CompetenciesForReviewSubmitted;
+use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
@@ -386,12 +387,23 @@ class SettingsController extends Controller
         }
     }
 
-    public function getCgaSubmissionSchedules()
+    public function getCgaSubmissionSchedules(Request $request)
     {
         $conn2 = DB::connection('mysql2');
 
+        $sort      = $request->get('sort', 'year');
+        $direction = $request->get('direction', 'desc');
+
+         $sortable = [
+            'year'      => DB::raw('year'),
+            'from_date' => DB::raw("STR_TO_DATE(SUBSTRING_INDEX(submission_dates, ' - ', 1), '%Y-%m-%d')"),
+            'end_date'  => DB::raw("STR_TO_DATE(SUBSTRING_INDEX(submission_dates, ' - ', -1), '%Y-%m-%d')"),
+        ];
+
+        $sortColumn = $sortable[$sort] ?? $sortable['year'];
+
         $schedules = $conn2->table('cga_submission_settings')
-            ->orderBy('year', 'desc')
+            ->orderBy($sortColumn, $direction)
             ->paginate(5);
 
         $schedules->getCollection()->transform(function ($item) {
@@ -407,6 +419,242 @@ class SettingsController extends Controller
             return $item;
         });
 
-        return response()->json($schedules);
+        return response()->json(
+        ['data' => [
+            'schedules' => $schedules
+        ]]);
+    }
+
+    public function getCgaSubmissionSchedulesList(Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+        $today = Carbon::today();
+
+        $schedules = $conn2->table('cga_submission_settings')
+            ->orderByDesc('year')
+            ->get()
+            ->filter(function ($item) use ($today) {
+                if (!empty($item->submission_dates) && str_contains($item->submission_dates, ' - ')) {
+                    [$fromDate, $endDate] = explode(' - ', $item->submission_dates);
+                    $from = Carbon::parse($fromDate);
+                    $to = Carbon::parse($endDate);
+
+                    return $today->between($from, $to);
+                }
+                return false;
+            })
+            ->map(function ($item) {
+                [$fromDate, $endDate] = explode(' - ', $item->submission_dates);
+                $item->from_date = $fromDate;
+                $item->end_date = $endDate;
+                $item->from_date_formatted = Carbon::parse($fromDate)->format('F j, Y');
+                $item->end_date_formatted = Carbon::parse($endDate)->format('F j, Y');
+
+                return $item;
+            })
+            ->values(); 
+            
+        return response()->json(['data' => $schedules]);
+    }
+
+    public function storeCgaSubmissionSchedules(Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+
+        $validated = $request->validate([
+            'year' => [
+                'required',
+                'digits:4',
+                function ($attribute, $value, $fail) use ($conn2) {
+                    if ($conn2->table('cga_submission_settings')
+                            ->where('year', $value)
+                            ->exists()) {
+                        $fail('A submission schedule already exists for this year.');
+                    }
+                },
+            ],
+            'from_date' => 'required|date',
+            'end_date' => 'after_or_equal:from_date',
+        ], [
+            'year.required' => 'The year field is required.',
+            'year.digits' => 'The year must be a 4-digit year.',
+
+            'from_date.required' => 'The start date field is required.',
+            'from_date.date' => 'The start date must be a valid date.',
+
+            'end_date.required' => 'The end date field is required.',
+            'end_date.date' => 'The end date must be a valid date.',
+            'end_date.after_or_equal' => 'The end date must be a date after or equal to the start date.',
+        ]);
+
+        try {
+
+            $conn2->beginTransaction();
+
+            $startDate = Carbon::parse($validated['from_date'])->startOfDay()->format('Y-m-d');
+            $endDate = Carbon::parse($validated['end_date'])->endOfDay()->format('Y-m-d');
+
+            $conn2->table('cga_submission_settings')
+            ->insert([
+                'year' => $validated['year'],
+                'submission_dates' => $startDate.' - '.$endDate,
+            ]);
+
+            $conn2->commit();
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Submission schedule saved successfully!'
+            ]);
+        } catch (\Exception $e) {
+            $conn2->rollBack();
+            Log::error('Failed to save submission schedule: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while submitting schedule. Please try again.'
+            ]);
+        }    
+    }
+
+    public function updateCgaSubmissionSchedules($id, Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+
+        $validated = $request->validate([
+            'year' => [
+                'required',
+                'digits:4',
+                function ($attribute, $value, $fail) use ($conn2, $id) {
+                    $exists = $conn2->table('cga_submission_settings')
+                        ->where('year', $value)
+                        ->where('id', '!=', $id)
+                        ->exists();
+
+                    if ($exists) {
+                        $fail('A submission schedule already exists for this year.');
+                    }
+                },
+            ],
+            'from_date' => 'required|date',
+            'end_date' => 'after_or_equal:from_date',
+        ], [
+            'year.required' => 'The year field is required.',
+            'year.digits' => 'The year must be a 4-digit year.',
+
+            'from_date.required' => 'The start date field is required.',
+            'from_date.date' => 'The start date must be a valid date.',
+
+            'end_date.required' => 'The end date field is required.',
+            'end_date.date' => 'The end date must be a valid date.',
+            'end_date.after_or_equal' => 'The end date must be a date after or equal to the start date.',
+        ]);
+
+        try {
+            $conn2->beginTransaction();
+
+            $startDate = Carbon::parse($validated['from_date'])->startOfDay()->format('Y-m-d');
+            $endDate = Carbon::parse($validated['end_date'])->endOfDay()->format('Y-m-d');
+
+            $conn2->table('cga_submission_settings')
+                ->where('id', $id)
+                ->update([
+                    'year' => $validated['year'],
+                    'submission_dates' => $startDate . ' - ' . $endDate,
+                ]);
+
+            $conn2->commit();
+
+            return redirect()->back()->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Submission schedule updated successfully!',
+            ]);
+        } catch (\Exception $e) {
+            $conn2->rollBack();
+            Log::error('Failed to update submission schedule: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while updating schedule. Please try again.',
+            ]);
+        }
+    }
+
+    public function destroyCgaSubmissionSchedules($id)
+    {
+        $conn2 = DB::connection('mysql2');
+
+        try {
+            $conn2->beginTransaction();
+
+            $deleted = $conn2->table('cga_submission_settings')->where('id', $id)->delete();
+
+            $conn2->commit();
+
+            if ($deleted) {
+                return redirect()->back()->with([
+                    'status' => 'success',
+                    'title' => 'Deleted!',
+                    'message' => 'Submission schedule deleted successfully.'
+                ]);
+            } else {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Submission schedule not found or already deleted.'
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            $conn2->rollBack();
+            Log::error('Error deleting submission schedule: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh!',
+                'message' => 'An error occurred while deleting submission schedule. Please try again.'
+            ]);
+        }
+    }
+
+    public function bulkDestroyCgaSubmissionSchedules(Request $request)
+    {
+        $conn2 = DB::connection('mysql2');
+
+        try {
+            $conn2->beginTransaction();
+
+            $deleted = $conn2->table('cga_submission_settings')->whereIn('id', $request->input('ids'))->delete();
+
+            $conn2->commit();
+
+            if ($deleted) {
+                return redirect()->back()->with([
+                    'status' => 'success',
+                    'title' => 'Deleted!',
+                    'message' => 'Selected submission schedules have been deleted successfully.'
+                ]);
+            } else {
+                return redirect()->back()->with([
+                    'status' => 'error',
+                    'title' => 'Not Found',
+                    'message' => 'Selected submission schedules not found or already deleted.'
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            $conn2->rollBack();
+            Log::error('Error bulk deleting submission schedules: ' . $e->getMessage());
+
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Uh oh!',
+                'message' => 'An error occurred while deleting submission schedules. Please try again.'
+            ]);
+        }
     }
 }
