@@ -314,8 +314,8 @@ const VacancyForm = () => {
                                   division: matched?.division_id || "",
                                   sg: matched?.grade || "",
                                   position: matched?.position_id || "",
-                                  position_description: matched?.position_description || "",
-                                  monthly_salary: matched?.salary || "",
+                                  position_description: prev.position_description || matched?.position_description || "",
+                                  monthly_salary: prev.monthly_salary || matched?.salary || "",
                                 }
 
                                 // If it's a new vacancy (no id yet), merge all fields from matched
