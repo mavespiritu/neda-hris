@@ -329,13 +329,12 @@ class SettingsController extends Controller
         $conn2 = DB::connection('mysql2');
 
         $validated = $request->validate([
-            'requirements' => 'required|array',
+            'requirements' => 'nullable|array',
             'requirements.*.requirement' => 'required|string|max:255',
             'requirements.*.is_default' => 'boolean',
             'requirements.*.is_multiple' => 'boolean',
             'requirements.*.id' => 'nullable|integer|exists:mysql2.recruitment_requirements,id',
         ], [
-            'requirements.required' => 'At least one requirement is required.',
             'requirements.*.requirement.required' => 'The requirement field is required.',
             'requirements.*.is_default.boolean' => 'The "is default" value must be true or false.',
             'requirements.*.is_multiple.boolean' => 'The "is multiple" value must be true or false.',
