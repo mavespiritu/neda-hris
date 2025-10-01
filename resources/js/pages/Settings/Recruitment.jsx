@@ -84,13 +84,16 @@ const Recruitment = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    patch(route('settings.recruitment.update'), {
-        requirements: data.requirements,
+    patch(route('settings.recruitment.update'),
+      { requirements: data.requirements }, 
+      {
         preserveScroll: true,
         onSuccess: () => {
-            toast({ title: 'Saved', description: 'Settings updated successfully.' })
+          toast({ title: 'Saved', description: 'Settings updated successfully.' })
+          fetchRecruitment() 
         },
-    })
+      }
+    )
   }
 
   const sections = [
