@@ -355,7 +355,7 @@ class SettingsController extends Controller
                             'requirement' => $req['requirement'],
                             'is_default' => $req['is_default'] ?? false,
                             'is_multiple' => $req['is_multiple'] ?? false,
-                            'connected_to' => $req['connected_to'],
+                            'connected_to' => $req['connected_to'] ?? null,
                         ]);
                 } else {
                     $conn2->table('recruitment_requirements')
@@ -363,7 +363,7 @@ class SettingsController extends Controller
                             'requirement' => $req['requirement'],
                             'is_default' => $req['is_default'] ?? false,
                             'is_multiple' => $req['is_multiple'] ?? false,
-                            'connected_to' => $req['connected_to'],
+                            'connected_to' => $req['connected_to'] ?? null,
                         ]);
                 }
             }
