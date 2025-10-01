@@ -75,6 +75,8 @@ const WorkExperience = ({ data, setData, errors = {} }) => {
     removeWorkExperience(index) 
   }
 
+  console.log(data)
+
   return (
     <Card>
       <CardHeader>
@@ -85,7 +87,7 @@ const WorkExperience = ({ data, setData, errors = {} }) => {
         {data.map((child, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-semibold">
                 Work Experience Entry # {index + 1}
               </CardTitle>
               <Button 
@@ -100,7 +102,7 @@ const WorkExperience = ({ data, setData, errors = {} }) => {
                   <span className="hidden md:block">Remove</span>
               </Button>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4 pt-4">
+            <CardContent className="flex flex-col gap-4 pt-4 border-t bg-muted">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-4">
               <div className="flex items-center space-x-2">
                 <Switch 
@@ -121,7 +123,7 @@ const WorkExperience = ({ data, setData, errors = {} }) => {
               <div className="flex flex-col gap-2 items-end">
                 <div className="grid lg:grid-cols-2 gap-4 w-full">
                   <div>
-                    <Label htmlFor={`inclusive_dates_from_${index}`}>Inclusive Dates</Label>
+                    <Label htmlFor={`inclusive_dates_from_${index}`}>Start Date</Label>
                     <DatePicker
                       placeholder="From"
                       onDateChange={(date) => handleUpdateWorkExperience(index, 'from_date', date)}
@@ -130,7 +132,7 @@ const WorkExperience = ({ data, setData, errors = {} }) => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor={`inclusive_dates_to_${index}`}>&nbsp;</Label>
+                    <Label htmlFor={`inclusive_dates_to_${index}`}>End Date</Label>
                     <DatePicker
                       placeholder="To"
                       onDateChange={(date) => handleUpdateWorkExperience(index, 'to_date', date)}
@@ -236,7 +238,7 @@ const WorkExperience = ({ data, setData, errors = {} }) => {
             </CardContent>
           </Card>
         ))}
-        <Button type="button" onClick={() => handleAddWorkExperience()} variant="secondary" className="inline-flex self-start">
+        <Button type="button" onClick={() => handleAddWorkExperience()} variant="outline" className="w-full bg-muted">
           <Plus className="h-4 w-4" />
           Add Record
         </Button>

@@ -47,7 +47,7 @@ const LearningAndDevelopment = ({ data, setData, errors = {} }) => {
 
   const handleAddLearningAndDevelopment = () => {
     const newLearningAndDevelopment = {
-      training_title: "",
+      seminar_title: "",
       from_date: "",
       to_date: "",
       hours: "",
@@ -85,7 +85,7 @@ const LearningAndDevelopment = ({ data, setData, errors = {} }) => {
         {data.map((child, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-semibold">
                 L&D Entry # {index + 1}
               </CardTitle>
               <Button 
@@ -100,25 +100,25 @@ const LearningAndDevelopment = ({ data, setData, errors = {} }) => {
                   <span className="hidden md:block">Remove</span>
               </Button>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4 mt-4">
+            <CardContent className="flex flex-col gap-4 pt-4 border-t bg-muted">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor={`training_title_${index}`}>Title of Learning and Development Interventions / Training Programs (Write in full)</Label>
+                <Label htmlFor={`seminar_title_${index}`}>Title of Learning and Development Interventions / Training Programs (Write in full)</Label>
                 <TextInput
-                  id={`training_title_${index}`}
-                  value={child.training_title ?? ""}
-                  onChange={(e) => handleUpdateLearningAndDevelopment(index, 'training_title', e.target.value)}
-                  isInvalid={!!errors[`learningAndDevelopment.${index}.training_title`]}
+                  id={`seminar_title_${index}`}
+                  value={child.seminar_title ?? ""}
+                  onChange={(e) => handleUpdateLearningAndDevelopment(index, 'seminar_title', e.target.value)}
+                  isInvalid={!!errors[`learningAndDevelopment.${index}.seminar_title`]}
                 />
-                {errors[`learningAndDevelopment.${index}.training_title`] && (
+                {errors[`learningAndDevelopment.${index}.seminar_title`] && (
                   <p className="text-red-500 text-xs mt-1">
-                    {errors[`learningAndDevelopment.${index}.training_title`]}
+                    {errors[`learningAndDevelopment.${index}.seminar_title`]}
                   </p>
                 )}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-4">
                 <div>
-                  <Label htmlFor={`from_date_${index}`}>Inclusive Dates</Label>
+                  <Label htmlFor={`from_date_${index}`}>Start Date</Label>
                   <DatePicker
                     placeholder="From"
                     onDateChange={(date) => handleUpdateLearningAndDevelopment(index, 'from_date', date)}
@@ -127,7 +127,7 @@ const LearningAndDevelopment = ({ data, setData, errors = {} }) => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor={`to_date_${index}`}>&nbsp;</Label>
+                  <Label htmlFor={`to_date_${index}`}>End Date</Label>
                   <DatePicker
                     placeholder="To"
                     onDateChange={(date) => handleUpdateLearningAndDevelopment(index, 'to_date', date)}
@@ -209,7 +209,7 @@ const LearningAndDevelopment = ({ data, setData, errors = {} }) => {
             </CardContent>
           </Card>
         ))}
-        <Button type="button" onClick={() => handleAddLearningAndDevelopment()} variant="secondary" className="inline-flex self-start">
+        <Button type="button" onClick={() => handleAddLearningAndDevelopment()} variant="outline" className="w-full bg-muted">
           <Plus className="h-4 w-4" />
           Add Record
         </Button>

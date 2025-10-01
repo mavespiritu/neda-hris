@@ -60,7 +60,7 @@ const CivilServiceEligibility = ({ data, setData, errors = {} }) => {
           {data.map((child, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-sm font-semibold">
                   Civil Service Eligibility Entry # {index + 1}
                 </CardTitle>
                 <Button 
@@ -75,7 +75,7 @@ const CivilServiceEligibility = ({ data, setData, errors = {} }) => {
                     <span className="hidden md:block">Remove</span>
                 </Button>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+              <CardContent className="flex flex-col gap-4 border-t pt-4 bg-muted">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
                   <div>
                     <Label htmlFor={`eligibility_${index}`}>Career Service / RA 1080 (Board / Bar) Under Special Laws / CES / CSEE Barangay Eligibility / Driver's License</Label>
@@ -157,7 +157,7 @@ const CivilServiceEligibility = ({ data, setData, errors = {} }) => {
               </CardContent>
             </Card>
           ))}
-          <Button type="button" onClick={() => handleAddEligibility()} variant="secondary" className="inline-flex self-start">
+          <Button type="button" onClick={() => handleAddEligibility()} variant="outline" className="w-full bg-muted">
             <Plus className="h-4 w-4" />
             Add Record
           </Button>

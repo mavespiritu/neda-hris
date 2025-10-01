@@ -170,8 +170,8 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
         <CardTitle className="font-semibold text-lg flex items-center"><SquareLibrary className="mr-2 h-4 w-4"/> Other Information</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <Fieldset legend="Special Skills and Hobbies">
-          <div className="border rounded-lg my-2">
+        <Fieldset legend="Special Skills and Hobbies" className="bg-muted">
+          <div className="border rounded-lg my-2 bg-white">
             <Table className="text-sm">
               <TableHeader>
                   <TableRow>
@@ -214,7 +214,7 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
               <TableFooter>
                 <TableRow>
                   <TableCell colSpan={3}>
-                    <Button type="button" onClick={() => handleAddSkill()} variant="outline" className="flex">
+                    <Button type="button" onClick={() => handleAddSkill()} variant="outline" className="w-full">
                       <Plus className="h-4 w-4" />
                       Add Entry
                     </Button>
@@ -224,8 +224,8 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
             </Table>
           </div>
         </Fieldset>
-        <Fieldset legend="Non-Academic Distinctions/Recognition">
-          <div className="border rounded-lg my-2">
+        <Fieldset legend="Non-Academic Distinctions/Recognition" className="bg-muted">
+          <div className="border rounded-lg my-2 bg-white">
             <Table className="text-sm">
               <TableHeader>
                   <TableRow>
@@ -267,7 +267,7 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
               <TableFooter>
                 <TableRow>
                   <TableCell colSpan={3}>
-                    <Button type="button" onClick={() => handleAddRecognition()} variant="outline" className="flex">
+                    <Button type="button" onClick={() => handleAddRecognition()} variant="outline" className="w-full">
                       <Plus className="h-4 w-4" />
                       Add Entry
                     </Button>
@@ -277,8 +277,8 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
             </Table>
           </div>
         </Fieldset>
-        <Fieldset legend="Membership in Association/Organization">
-          <div className="border rounded-lg my-2">
+        <Fieldset legend="Membership in Association/Organization" className="bg-muted">
+          <div className="border rounded-lg my-2 bg-white">
             <Table className="text-sm">
               <TableHeader>
                   <TableRow>
@@ -320,7 +320,7 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
               <TableFooter>
                 <TableRow>
                   <TableCell colSpan={3}>
-                    <Button type="button" onClick={() => handleAddMembership()} variant="outline" className="flex">
+                    <Button type="button" onClick={() => handleAddMembership()} variant="outline" className="w-full">
                       <Plus className="h-4 w-4" />
                       Add Entry
                     </Button>
@@ -330,7 +330,8 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
             </Table>
           </div>
         </Fieldset>
-        <Fieldset legend="Questions">
+        <Fieldset legend="Questions" className="bg-muted">
+          <div className="border rounded-lg p-4 bg-white">
           {data.questions.map((question, index) => (
             <Question 
               key={`question-${index}`}
@@ -340,10 +341,11 @@ const OtherInformation = ({ data, setData, errors = {} }) => {
               errors={errors}
             />
           ))}
+          </div>
         </Fieldset>
-        <Fieldset legend="References">
+        <Fieldset legend="References" className="bg-muted">
           <p className="text-sm">Person not related by consanguinity or affinity to applicant /appointee</p>
-          <div className="border rounded-lg my-2">
+          <div className="border rounded-lg my-2 bg-white">
             <Table className="text-sm">
               <TableHeader>
                   <TableRow>

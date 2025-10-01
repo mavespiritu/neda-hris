@@ -95,7 +95,7 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
         <CardTitle className="font-semibold text-lg flex items-center"><UserPen className="mr-2 h-4 w-4"/> Personal Information</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <Fieldset legend="Basic Information">
+        <Fieldset legend="Basic Information" className="bg-muted">
           <div className="grid grid-cols-1 lg:grid-cols-[28%_28%_28%_auto] gap-4">
             {/* Last Name */}
             <div>
@@ -428,7 +428,7 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
             </div>
           </div>
         </Fieldset>
-        <Fieldset legend="Residential Address">
+        <Fieldset legend="Residential Address" className="bg-muted">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Province */}
             <div>

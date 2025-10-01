@@ -94,7 +94,9 @@ const usePdsStore = create((set, get) => ({
                 school: "",
                 highest_attainment: "",
                 from_date: "",
+                from_year: "",
                 to_date: "",
+                to_year: "",
                 award: "",
                 year_graduated: "",
               }
@@ -107,7 +109,9 @@ const usePdsStore = create((set, get) => ({
                 school: "",
                 highest_attainment: "",
                 from_date: "",
+                from_year: "",
                 to_date: "",
+                to_year: "",
                 award: "",
                 year_graduated: "",
               }
@@ -121,7 +125,9 @@ const usePdsStore = create((set, get) => ({
                   school: "",
                   highest_attainment: "",
                   from_date: "",
-                  to_date: "",
+                from_year: "",
+                to_date: "",
+                to_year: "",
                   award: "",
                   year_graduated: "",
                 }

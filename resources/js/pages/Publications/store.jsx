@@ -13,7 +13,7 @@ export const store = create((set, get) => ({
         status: "",
         date_published: "",
         date_closed: "",
-        time_closed: "",
+        newFiles: "",
     },
 
     setSelectedItem: (item) => set({ selectedItem: item }),

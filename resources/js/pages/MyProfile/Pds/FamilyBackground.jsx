@@ -74,7 +74,7 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
           I have a spouse.
         </div>
         {data.isThereSpouse && (
-          <Fieldset legend="Spouse's Information">
+          <Fieldset legend="Spouse's Information" className="bg-muted">
             <div className="grid grid-cols-1 lg:grid-cols-[28%_28%_28%_auto] gap-4">
               <div>
                 <Label htmlFor="spouse_last_name">Last Name</Label>
@@ -195,7 +195,7 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
         )}
 
         {/* FATHER */}
-        <Fieldset legend="Father's Information">
+        <Fieldset legend="Father's Information" className="bg-muted">
           <div className="grid grid-cols-1 lg:grid-cols-[28%_28%_28%_auto] gap-4">
             <div>
               <Label htmlFor="father_last_name">Last Name</Label>
@@ -268,7 +268,7 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
         </Fieldset>
 
         {/* MOTHER */}
-        <Fieldset legend="Mother's Information">
+        <Fieldset legend="Mother's Information" className="bg-muted">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="mother_last_name">Last Name</Label>
@@ -341,11 +341,11 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
         </Fieldset>
 
         {/* CHILDREN */}
-        <Fieldset legend="Children's Information">
+        <Fieldset legend="Children's Information" className="bg-muted">
           {data.children.map((child, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Child # {index + 1}</CardTitle>
+                <CardTitle className="text-sm font-semibold">Child # {index + 1}</CardTitle>
                 <Button 
                   type="button"
                   variant="destructive"
@@ -356,7 +356,7 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
                   <Trash2 className="h-4 w-4" /> Remove
                 </Button>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4 pt-4">
+              <CardContent className="flex flex-col gap-4 pt-4 border-t">
                 <div className="grid grid-cols-1 lg:grid-cols-[28%_28%_28%_auto] gap-4">
                   <div>
                     <Label htmlFor={`last_name_${index}`}>Last Name</Label>
@@ -429,7 +429,7 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
               </CardContent>
             </Card>
           ))}
-          <Button type="button" onClick={handleAddChild} variant="secondary" className="flex">
+          <Button type="button" onClick={handleAddChild} variant="outline" className="w-full">
             <UserPlus className="h-4 w-4" /> Add Child
           </Button>
         </Fieldset>

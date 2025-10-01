@@ -5,7 +5,7 @@ import { useHasRole } from '@/hooks/useAuth'
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Link } from '@inertiajs/react'
+import { Link, usePage } from '@inertiajs/react'
 import {
     Tabs,
     TabsContent,
@@ -48,10 +48,14 @@ const MyProfile = () => {
 
   const [activeTab, setActiveTab] = useState("pds")
 
+  const { url } = usePage()
+  const params = new URLSearchParams(url.split("?")[1])
+  const redirect = params.get("redirect")
+
   return (
     <div className="flex flex-col gap-4">
       <PageTitle pageTitle="My Profile" description="Make sure your personal data sheet is updated before submitting an application." />
-      <Pds />
+      <Pds redirect={redirect}/>
     </div>
   )
 }

@@ -42,12 +42,18 @@ const DatePicker = ({
     const newDate = new Date(selectedDate || new Date())
     newDate.setFullYear(year)
     setSelectedDate(newDate)
+    if (onDateChange) {
+      onDateChange(format(newDate, 'yyyy-MM-dd'))
+    }
   }
 
   const handleMonthChange = (month) => {
     const newDate = new Date(selectedDate || new Date())
     newDate.setMonth(month)
     setSelectedDate(newDate)
+    if (onDateChange) {
+      onDateChange(format(newDate, 'yyyy-MM-dd'))
+    }
   }
 
   const handleClear = () => {

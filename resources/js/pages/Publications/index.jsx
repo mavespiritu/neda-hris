@@ -106,12 +106,7 @@ const Publications = () => {
             header: "Closing Date",
             accessorKey: "date_closed",
             cell: ({ row }) => {        
-                return (
-                    <div className="flex flex-col">
-                        <span>{formatDate(row.original.date_closed)}</span>
-                        <span>{formatTime12(row.original.time_closed)}</span>
-                    </div>
-                )
+                return formatDate(row.original.date_closed)
             },
             meta: { enableSorting: true },
         },
@@ -264,7 +259,12 @@ const Publications = () => {
                     open={isFormOpen}
                     mode={formMode}
                     data={selectedItem}
-                    onClose={handleCloseForm}
+                    onClose={(shouldReload) => {
+                        handleCloseForm()
+                        if (shouldReload) {
+                        router.reload({ preserveScroll: true, preserveState: true })
+                        }
+                    }}
                 />
             )}
             {isFilterOpen && (

@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import PaginationControls from "@/components/PaginationControls"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -329,29 +330,29 @@ const Indicator = ({
             </div>
             <div className="mt-4 flex flex-col md:flex-row justify-between gap-4">
                 <div className="flex gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="" size="sm">
-                                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap flex gap-2 items-center">
-                                    <span>Add Evidence</span>
-                                    <ChevronDown className="h-3 w-3" />
-                                </span>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="" size="sm" className="flex gap-2 items-center">
+                            <span>Add Evidence</span>
+                            <ChevronDown className="h-3 w-3" />
                             </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56" align="start">
-                            <DropdownMenuLabel>Select Type</DropdownMenuLabel>
-                            <DropdownMenuGroup>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-56">
+                            <div className="flex flex-col">
                             {evidenceTypes.map((evidenceType) => (
-                                <DropdownMenuItem 
+                                <Button
                                 key={evidenceType}
+                                variant="ghost"
+                                className="justify-start"
                                 onClick={() => setSelectedEvidenceType(evidenceType)}
                                 >
-                                <span>{evidenceType}</span>
-                                </DropdownMenuItem>
+                                {evidenceType}
+                                </Button>
                             ))}
-                            </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button

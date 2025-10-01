@@ -42,8 +42,6 @@ const index = () => {
         },
     ], [])
 
-    console.log(competencies)
-
     const { 
         TableView,
         isFormOpen,

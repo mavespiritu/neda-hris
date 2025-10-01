@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import PaginationControls from "@/components/PaginationControls"
 import PageTitle from "@/components/PageTitle"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import VacancyInfo from "./VacancyInfo/index"
+import Requirements from "./Requirements/index"
 import BeiQuestions from "./BeiQuestions/index"
 import {
     Table,
@@ -124,7 +125,7 @@ const ViewVacancy = () => {
     const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="h-[calc(100vh-115px)] flex flex-col gap-2">
 
       <div className="flex justify-between">
         <Link
@@ -210,7 +211,7 @@ const ViewVacancy = () => {
 
       <PageTitle pageTitle={`Vacancy Info: [RF#: ${vacancy.reference_no}] ${vacancy.position}${vacancy.item_no ? ` (${vacancy.item_no})` : ''}`} description="Manage the vacancy info here." breadcrumbItems={breadcrumbItems}/>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-1 flex-col md:flex-row gap-4 overflow-hidden">
 
         <div className="w-full md:w-[20%] py-4">
           <div className="space-y-2 text-sm font-medium">
@@ -258,10 +259,14 @@ const ViewVacancy = () => {
           </div>
         </div>
 
-        <div className="w-full md:w-[80%] py-4">
-          {currentTab === 'Vacancy Info' && <VacancyInfo />}
-          {currentTab === 'BEI Questions' && <BeiQuestions />}
+        <div className="w-full md:w-[80%] h-full">
+          <ScrollArea className="h-full border rounded-lg p-4">
+            {currentTab === 'Vacancy Info' && <VacancyInfo />}
+            {currentTab === 'Requirements' && <Requirements />}
+            {currentTab === 'BEI Questions' && <BeiQuestions />}
+          </ScrollArea>
         </div>
+
       </div>
 
     </div>

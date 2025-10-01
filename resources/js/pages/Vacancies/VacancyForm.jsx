@@ -306,15 +306,43 @@ const VacancyForm = () => {
                             onChange={(value) => {
                               const matched = positionsData.find(item => item.value === value)
 
-                              setData((prev) => ({
-                                ...prev,
-                                item_no: value,
-                                division: matched?.division_id || "",
-                                sg: matched?.grade || "",
-                                position: matched?.position_id || "",
-                                position_description: matched?.position_description || "",
-                                monthly_salary: matched?.salary || "",
-                              }))
+                              setData((prev) => {
+                                // Always update item_no
+                                let base = {
+                                  ...prev,
+                                  item_no: value,
+                                  division: matched?.division_id || "",
+                                  sg: matched?.grade || "",
+                                  position: matched?.position_id || "",
+                                  position_description: matched?.position_description || "",
+                                  monthly_salary: matched?.salary || "",
+                                }
+
+                                // If it's a new vacancy (no id yet), merge all fields from matched
+                                if (!prev.id && matched) {
+                                  base = {
+                                    ...base,
+
+                                    // merge all additional job_description fields
+                                    reports_to: prev.reports_to || matched.reports_to || "",
+                                    classification: prev.classification || matched.classification || "",
+                                    prescribed_eligibility: prev.prescribed_eligibility || matched.prescribed_eligibility || "",
+                                    prescribed_education: prev.prescribed_education || matched.prescribed_education || "",
+                                    prescribed_experience: prev.prescribed_experience || matched.prescribed_experience || "",
+                                    prescribed_training: prev.prescribed_training || matched.prescribed_training || "",
+                                    preferred_eligibility: prev.preferred_eligibility || matched.preferred_eligibility || "",
+                                    preferred_education: prev.preferred_education || matched.preferred_education || "",
+                                    preferred_experience: prev.preferred_experience || matched.preferred_experience || "",
+                                    preferred_training: prev.preferred_training || matched.preferred_training || "",
+                                    examination: prev.examination || matched.examination || "",
+                                    summary: prev.summary || matched.summary || "",
+                                    output: prev.output || matched.output || "",
+                                    responsibility: prev.responsibility || matched.responsibility || "",
+                                  }
+                                }
+
+                                return base
+                              })
 
                               fetchCompetenciesPerPosition(value, setData)
 

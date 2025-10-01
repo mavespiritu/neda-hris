@@ -267,8 +267,7 @@ export default function useCrudTable({
 
     const ids = selectedRows.map((row) => row.original.id)
 
-    router.post(bulkDeleteEndpoint, {
-      ids,
+    router.post(bulkDeleteEndpoint, { ids }, {
       preserveScroll: true,
       onSuccess: () => {
         toast({
@@ -363,7 +362,7 @@ export default function useCrudTable({
                         onClick={() => {
                           const endpoint = 
                             typeof viewEndpoint === "function" 
-                              ? viewEndpoint(row.original) 
+                              ? viewEndpoint(row.original.id) 
                               : viewEndpoint;
                           router.visit(endpoint)
                         }}

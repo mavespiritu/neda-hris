@@ -31,9 +31,6 @@ Route::get('/', function () {
         : Inertia::render('Home');
 });
 
-Route::get('/jobs', fn () => Inertia::render('Jobs'));
-Route::get('/jobs/{id}', fn () => Inertia::render('JobDetails'));
-
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
@@ -104,6 +101,9 @@ require __DIR__ . '/applicant.php';
 
 require __DIR__ . '/publications.php';
 require __DIR__ . '/vacancies.php';
+require __DIR__ . '/vacancies.requirements.php';
 require __DIR__ . '/trainings.php';
+
+require __DIR__ . '/jobs.php';
 
 require __DIR__ . '/file.php';

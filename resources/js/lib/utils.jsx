@@ -1,5 +1,6 @@
 import { clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { format, isSameDay, isSameMonth, isSameYear } from "date-fns"
 
 export function formatDate(selectedDate) {
   // Convert the input string to a Date object
@@ -86,6 +87,33 @@ export function formatDateWithTime(selectedDate) {
   return formattedDate
 }
 
+export function formatDateRange(fromDate, toDate) {
+  const from = new Date(fromDate)
+
+  // ✅ Handle "Present"
+  if (!toDate) {
+    return `${format(from, "MMMM d, yyyy")} - Present`
+  }
+
+  const to = new Date(toDate)
+
+  if (isSameDay(from, to)) {
+    return format(from, "MMMM d, yyyy") // March 20, 2025
+  }
+
+  if (isSameMonth(from, to) && isSameYear(from, to)) {
+    // March 20–25, 2025
+    return `${format(from, "MMMM d")} - ${format(to, "d, yyyy")}`
+  }
+
+  if (isSameYear(from, to)) {
+    // November 1 – December 2, 2025
+    return `${format(from, "MMMM d")} - ${format(to, "MMMM d, yyyy")}`
+  }
+
+  // December 31, 2025 – January 1, 2026
+  return `${format(from, "MMMM d, yyyy")} - ${format(to, "MMMM d, yyyy")}`
+}
 
 export function formatNumberWithCommas(number){
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")

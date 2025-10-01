@@ -339,7 +339,7 @@ class VacancyController extends Controller
             $nextReferenceNo = '001'; 
 
             if ($lastReferenceNo) {
-                $lastRefNum = explode('-', $lastReferenceNo->reference_no)[0];
+                $lastRefNum = explode('-', $lastReferenceNo->reference_no)[1];
                 $nextReferenceNo = str_pad((int)$lastRefNum + 1, 3, '0', STR_PAD_LEFT);
             }
     
@@ -370,6 +370,19 @@ class VacancyController extends Controller
                             'comp_type' => $competency['comp_type'], 
                         ]);
                     }
+                }
+            }
+
+            $defaultRequirements = $conn2->table('recruitment_requirements')->where('is_default', 1)->get();
+
+            if($defaultRequirements){
+                foreach($defaultRequirements as $requirement){
+                    $conn2->table('vacancy_requirements')
+                    ->insert([
+                        'vacancy_id' => $vacancy,
+                        'requirement_id' => $requirement->id,
+                        'requirement' => $requirement->requirement,
+                    ]);
                 }
             }
 
@@ -904,6 +917,27 @@ class VacancyController extends Controller
         if (auth()->user()->can('HRIS_DC')) {
             $positions = $positions->where('epi.division_id', auth()->user()->division);
         }
+
+        $itemNos = $positions->pluck('value')->toArray();
+
+        $jobDescriptions = $conn2->table('job_description')
+        ->whereIn('item_no', $itemNos)
+        ->get()
+        ->mapWithKeys(function ($jd) {
+            $key = $jd->item_no; 
+            unset($jd->id, $jd->item_no);
+            return [$key => (array) $jd];
+        });
+
+        $positions = $positions->map(function ($pos) use ($jobDescriptions) {
+            $extra = $jobDescriptions[$pos->value] ?? null;
+            if ($extra) {
+                foreach ($extra as $key => $val) {
+                    $pos->$key = $val;
+                }
+            }
+            return $pos;
+        });
 
         return response()->json($positions); 
     }

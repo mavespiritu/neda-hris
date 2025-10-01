@@ -111,6 +111,7 @@ class MyProfileController extends Controller
         $user = Auth::user();
 
         $basicInformation = (object) [
+            'emp_id' => $user->ipms_id,
             'type' => 'Applicant',
             'email_address' => $user->email,
             'last_name' => null,
@@ -168,6 +169,7 @@ class MyProfileController extends Controller
 
                     if ($_staff) {
                         $basicInformation->type = 'Staff';
+                        $basicInformation->emp_id = $_staff->emp_id;
                         $basicInformation->last_name = $_staff->lname;
                         $basicInformation->first_name = $_staff->fname;
                         $basicInformation->middle_name = $_staff->mname;
@@ -202,7 +204,8 @@ class MyProfileController extends Controller
                     }
                 }
             } else {
-                $_app = $this->fetchApplicantPersonalInfo($appConn, $this->id, 'Applicant');
+                $_app = $this->fetchApplicantPersonalInfo($appConn, auth()->user()->id, 'Applicant');
+
                 if ($_app) {
                     $basicInformation = (object) $_app;
                 }
@@ -319,7 +322,8 @@ class MyProfileController extends Controller
             $data['citizenship_country'] = null;
         }
 
-        $data['email_address'] = Auth::user()->email;
+        $data['email_address'] = $data['email_address'] ?? Auth::user()->email;
+        $data['emp_id'] = $data['emp_id'] ?? Auth::user()->ipms_id;
 
         $type = $request->personalInformation['type'] ?? 'Applicant';
 
@@ -386,6 +390,7 @@ class MyProfileController extends Controller
                 $personal = $staffSpouseData['personal'];
                 $spouseOccupation = $staffSpouseData['spouseOccupation'];
 
+                $familyBackground->isThereSpouse = !empty($personal->spouse_surname ?? null);
                 $familyBackground->spouse = (object) [
                     'hasSpouse' => !empty($personal->spouse_surname ?? null),
                     'last_name' => $personal->spouse_surname ?? '',
@@ -448,14 +453,13 @@ class MyProfileController extends Controller
                 if($staffChildrenData->isNotEmpty()) {
                     foreach($staffChildrenData as $child) {
                         $children[] = (object) [
-                            'last_name'   => $child->last_name ?? '',
-                            'first_name'  => $child->first_name ?? '',
-                            'middle_name' => $child->middle_name ?? '',
-                            'ext_name'    => $child->ext_name ?? '',
-                            'birth_date'  => $child->birth_date ?? '',
+                            'last_name'   => $child->child_name ?? '',
+                            'birth_date'  => $child->birthday ?? '',
                         ];
                     }
                 }
+
+                $familyBackground->children = $children;
             }
 
             return response()->json($familyBackground);
@@ -476,12 +480,12 @@ class MyProfileController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'familyBackground.spouse.last_name' => 'required',
-            'familyBackground.spouse.first_name' => 'required',
-            'familyBackground.spouse.occupation' => 'required',
-            'familyBackground.spouse.employer_name' => 'required',
-            'familyBackground.spouse.business_address' => 'required',
-            'familyBackground.spouse.telephone_no' => 'required',
+            'familyBackground.spouse.last_name' => 'required_if:familyBackground.isThereSpouse,true|nullable',
+            'familyBackground.spouse.first_name' => 'required_if:familyBackground.isThereSpouse,true|nullable',
+            'familyBackground.spouse.occupation' => 'required_if:familyBackground.isThereSpouse,true|nullable',
+            'familyBackground.spouse.employer_name' => 'required_if:familyBackground.isThereSpouse,true|nullable',
+            'familyBackground.spouse.business_address' => 'required_if:familyBackground.isThereSpouse,true|nullable',
+            'familyBackground.spouse.telephone_no' => 'required_if:familyBackground.isThereSpouse,true|nullable',
 
             'familyBackground.father.last_name' => 'required',
             'familyBackground.father.first_name' => 'required',
@@ -496,12 +500,12 @@ class MyProfileController extends Controller
             'familyBackground.children.*.first_name' => 'required',
             'familyBackground.children.*.birth_date' => 'required|date',
         ], [
-            'familyBackground.spouse.last_name.required' => 'The spouse\'s last name is required.',
-            'familyBackground.spouse.first_name.required' => 'The spouse\'s first name is required.',
-            'familyBackground.spouse.occupation.required' => 'The spouse\'s occupation is required.',
-            'familyBackground.spouse.employer_name.required' => 'The spouse\'s employer name is required.',
-            'familyBackground.spouse.business_address.required' => 'The spouse\'s business address is required.',
-            'familyBackground.spouse.telephone_no.required' => 'The spouse\'s telephone number is required.',
+            'familyBackground.spouse.last_name.required_if' => 'The spouse\'s last name is required.',
+            'familyBackground.spouse.first_name.required_if' => 'The spouse\'s first name is required.',
+            'familyBackground.spouse.occupation.required_if' => 'The spouse\'s occupation is required.',
+            'familyBackground.spouse.employer_name.required_if' => 'The spouse\'s employer name is required.',
+            'familyBackground.spouse.business_address.required_if' => 'The spouse\'s business address is required.',
+            'familyBackground.spouse.telephone_no.required_if' => 'The spouse\'s telephone number is required.',
 
             'familyBackground.father.last_name.required' => 'The father\'s last name is required.',
             'familyBackground.father.first_name.required' => 'The father\'s first name is required.',
@@ -625,7 +629,9 @@ class MyProfileController extends Controller
                                 'school' => $edu->school ?? '',
                                 'highest_attainment' => '',
                                 'from_date' => $edu->from_date ?? '',
+                                'from_year' => '',
                                 'to_date' => $edu->to_date ?? '',
+                                'to_year' => '',
                                 'award' => $edu->award ?? '',
                                 'year_graduated' => $edu->year_graduated ?? '',
                                 'is_graduated' => !empty($edu->year_graduated),
@@ -668,18 +674,18 @@ class MyProfileController extends Controller
             $rules["educationalBackground.$level.*.course"] = 'required';
             $rules["educationalBackground.$level.*.school"] = 'required';
             $rules["educationalBackground.$level.*.highest_attainment"] = 'required';
-            $rules["educationalBackground.$level.*.from_date"] = 'required|digits:4';
-            $rules["educationalBackground.$level.*.to_date"] = 'required|digits:4';
+            $rules["educationalBackground.$level.*.from_year"] = 'required|digits:4';
+            $rules["educationalBackground.$level.*.to_year"] = 'required|digits:4';
             $rules["educationalBackground.$level.*.award"] = 'required';
             $rules["educationalBackground.$level.*.year_graduated"] = 'nullable|digits:4';
 
             $messages["educationalBackground.$level.*.course.required"] = "Each $level's course is required.";
             $messages["educationalBackground.$level.*.school.required"] = "Each $level's school is required.";
             $messages["educationalBackground.$level.*.highest_attainment.required"] = "Each $level's highest level/units earned is required.";
-            $messages["educationalBackground.$level.*.from_date.required"] = "Each $level's start year is required.";
-            $messages["educationalBackground.$level.*.to_date.required"] = "Each $level's end year is required.";
-            $messages["educationalBackground.$level.*.from_date.digits"] = "Must be a 4-digit year.";
-            $messages["educationalBackground.$level.*.to_date.digits"] = "Must be a 4-digit year.";
+            $messages["educationalBackground.$level.*.from_year.required"] = "Each $level's start year is required.";
+            $messages["educationalBackground.$level.*.to_year.required"] = "Each $level's end year is required.";
+            $messages["educationalBackground.$level.*.from_year.digits"] = "Must be a 4-digit year.";
+            $messages["educationalBackground.$level.*.to_year.digits"] = "Must be a 4-digit year.";
             $messages["educationalBackground.$level.*.award.required"] = "Each $level's scholarship/academic honors received is required.";
             $messages["educationalBackground.$level.*.year_graduated.digits"] = "Each $level's year graduated must be a 4-digit year.";
         }
@@ -698,8 +704,8 @@ class MyProfileController extends Controller
                             );
                         }
                     }
-                    if (!empty($entry['from_date']) && !empty($entry['to_date'])
-                        && (int)$entry['to_date'] < (int)$entry['from_date']) {
+                    if (!empty($entry['from_year']) && !empty($entry['to_year'])
+                        && (int)$entry['to_year'] < (int)$entry['from_year']) {
                         $validator->errors()->add(
                             "educationalBackground.$level.$index.to_date",
                             "The end year must be after or equal to the start year."
@@ -1216,7 +1222,7 @@ class MyProfileController extends Controller
                 if ($staffData->isNotEmpty()) {
                     foreach ($staffData as $learningAndDevelopment) {
                         $learningAndDevelopments[] = (object) [
-                            'training_title' => $learningAndDevelopment->seminar_title ?? '',
+                            'seminar_title' => $learningAndDevelopment->seminar_title ?? '',
                             'from_date'      => $learningAndDevelopment->from_date ?? '',
                             'to_date'        => $learningAndDevelopment->to_date ?? '',
                             'hours'          => $learningAndDevelopment->hours ?? '',
@@ -1246,7 +1252,7 @@ class MyProfileController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'learningAndDevelopment.*.training_title' => 'required',
+            'learningAndDevelopment.*.seminar_title' => 'required',
             'learningAndDevelopment.*.from_date' => 'required|date',
             'learningAndDevelopment.*.to_date' => 'required|date',
             'learningAndDevelopment.*.to_date' => 'nullable|date|after_or_equal:learningAndDevelopment.*.from_date',
@@ -1255,7 +1261,7 @@ class MyProfileController extends Controller
             'learningAndDevelopment.*.type' => 'required',
             'learningAndDevelopment.*.conducted_by' => 'required',
         ], [
-            'learningAndDevelopment.*.training_title.required' => 'The title of traiing is required for each L&D.',
+            'learningAndDevelopment.*.seminar_title.required' => 'The title of training is required for each L&D.',
             'learningAndDevelopment.*.from_date.required' => 'The start date is required for each L&D.',
             'learningAndDevelopment.*.from_date.date' => 'Must be a valid date.',
             'learningAndDevelopment.*.to_date.required' => 'The end date is required for each L&D.',
@@ -1515,6 +1521,7 @@ class MyProfileController extends Controller
         $skillIds = [];
 
         foreach ($skills as $child) {
+            $child['type'] = 'hobbies';
             if (isset($child['id']) && !empty($child['id'])) {
                 $conn->table('applicant_other_info')
                     ->where('id', $child['id'])
@@ -1522,7 +1529,7 @@ class MyProfileController extends Controller
                 $skillIds[] = $child['id'];
             } else {
                 $newId = $conn->table('applicant_other_info')->insertGetId(array_merge(
-                    ['applicant_id' => $applicant->id],
+                    ['applicant_id' => $applicant->id, 'type' => 'hobbies'],
                     $child
                 ));
                 $skillIds[] = $newId; 
@@ -1531,12 +1538,14 @@ class MyProfileController extends Controller
 
         $conn->table('applicant_other_info')
             ->where('applicant_id', $applicant->id)
+            ->where('type', 'hobbies')
             ->whereNotIn('id', $skillIds)
             ->delete();
 
         $recognitionIds = [];
 
         foreach ($recognitions as $child) {
+            $child['type'] = 'recognition';
             if (isset($child['id']) && !empty($child['id'])) {
                 $conn->table('applicant_other_info')
                     ->where('id', $child['id'])
@@ -1544,7 +1553,7 @@ class MyProfileController extends Controller
                 $recognitionIds[] = $child['id'];
             } else {
                 $newId = $conn->table('applicant_other_info')->insertGetId(array_merge(
-                    ['applicant_id' => $applicant->id],
+                    ['applicant_id' => $applicant->id, 'type' => 'recognition'],
                     $child
                 ));
                 $recognitionIds[] = $newId; 
@@ -1553,12 +1562,14 @@ class MyProfileController extends Controller
 
         $conn->table('applicant_other_info')
             ->where('applicant_id', $applicant->id)
+            ->where('type', 'recognition')
             ->whereNotIn('id', $recognitionIds)
             ->delete();
 
         $membershipIds = [];
 
         foreach ($memberships as $child) {
+            $child['type'] = 'membership';
             if (isset($child['id']) && !empty($child['id'])) {
                 $conn->table('applicant_other_info')
                     ->where('id', $child['id'])
@@ -1566,7 +1577,7 @@ class MyProfileController extends Controller
                 $membershipIds[] = $child['id'];
             } else {
                 $newId = $conn->table('applicant_other_info')->insertGetId(array_merge(
-                    ['applicant_id' => $applicant->id],
+                    ['applicant_id' => $applicant->id, 'type' => 'membership'],
                     $child
                 ));
                 $membershipIds[] = $newId; 
@@ -1575,6 +1586,7 @@ class MyProfileController extends Controller
 
         $conn->table('applicant_other_info')
             ->where('applicant_id', $applicant->id)
+            ->where('type', 'membership')
             ->whereNotIn('id', $membershipIds)
             ->delete();
 
@@ -1729,9 +1741,6 @@ class MyProfileController extends Controller
 
         try {
             $educationalBackground = $this->getEducationalBackground()->getData(true);
-
-            dd($educationalBackground);
-
             $civilServiceEligibility = $this->getCivilServiceEligibility()->getData(true);
             $workExperience = $this->getWorkExperience()->getData(true);
             $voluntaryWork = $this->getVoluntaryWork()->getData(true);

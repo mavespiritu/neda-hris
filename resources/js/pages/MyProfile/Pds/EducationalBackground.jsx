@@ -20,28 +20,26 @@ const EducationSection = ({
   data
 }) => {
   return (
-    <Fieldset legend={level}>
+    <Fieldset legend={level} className="bg-muted">
       <p className="text-sm">List your entries from the most recent up to the oldest.</p>
       {data?.map((child, index) => (
         <Card key={`${dataKey}-${index}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-semibold">
               {level} Entry # {index + 1}
             </CardTitle>
-            {index > 0 && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => onRemove(dataKey, index)}
-                className="flex"
-                size="sm"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden md:block">Remove</span>
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => onRemove(dataKey, index)}
+              className="flex"
+              size="sm"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden md:block">Remove</span>
+            </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 pt-4">
+          <CardContent className="flex flex-col gap-4 pt-4 border-t">
             <div className="flex gap-4 items-center text-sm font-medium">
               <Switch
                 checked={child.is_graduated}
@@ -83,29 +81,29 @@ const EducationSection = ({
                 <div className="flex gap-4">
                   <div className="flex-1 w-[45%]">
                     <YearPicker
-                      value={child.from_date}
-                      onChange={(value) => onUpdate(dataKey, index, 'from_date', value)}
+                      value={child.from_year}
+                      onChange={(value) => onUpdate(dataKey, index, 'from_year', value)}
                       startYear={1950}
                       placeholder="Select year"
-                      isInvalid={!!errors[`educationalBackground.${dataKey}.${index}.from_date`]}
+                      isInvalid={!!errors[`educationalBackground.${dataKey}.${index}.from_year`]}
                     />
-                    {errors[`educationalBackground.${dataKey}.${index}.from_date`] && (
+                    {errors[`educationalBackground.${dataKey}.${index}.from_year`] && (
                       <p className="text-red-500 text-xs mt-1">
-                        {errors[`educationalBackground.${dataKey}.${index}.from_date`]}
+                        {errors[`educationalBackground.${dataKey}.${index}.from_year`]}
                       </p>
                     )}
                   </div>
                   <div className="flex-1 w-[45%]">
                     <YearPicker
-                      value={child.to_date}
-                      onChange={(value) => onUpdate(dataKey, index, 'to_date', value)}
+                      value={child.to_year}
+                      onChange={(value) => onUpdate(dataKey, index, 'to_year', value)}
                       startYear={1950}
                       placeholder="Select year"
-                      isInvalid={!!errors[`educationalBackground.${dataKey}.${index}.to_date`]}
+                      isInvalid={!!errors[`educationalBackground.${dataKey}.${index}.to_year`]}
                     />
-                    {errors[`educationalBackground.${dataKey}.${index}.to_date`] && (
+                    {errors[`educationalBackground.${dataKey}.${index}.to_year`] && (
                       <p className="text-red-500 text-xs mt-1">
-                        {errors[`educationalBackground.${dataKey}.${index}.to_date`]}
+                        {errors[`educationalBackground.${dataKey}.${index}.to_year`]}
                       </p>
                     )}
                   </div>
@@ -161,7 +159,7 @@ const EducationSection = ({
           </CardContent>
         </Card>
       ))}
-      <Button type="button" onClick={() => onAdd(dataKey)} variant="secondary" className="flex">
+      <Button type="button" onClick={() => onAdd(dataKey)} variant="outline" className="w-full">
         <Plus className="h-4 w-4" /> Add Entry
       </Button>
     </Fieldset>
@@ -169,6 +167,7 @@ const EducationSection = ({
 }
 
 const EducationalBackground = ({ data, setData, errors = {} }) => {
+  
   const { addEducation, updateEducation, removeEducation } = usePdsStore()
 
   const levels = [
@@ -186,7 +185,9 @@ const EducationalBackground = ({ data, setData, errors = {} }) => {
       school: "",
       highest_attainment: "",
       from_date: "",
+      from_year: "",
       to_date: "",
+      to_year: "",
       award: "",
       year_graduated: "",
     }

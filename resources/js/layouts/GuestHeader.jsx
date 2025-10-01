@@ -1,10 +1,15 @@
 import { Button } from "@/components/ui/button"
-import { Link } from '@inertiajs/react'
+import { Link, usePage } from '@inertiajs/react'
 import { Menu } from 'lucide-react'
 import { useState } from "react"
 
 const GuestHeader = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const { auth } = usePage().props
+
+    const isLoggedIn = !!auth?.user
+    
+    console.log(usePage().props)
 
     return (
         <header className="h-[80px] border-b flex justify-between items-center px-4 md:px-8 lg:px-16 xl:px-32">
@@ -15,11 +20,23 @@ const GuestHeader = () => {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex gap-6 items-center font-medium">
-                <Link href="/jobs" className="hover:text-gray-800">Search Jobs</Link>
-                <Link href="/register" className="hover:text-gray-800">Create an Account</Link>
-                <Link href="/login">
+                {!isLoggedIn ? (
+                <>
+                    <Link href={route('jobs.index')} className="hover:text-gray-800">Search Jobs</Link>
+                    <Link href={route('register')} className="hover:text-gray-800">Create an Account</Link>
+                    <Link href={route('login')}>
                     <Button>Sign in</Button>
-                </Link>
+                    </Link>
+                </>
+                ) : (
+                <>
+                    <Link href={route('jobs.index')} className="hover:text-gray-800">Search Jobs</Link>
+                    <Link href={route('applicant.index')} className="hover:text-gray-800">My Profile</Link>
+                    <Link href={route('logout')} method="post" as="button">
+                    <Button variant="outline">Logout</Button>
+                    </Link>
+                </>
+                )}
             </div>
 
             {/* Mobile Menu Button */}

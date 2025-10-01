@@ -9,13 +9,14 @@ trait FetchEducationalBackground
         return $conn->table('applicant_education')
             ->select(
                 'applicant_education.id',
-                'applicant_education.ipms_id',
                 'applicant_education.level',
                 'applicant_education.course',
                 'applicant_education.school',
                 'applicant_education.highest_attainment',
                 'applicant_education.from_date',
+                'applicant_education.from_year',
                 'applicant_education.to_date',
+                'applicant_education.to_year',
                 'applicant_education.award',
                 'applicant_education.year_graduated',
                 'applicant_education.is_graduated',

@@ -47,6 +47,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 const View = () => {
 
@@ -137,15 +138,18 @@ const View = () => {
     ], [])
 
     const [filters, setFilters] = useState({})
+    const [isFormOpen, setIsFormOpen] = useState(false)
+
+    const handleCloseForm = () => {
+        setIsFormOpen(false)
+    }
 
     const { 
         TableView,
-        isFormOpen,
         isFilterOpen,
         isViewOpen,
         formMode,
         selectedItem,
-        handleCloseForm,
         handleCloseFilter,
         } = useCrudTable({
         columns,
@@ -192,76 +196,64 @@ const View = () => {
                     </Button>
                 </Link>
                 <div className="flex gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                    <Popover>
+                        <PopoverTrigger asChild>
                             <Button 
-                                variant="outline"
-                                size="sm"
-                                className="flex items-center" 
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center" 
                             >
-                                <span className="sr-only sm:not-sr-only">More Actions</span>
-                                <ChevronDown className="h-8 w-8" />
+                            <span className="sr-only sm:not-sr-only">More Actions</span>
+                            <ChevronDown className="h-8 w-8" />
                             </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel>This Publication</DropdownMenuLabel>
-                            <DropdownMenuGroup>
-                                <DropdownMenuItem 
-                                    className="flex justify-between"
-                                    onClick={() => {
-                                        setSelectedItem(publication)
-                                        openRequestForm()
-                                    }}
-                                >
-                                    <span>Edit</span> 
-                                    <Pencil className="h-4 w-4" />
-                                </DropdownMenuItem>
-                                {/* <DropdownMenuItem 
-                                    className="flex justify-between"
-                                    onClick={handlePrintCsForm}
-                                >
-                                    <span>Print</span> 
-                                    <Printer className="h-4 w-4" />
-                                </DropdownMenuItem> */}
-                                <DropdownMenuSeparator />
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <div
-                                            className="flex justify-between items-center px-2 py-1.5 text-sm text-destructive cursor-pointer hover:bg-destructive/10 rounded-sm"
-                                            role="menuitem"
-                                        >
-                                            <span>Delete</span>
-                                            <Trash2 className="h-4 w-4" />
-                                        </div>
-                                    </AlertDialogTrigger>
+                        </PopoverTrigger>
 
-                                    <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete the publication request.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                        className="bg-destructive text-white hover:bg-destructive/90"
-                                        /* onClick={() => {
-                                            deleteRequest({
-                                            id: publication.id,
-                                            form,
-                                            toast,
-                                            })
-                                        }} */
-                                        >
-                                        Yes, delete it
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                        <PopoverContent align="end" className="w-56 p-2">
+                            <div className="flex flex-col gap-1">
+                            {/* Edit */}
+                            <button
+                                className="flex justify-between items-center px-2 py-1.5 text-sm hover:bg-accent rounded-md"
+                                onClick={() => {
+                                setSelectedItem(publication)
+                                setIsFormOpen(true)
+                                }}
+                            >
+                                <span>Edit</span>
+                                <Pencil className="h-4 w-4" />
+                            </button>
+
+                            {/* Delete */}
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                <button
+                                    className="flex justify-between items-center px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 rounded-md"
+                                >
+                                    <span>Delete</span>
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                                </AlertDialogTrigger>
+
+                                <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the publication request.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                    className="bg-destructive text-white hover:bg-destructive/90"
+                                    // onClick={() => deleteRequest({ id: publication.id, toast })}
+                                    >
+                                    Yes, delete it
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 </div>
             </div>
             <h1 className="text-xl font-semibold">
@@ -281,7 +273,7 @@ const View = () => {
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-center">
                     <Label className="text-muted-foreground">Closing Date</Label>
                     <span className="text-sm font-medium flex flex-col">
-                    <span>{formatDate(publication.date_closed)} {formatTime12(publication.time_closed)}</span>
+                    <span>{formatDate(publication.date_closed)}</span>
                     </span>
                 </div>
 
@@ -335,7 +327,17 @@ const View = () => {
                 <TableView />
             </div>
             <VacancyForm id={publication.id} />
-            <RequestForm />
+            <Form 
+                mode="edit"
+                data={publication}
+                open={isFormOpen}
+                onClose={(shouldReload) => {
+                    handleCloseForm()
+                    if (shouldReload) {
+                    router.reload({ preserveScroll: true, preserveState: true })
+                    }
+                }}
+            />
         </div>
     )
 }

@@ -12,7 +12,7 @@ Route::middleware(['web', 'auth.any'])->group(function () {
 
     Route::post('/publications', [PublicationController::class, 'store'])->name('publications.store');
 
-    Route::put('/publications/{id}', [PublicationController::class, 'update'])->name('publications.update');
+    Route::post('/publications/{id}', [PublicationController::class, 'update'])->name('publications.update');
 
     Route::delete('/publications/{id}', [PublicationController::class, 'destroy'])->name('publications.destroy');
 

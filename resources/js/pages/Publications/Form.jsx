@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "@inertiajs/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import DatePicker from "@/components/DatePicker"
-import TimePicker from "@/components/TimePicker"
+import FileUpload from "@/components/FileUpload"
+import axios from "axios"
+import Attachment from "@/components/Attachment"
 
 const Form = ({mode, data, onClose, open}) => {
 
@@ -14,58 +16,117 @@ const Form = ({mode, data, onClose, open}) => {
 
   const { toast } = useToast()
 
-  const { 
-    data: formData, 
-    setData, 
-    post, 
-    put, 
-    processing, 
-    reset, 
-    errors 
+  const [processing, setProcessing] = useState(false)
+  const [existingFiles, setExistingFiles] = useState([])
+
+  const {
+    data: formData,
+    setData,
+    errors,
+    reset,
+    clearErrors,
+    progress,
   } = useForm({
+    id: null,
     date_published: "",
     date_closed: "",
-    time_closed: "",
+    newFiles: [],
+    removeFiles: [],
   })
 
   useEffect(() => {
     if (isEdit && data) {
+      setExistingFiles(data.files || [])
       setData({
         id: data.id || null,
         date_published: data.date_published || "",
         date_closed: data.date_closed || "",
-        time_closed: data.time_closed || "",
+        newFiles: [],
+        removeFiles: [],
       })
     } else {
       reset()
+      setExistingFiles([])
     }
   }, [mode, data])
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleFileSelect = (files) => {
+    setData("newFiles", Array.from(files))
+  }
 
-    if (isEdit) {
-      put(route("publications.update", data.id), {
-        onSuccess: () => {
-          onClose()
-          reset()
-          toast({
-            title: "Success!",
-            description: "The item was updated successfully.",
-          })
-        },
-      })
-    } else {
-      post(route("publications.store"), {
-        onSuccess: () => {
-          onClose()
-          reset()
-          toast({
-            title: "Success!",
-            description: "The item was saved successfully.",
-          })
-        },
-      })
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setProcessing(true)
+
+    const submission = new FormData()
+    if (isEdit) submission.append("id", formData.id)
+    submission.append("date_published", formData.date_published)
+    submission.append("date_closed", formData.date_closed)
+
+    formData.newFiles.forEach((file) => {
+      submission.append("newFiles[]", file)
+    })
+
+    formData.removeFiles.forEach((fileId) => {
+      submission.append("removeFiles[]", fileId)
+    })
+
+    try {
+      if (isEdit) {
+        await axios.post(route("publications.update", data.id), submission, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        toast({
+          title: "Success!",
+          description: "The publication was updated successfully.",
+        })
+      } else {
+        await axios.post(route("publications.store"), submission, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        toast({
+          title: "Success!",
+          description: "The publication was saved successfully.",
+        })
+      }
+      reset()
+      clearErrors()
+      onClose?.(true)
+    } catch (err) {
+      if (err.response?.data?.errors) {
+        const backendErrors = err.response.data.errors
+
+        // Handle combined newFiles errors
+        let combinedNewFilesError = backendErrors.newFiles
+          ? backendErrors.newFiles[0]
+          : ""
+
+        const indexedErrors = Object.keys(backendErrors)
+          .filter((k) => k.startsWith("newFiles."))
+          .map((k) => backendErrors[k][0])
+
+        if (indexedErrors.length) {
+          combinedNewFilesError +=
+            (combinedNewFilesError ? " " : "") + indexedErrors.join(", ")
+        }
+
+        if (combinedNewFilesError) {
+          errors.newFiles = combinedNewFilesError
+        }
+
+        Object.keys(backendErrors).forEach((key) => {
+          if (!key.startsWith("newFiles")) {
+            errors[key] = backendErrors[key][0]
+          }
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Something went wrong. Please try again.",
+        })
+      }
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -99,13 +160,71 @@ const Form = ({mode, data, onClose, open}) => {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="time_closed">Closing Time</Label>
-            <TimePicker
-                value={formData.time_closed}
-                onTimeChange={(time) => setData('time_closed', time)}
-                invalidMessage={errors.time_closed}
-            />
+            
+            
+            {(!isEdit || (isEdit && existingFiles.length === 0)) ? (
+              <>
+                <Label htmlFor="newFiles">Attachment</Label>
+                <FileUpload
+                  id="newFiles"
+                  name="newFiles"
+                  data={formData.newFiles}
+                  onFilesSelect={handleFileSelect}
+                  invalidMessage={errors.newFiles}
+                />
+              </>
+            ) : (
+              <div className="text-xs text-muted-foreground italic">
+                An attachment already exists. Remove it first to upload a new one.
+              </div>
+            )}
+            
+            {progress && (
+              <>
+                <span className="text-xs">Uploading. Please wait</span>
+                <progress value={progress.percentage} max="100">
+                  {progress.percentage}%
+                </progress>
+              </>
+            )}
+            {errors.newFiles && (
+              <span className="text-red-500 text-xs">{errors.newFiles}</span>
+            )}
+            {!errors.newFiles && 
+              (!isEdit || (isEdit && existingFiles.length === 0)) && (
+                <div className="inline-flex justify-end text-xs text-muted-foreground">
+                  <span>Allowed file type: PDF, Word (max 5MB)</span>
+                </div>
+              )
+            }
           </div>
+
+          {isEdit && existingFiles.length > 0 && (
+            <div className="space-y-2">
+              <Label>Existing Attachments</Label>
+              <ul className="space-y-1">
+                {existingFiles.map((file) => (
+                  <li key={file.id} className="flex items-center justify-between text-sm">
+                    <Attachment file={file} />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-500"
+                      onClick={() => {
+                        // Add to removeFiles
+                        setData("removeFiles", [...formData.removeFiles, file.id])
+                        // Remove visually
+                        setExistingFiles(existingFiles.filter((f) => f.id !== file.id))
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <DialogClose asChild>

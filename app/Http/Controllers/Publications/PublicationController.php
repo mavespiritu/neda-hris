@@ -46,7 +46,7 @@ class PublicationController extends Controller
         $searchable = [
             'reference_no',
             'date_published',
-            'date_published',
+            'date_closed',
             'creator',
         ];
 
@@ -89,9 +89,17 @@ class PublicationController extends Controller
         ->get()
         ->keyBy('emp_id');
 
-        $publications->getCollection()->transform(function ($publication) use ($employees, $vacancyCounts) {
+        $files = $conn2->table('file')
+            ->select(['id', 'itemId', 'name', 'path', 'size', 'mime'])
+            ->where('model', 'Publication')
+            ->whereIn('itemId', $publicationIDs)
+            ->get()
+            ->groupBy('itemId');
+
+        $publications->getCollection()->transform(function ($publication) use ($employees, $vacancyCounts, $files) {
             $publication->creator = $employees->get($publication->created_by)->name ?? null;
             $publication->vacancy_count = $vacancyCounts[$publication->id] ?? 0;
+            $publication->files         = $files[$publication->id] ?? collect();
             
             if (!empty($publication->date_closed)) {
                 $closingDateTime = Carbon::parse($publication->date_closed . ' ' . ($publication->time_closed ?? '23:59:59'));
@@ -108,10 +116,12 @@ class PublicationController extends Controller
             return $publication;
         });
 
+        $status = $request->input('status');
+
         if ($request->filled('status')) {
             $publications->setCollection(
                 $publications->getCollection()->filter(function ($publication) use ($status) {
-                    return $publication->status === $$request->input('status');
+                    return $publication->status === $status;
                 })->values()
             );
         }
@@ -343,9 +353,18 @@ class PublicationController extends Controller
             abort(404, 'Page not found.');
         }
 
+        $publication->files = $conn2->table('file')
+            ->where('model', 'Publication')
+            ->where('itemId', $publication->id)
+            ->select(['id', 'itemId', 'name', 'path', 'size', 'mime'])
+            ->orderBy('id', 'desc')
+            ->get();
+
         if (!empty($publication->date_closed)) {
-            $closingDateTime = Carbon::parse($publication->date_closed . ' ' . ($publication->time_closed ?? '23:59:59'));
-            if (Carbon::now()->greaterThan($closingDateTime)) {
+
+            $closingDate = Carbon::parse($publication->date_closed)->toDateString();
+
+            if (now()->toDateString() > $closingDate) {
                 $publication->status = 'Closed';
             } else {
                 $publication->status = $publication->is_public ? 'Published' : 'Draft';
@@ -442,11 +461,14 @@ class PublicationController extends Controller
         $validator = Validator::make($request->all(), [
             'date_published' => 'required|date',
             'date_closed' => 'required|date',
-            'time_closed' => ['required'],
+            'newFiles'       => 'nullable|array|max:1',
+            'newFiles.*'     => 'nullable|mimes:pdf,doc,docx|max:5120',
         ], [
             'date_published.required' => 'The posting date is required.',
             'date_closed.required' => 'The closing date is required.',
-            'time_closed.required' => 'The closing time is required.',
+            'newFiles.max'            => 'Only 1 file may be uploaded.',
+            'newFiles.*.mimes'        => 'Files must be a PDF or Word document.',
+            'newFiles.*.max'          => 'Files may not be greater than 5MB.',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -480,15 +502,33 @@ class PublicationController extends Controller
     
             $referenceNo = $nextReferenceNo . '-' . $year;
 
-            $publication = $conn2->table('publication')
-            ->insertGetId([
-                'reference_no' => $referenceNo,
+            $publicationId = $conn2->table('publication')->insertGetId([
+                'reference_no'   => $referenceNo,
                 'date_published' => Carbon::parse($request->date_published)->format('Y-m-d'),
-                'date_closed' => Carbon::parse($request->date_closed)->format('Y-m-d'),
-                'time_closed' => Carbon::parse($request->time_closed)->format('H:i:s'),
-                'created_by' => Auth::user()->ipms_id,
-                'date_created' => Carbon::now()->format('Y-m-d H:i:s'),
+                'date_closed'    => Carbon::parse($request->date_closed)->format('Y-m-d'),
+                'created_by'     => Auth::user()->ipms_id,
+                'date_created'   => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
+
+            // Handle file uploads
+            if ($request->hasFile('newFiles')) {
+                foreach ($request->file('newFiles') as $file) {
+                    $filename = Str::random(20) . '_' . time() . '.' . $file->getClientOriginalExtension();
+                    $path = $file->storeAs('uploads/publications/'.$year, $filename, 'public'); 
+
+                    $conn2->table('file')->insert([
+                        'model'       => 'Publication',
+                        'itemId'      => $publicationId,
+                        'name'        => $file->getClientOriginalName(),
+                        'path'        => $path,
+                        'size'        => $file->getSize(),
+                        'mime'        => $file->getMimeType(),
+                        'hash'        => $file->hashName(),
+                        'type'        => $file->getClientOriginalExtension(),
+                        'date_upload' => now()->timestamp,
+                    ]);
+                }
+            }
 
             $conn2->commit();
 
@@ -517,17 +557,20 @@ class PublicationController extends Controller
         // Validation
         $validator = Validator::make($request->all(), [
             'date_published' => 'required|date',
-            'date_closed' => 'required|date',
-            'time_closed' => ['required'],
+            'date_closed'    => 'required|date',
+            'newFiles'       => 'nullable|array|max:1',
+            'newFiles.*'     => 'nullable|mimes:pdf,doc,docx|max:5120',
         ], [
             'date_published.required' => 'The posting date is required.',
-            'date_closed.required' => 'The closing date is required.',
-            'time_closed.required' => 'The closing time is required.',
+            'date_closed.required'    => 'The closing date is required.',
+            'newFiles.max'            => 'Only 1 file may be uploaded.',
+            'newFiles.*.mimes'        => 'Files must be a PDF or Word document.',
+            'newFiles.*.max'          => 'Files may not be greater than 5MB.',
         ]);
 
         $validator->after(function ($validator) use ($request) {
             $publishedDate = Carbon::parse($request->date_published)->startOfDay();
-            $closedDate = Carbon::parse($request->date_closed)->startOfDay();
+            $closedDate    = Carbon::parse($request->date_closed)->startOfDay();
 
             if ($closedDate->lt($publishedDate)) {
                 $validator->errors()->add('date_closed', 'The closing date must be on or after the posting date.');
@@ -537,24 +580,63 @@ class PublicationController extends Controller
         $validator->validate();
 
         try {
-
             $conn2->beginTransaction();
 
+            // Update publication info
             $conn2->table('publication')
                 ->where('id', $id)
                 ->update([
                     'date_published' => Carbon::parse($request->date_published)->format('Y-m-d'),
-                    'date_closed' => Carbon::parse($request->date_closed)->format('Y-m-d'),
-                    'time_closed' => Carbon::parse($request->time_closed)->format('H:i:s'),
-                    'updated_by' => Auth::user()->ipms_id,
-                    'date_updated' => Carbon::now()->format('Y-m-d H:i:s'),
+                    'date_closed'    => Carbon::parse($request->date_closed)->format('Y-m-d'),
+                    'updated_by'     => Auth::user()->ipms_id,
+                    'date_updated'   => Carbon::now()->format('Y-m-d H:i:s'),
                 ]);
+
+            $year = Carbon::now()->year;
+
+            // Handle removal of old files
+            if ($request->filled('removeFiles')) {
+                foreach ($request->removeFiles as $fileId) {
+                    $file = $conn2->table('file')
+                    ->where('id', $fileId)
+                    ->where('model', 'Publication')
+                    ->first();
+                    if ($file) {
+                        Storage::disk('public')->delete($file->path);
+
+                        $conn2->table('file')
+                        ->where('id', $fileId)
+                        ->where('model', 'Publication')
+                        ->delete();
+                    }
+                }
+            }
+
+            // Handle new file uploads
+            if ($request->hasFile('newFiles')) {
+                foreach ($request->file('newFiles') as $file) {
+                    $filename = Str::random(20) . '_' . time() . '.' . $file->getClientOriginalExtension();
+                    $path     = $file->storeAs('uploads/publications/'.$year, $filename, 'public');
+
+                    $conn2->table('file')->insert([
+                        'model'       => 'Publication',
+                        'itemId'      => $id,
+                        'name'        => $file->getClientOriginalName(),
+                        'path'        => $path,
+                        'size'        => $file->getSize(),
+                        'mime'        => $file->getMimeType(),
+                        'hash'        => $file->hashName(),
+                        'type'        => $file->getClientOriginalExtension(),
+                        'date_upload' => now()->timestamp,
+                    ]);
+                }
+            }
 
             $conn2->commit();
 
             return redirect()->back()->with([
-                'status' => 'success',
-                'title' => 'Success!',
+                'status'  => 'success',
+                'title'   => 'Success!',
                 'message' => 'Request updated successfully.'
             ]);
         } catch (\Exception $e) {
@@ -562,12 +644,13 @@ class PublicationController extends Controller
             Log::error('Failed to update request: ' . $e->getMessage());
 
             return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
+                'status'  => 'error',
+                'title'   => 'Uh oh! Something went wrong.',
                 'message' => 'An error occurred while updating the request. Please try again.'
             ]);
         }
     }
+
 
     public function destroy($id)
     {
@@ -595,6 +678,19 @@ class PublicationController extends Controller
                     ->update([
                         'status' => 'Open',
                     ]);
+            }
+
+            $files = $conn2->table('file')
+                ->where('model', 'Publication')
+                ->where('itemId', $publication->id)
+                ->get();
+
+            foreach ($files as $file) {
+                if ($file->path && Storage::disk('public')->exists($file->path)) {
+                    Storage::disk('public')->delete($file->path);
+                }
+
+                $conn2->table('file')->where('id', $file->id)->delete();
             }
 
             $conn2->table('publication_vacancies')
@@ -643,6 +739,19 @@ class PublicationController extends Controller
                 $conn2->table('vacancy')
                     ->whereIn('id', $vacancies)
                     ->update(['status' => 'Open']);
+            }
+
+            $files = $conn2->table('file')
+                ->where('model', 'Publication')
+                ->whereIn('itemId', $ids)
+                ->get();
+
+            foreach ($files as $file) {
+                if ($file->path && Storage::disk('public')->exists($file->path)) {
+                    Storage::disk('public')->delete($file->path);
+                }
+
+                $conn2->table('file')->where('id', $file->id)->delete();
             }
 
             $conn2->table('publication_vacancies')

@@ -33,7 +33,7 @@ trait FetchFamilyBackground
     protected function fetchStaffSpouse($conn, $ipmsId)
     {
         $personal = $conn->table('tblemployee')->where('emp_id', $ipmsId)->first();
-        $spouseOccupation = $conn->table('tblemp_spouse_occupation')->where('emp_id', $userId)->first();
+        $spouseOccupation = $conn->table('tblemp_spouse_occupation')->where('emp_id', $ipmsId)->first();
 
         return [
             'personal' => $personal,

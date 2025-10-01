@@ -9,7 +9,7 @@ trait FetchLearningAndDevelopment
         return $conn->table('applicant_learning')
             ->select(
                 'applicant_learning.id',
-                'applicant_learning.training_title',
+                'applicant_learning.seminar_title',
                 'applicant_learning.from_date',
                 'applicant_learning.to_date',
                 'applicant_learning.hours',
@@ -28,10 +28,19 @@ trait FetchLearningAndDevelopment
 
     protected function fetchStaffLearningAndDevelopment($conn, $ipmsId)
     {
-        return $conn->table('tblemp_training_program')
-            ->where('emp_id', $ipmsId)
-            ->where('approval', 'yes')
-            ->orderBy('from_date', 'desc')
+        return $conn->table('tblemp_training_program as e')
+            ->select([
+                'ei.id as id',
+                'e.*'
+            ])
+            ->leftJoin('tblemp_training_program_id as ei', function ($join) {
+                $join->on('ei.emp_id', '=', 'e.emp_id')
+                     ->on('ei.seminar_title', '=', 'e.seminar_title')
+                     ->on('ei.from_date', '=', 'e.from_date');
+            })
+            ->where('e.emp_id', $ipmsId)
+            ->where('e.approval', 'yes')
+            ->orderBy('e.from_date', 'desc')
             ->get();
     }
 }
