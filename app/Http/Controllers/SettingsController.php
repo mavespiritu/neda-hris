@@ -327,7 +327,6 @@ class SettingsController extends Controller
     public function updateRecruitment(Request $request)
     {
         $conn2 = DB::connection('mysql2');
-        $conn3 = DB::connection('mysql3');
 
         $validated = $request->validate([
             'requirements' => 'required|array',
@@ -335,20 +334,31 @@ class SettingsController extends Controller
             'requirements.*.is_default' => 'boolean',
             'requirements.*.is_multiple' => 'boolean',
             'requirements.*.id' => 'nullable|integer|exists:mysql2.recruitment_requirements,id',
-        ],[
+        ], [
             'requirements.required' => 'At least one requirement is required.',
             'requirements.*.requirement.required' => 'The requirement field is required.',
             'requirements.*.is_default.boolean' => 'The "is default" value must be true or false.',
             'requirements.*.is_multiple.boolean' => 'The "is multiple" value must be true or false.',
         ]);
 
-        $requirements = $request->requirements;
+        $requirements = $validated['requirements'];
 
         DB::beginTransaction();
 
         try {
+
+            $incomingIds = collect($requirements)
+                ->pluck('id')
+                ->filter() 
+                ->toArray();
+
+            $conn2->table('recruitment_requirements')
+                ->whereNotIn('id', $incomingIds)
+                ->delete();
+
             foreach ($requirements as $req) {
-                if (isset($req['id'])) {
+                if (!empty($req['id'])) {
+
                     $conn2->table('recruitment_requirements')
                         ->where('id', $req['id'])
                         ->update([
@@ -358,6 +368,7 @@ class SettingsController extends Controller
                             'connected_to' => $req['connected_to'] ?? null,
                         ]);
                 } else {
+ 
                     $conn2->table('recruitment_requirements')
                         ->insert([
                             'requirement' => $req['requirement'],
@@ -373,7 +384,7 @@ class SettingsController extends Controller
             return redirect()->back()->with([
                 'status' => 'success',
                 'title' => 'Recruitment settings updated',
-                'message' => 'Recruitment settings updated successfully..',
+                'message' => 'Recruitment settings updated successfully.',
             ]);
 
         } catch (\Exception $e) {

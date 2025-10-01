@@ -16,52 +16,70 @@ import { useForm } from '@inertiajs/react'
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import {
-    Table,
-    TableBody,
-    TableCaption,
-    TableCell,
-    TableFooter,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 
+const sections = [
+  { value: 'Educational Background', label: 'Educational Background' },
+  { value: 'Civil Service Eligibility', label: 'Civil Service Eligibility' },
+  { value: 'Work Experience', label: 'Work Experience' },
+  { value: 'Voluntary Work', label: 'Voluntary Work' },
+  { value: 'Learning and Development', label: 'Learning and Development' },
+  { value: 'Other Information', label: 'Other Information' },
+]
+
 const Recruitment = () => {
-
   const { toast } = useToast()
-
-  const {
-    recruitmentState,
-    fetchRecruitment,
-  } = useSettingsStore()
-
+  const { recruitmentState, fetchRecruitment } = useSettingsStore()
   const [loading, setLoading] = useState(true)
 
   const { data, setData, patch, processing, errors } = useForm({
     requirements: [],
   })
 
+  // Helper to sync form state with store
+  const syncFormWithStore = () => {
+    if (!recruitmentState) return
+    setData({
+      requirements: recruitmentState.requirements.map(req => ({
+        id: req.id || null,
+        requirement: req.requirement || '',
+        is_default: !!req.is_default,
+        is_multiple: !!req.is_multiple,
+        connected_to: req.connected_to || '',
+      })),
+    })
+  }
+
+  // Initial load
   useEffect(() => {
     const load = async () => {
-        await fetchRecruitment()
-        setLoading(false)
+      await fetchRecruitment()
+      setLoading(false)
     }
     load()
-    }, [])
+  }, [])
 
-  useEffect(() => {
-    if (!loading && recruitmentState) {
-      setData({
-        requirements: recruitmentState.requirements.map(req => ({
-          id: req.id || null,
-          requirement: req.requirement || '',
-          is_default: !!req.is_default,
-          is_multiple: !!req.is_multiple,
-          connected_to: req.connected_to || '',
-        })),
-      })
-    }
-  }, [recruitmentState, loading])
+  // Sync when recruitmentState changes
+ useEffect(() => {
+  if (!loading && recruitmentState) {
+    setData({
+      requirements: recruitmentState.requirements.map(req => ({
+        id: req.id || null,
+        requirement: req.requirement || '',
+        is_default: !!req.is_default,
+        is_multiple: !!req.is_multiple,
+        connected_to: req.connected_to || '',
+      })),
+    })
+  }
+}, [recruitmentState, loading])
 
   const handleRequirementChange = (index, field, value) => {
     const updated = [...data.requirements]
@@ -72,7 +90,7 @@ const Recruitment = () => {
   const addRequirementRow = () => {
     setData('requirements', [
       ...data.requirements,
-      { id: null, requirement: '', is_default: false }
+      { id: null, requirement: '', is_default: false, is_multiple: false, connected_to: '' },
     ])
   }
 
@@ -84,26 +102,15 @@ const Recruitment = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    patch(route('settings.recruitment.update'),
-      { requirements: data.requirements }, 
-      {
-        preserveScroll: true,
-        onSuccess: () => {
-          toast({ title: 'Saved', description: 'Settings updated successfully.' })
-          fetchRecruitment() 
-        },
-      }
-    )
+    patch(route('settings.recruitment.update'), {
+      requirements: data.requirements,
+      preserveScroll: true,
+      onSuccess: async () => {
+        toast({ title: 'Saved', description: 'Settings updated successfully.' })
+        await fetchRecruitment() // no need to call syncFormWithStore() manually
+      },
+    })
   }
-
-  const sections = [
-    {value: 'Educational Background', label: 'Educational Background'},
-    {value: 'Civil Service Eligibility', label: 'Civil Service Eligibility'},
-    {value: 'Work Experience', label: 'Work Experience'},
-    {value: 'Voluntary Work', label: 'Voluntary Work'},
-    {value: 'Learning and Development', label: 'Learning and Development'},
-    {value: 'Other Information', label: 'Other Information'},
-  ]
 
   return (
     <form onSubmit={handleSubmit}>
@@ -135,21 +142,20 @@ const Recruitment = () => {
                 </TableHeader>
                 <TableBody>
                   {data.requirements.map((req, index) => (
-                    <TableRow key={index}>
+                    <TableRow key={req.id || index}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <TextInput
-                            name="rquirement"
-                            onChange={(e) => handleRequirementChange(index, 'requirement', e.target.value)}
-                            isInvalid={errors[`requirements.${index}.requirement`]}
-                            placeholder=""
-                            id="rquirement"
-                            value={req.requirement}
+                          name="requirement"
+                          onChange={(e) => handleRequirementChange(index, 'requirement', e.target.value)}
+                          isInvalid={errors[`requirements.${index}.requirement`]}
+                          placeholder=""
+                          value={req.requirement}
                         />
                         {errors?.[`requirements.${index}.requirement`] && (
-                        <span className="text-red-500 text-xs">
+                          <span className="text-red-500 text-xs">
                             {errors[`requirements.${index}.requirement`]}
-                        </span>
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-center">
@@ -168,18 +174,15 @@ const Recruitment = () => {
                         <SingleComboBox
                           items={sections}
                           placeholder="Select one"
-                          name="connected_to"
-                          id="connected_to"
                           onChange={(value) => handleRequirementChange(index, 'connected_to', value)}
                           invalidMessage={errors[`requirements.${index}.connected_to`]}
-                          width="w-fit"
-                          className="w-40"
                           value={req.connected_to}
+                          className="w-40"
                         />
                         {errors?.[`requirements.${index}.connected_to`] && (
-                        <span className="text-red-500 text-xs">
+                          <span className="text-red-500 text-xs">
                             {errors[`requirements.${index}.connected_to`]}
-                        </span>
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -205,15 +208,6 @@ const Recruitment = () => {
                   </TableRow>
                 </TableFooter>
               </Table>
-            </div>
-          </div>
-          <div className="flex justify-between items-start gap-4 px-4 py-6">
-            <div className="flex flex-col basis-1/3">
-              <span className="text-sm font-semibold">Assessment Rating</span>
-              <span className="text-xs text-muted-foreground">Set the assessment rating computation breakdown here</span>
-            </div>
-            <div className="flex-1 w-2/3 overflow-auto">
-              
             </div>
           </div>
         </CardContent>
