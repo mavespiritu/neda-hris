@@ -340,7 +340,7 @@ class SettingsController extends Controller
             'requirements.*.is_multiple.boolean' => 'The "is multiple" value must be true or false.',
         ]);
 
-        $requirements = $validated['requirements'];
+        $requirements = $request['requirements'];
 
         DB::beginTransaction();
 
