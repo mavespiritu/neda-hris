@@ -368,7 +368,7 @@ const VacancyForm = () => {
                           placeholder=""
                           id="position_description"
                           value={data.position_description}
-                          disabled={data.appointment_status === 'Permanent'}
+                          //disabled={data.appointment_status === 'Permanent'}
                         />
                         {errors?.position_description && <span className="text-red-500 text-xs">{errors.position_description}</span>}
                       </div>
@@ -396,7 +396,7 @@ const VacancyForm = () => {
                           value={data.monthly_salary}
                           onChange={(value) => setData("monthly_salary", value)}
                           isInvalid={!!errors.monthly_salary}
-                          disabled={data.appointment_status === 'Permanent'}
+                          //disabled={data.appointment_status === 'Permanent'}
                         />
                         {errors?.monthly_salary && <span className="text-red-500 text-xs">{errors.monthly_salary}</span>}
                       </div>

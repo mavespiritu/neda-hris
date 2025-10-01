@@ -70,7 +70,7 @@ const ChooseDocuments = ({ job, applicant }) => {
       <div>
         <h3 className="tracking-tight font-semibold text-lg flex items-center text-black">
           <Files className="mr-2 h-4 w-4" />
-          Review Requirements
+          Upload Requirements
         </h3>
         <div className="text-muted-foreground text-sm">
           <div className="space-y-2 text-sm text-muted-foreground mt-4">

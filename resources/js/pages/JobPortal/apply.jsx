@@ -26,19 +26,20 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { TriangleAlert } from "lucide-react"
 import ChooseDocuments from "./ChooseDocuments"
+import ReviewAndSubmit from "./ReviewAndSubmit"
 
 const steps = [
   {
     id: "profile",
-    title: "1. Review profile",
+    title: "1. Update Profile",
   },
   {
     id: "document",
-    title: "2. Review requirements",
+    title: "2. Upload Requirements",
   },
   {
     id: "complete",
-    title: "3. Submit",
+    title: "3. Review Application",
   },
 ]
 
@@ -70,6 +71,32 @@ const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPer
 const StepDocument = ({job, applicant, handlePrevious, handleNext, currentStep}) => (
   <div className="flex flex-col gap-4">
     <ChooseDocuments job={job} applicant={applicant} />
+    <div className="flex justify-between gap-4">
+        <Button 
+          variant="outline" 
+          onClick={handlePrevious} 
+          disabled={currentStep === 0}
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Previous
+        </Button>
+        <Button onClick={handleNext} disabled={currentStep === steps.length - 1}>
+            {currentStep === steps.length - 1 ? (
+                "Submit Application"
+            ) : (
+                <>
+                Continue
+                <ArrowRight className="h-4 w-4" />
+                </>
+            )}
+        </Button>
+    </div>
+  </div>
+)
+
+const StepReview = ({job, applicant, handlePrevious, handleNext, currentStep}) => (
+  <div className="flex flex-col gap-4">
+    <ReviewAndSubmit job={job} applicant={applicant} />
     <div className="flex justify-between gap-4">
         <Button 
           variant="outline" 
@@ -126,7 +153,7 @@ const apply = () => {
         case 1:
             return <StepDocument job={job} applicant={applicant} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} />
         case 2:
-            return <ReviewAndSubmit job={job} />
+            return <StepReview job={job} applicant={applicant} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} />
         default:
             return null
         }
