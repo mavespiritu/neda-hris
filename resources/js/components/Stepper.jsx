@@ -17,7 +17,7 @@ export function Stepper({ steps, currentStep, onStepClick, className }) {
                 size="icon"
                 className={cn(
                   "h-4 w-4 rounded-full transition-all duration-200",
-                  index < currentStep && "bg-primary text-primary-foreground p-3",
+                  index < currentStep && "bg-green-600 text-primary-foreground p-3",
                   index === currentStep && "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2",
                   index > currentStep && "bg-muted text-muted-foreground hover:bg-muted/80",
                   onStepClick && index <= currentStep && "cursor-pointer hover:scale-105",
@@ -35,14 +35,19 @@ export function Stepper({ steps, currentStep, onStepClick, className }) {
                 )}
               </Button>
               <div className="mt-2 text-center">
-                <p
+                <div
                   className={cn(
-                    "text-sm font-semibold transition-colors",
-                    index <= currentStep ? "text-foreground" : "text-muted-foreground",
+                    "flex items-center text-sm font-semibold transition-colors",
+                    index < currentStep
+                      ? "text-green-600"
+                      : index === currentStep
+                      ? "text-foreground"
+                      : "text-muted-foreground"
                   )}
                 >
+                  {step.icon}
                   {step.title}
-                </p>
+                </div>
                 {step.description && <p className="text-xs text-muted-foreground mt-1 max-w-24">{step.description}</p>}
               </div>
             </div>
@@ -50,7 +55,7 @@ export function Stepper({ steps, currentStep, onStepClick, className }) {
               <div
                 className={cn(
                   "flex-1 mx-4 border-t-2 transition-colors duration-200",
-                  index < currentStep ? "border-primary border-solid" : "border-border border-dashed"
+                  index < currentStep ? "border-green-600 border-solid" : "border-border border-dashed"
                 )}
               />
             )}

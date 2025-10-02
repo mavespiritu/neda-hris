@@ -98,9 +98,9 @@ const Review = ({setCurrentStep}) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-semibold text-lg flex items-center"><Save className="mr-2 h-4 w-4"/>Review Profile</CardTitle>
+        <CardTitle className="font-semibold text-lg flex items-center"><Save className="mr-2 h-4 w-4"/>Profile</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4 border-t">
         <Accordion
           type="single"
           collapsible

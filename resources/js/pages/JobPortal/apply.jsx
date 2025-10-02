@@ -3,7 +3,7 @@ import useCrudTable from "@/hooks/useCrudTable"
 import { usePage, router, Link } from '@inertiajs/react'
 import { useState, useEffect, useMemo } from "react"
 import { useHasRole } from "@/hooks/useAuth"
-import { Loader2, Search, Filter, ChevronRight, MapPin, Banknote, FileCog, Building, ChevronLeft, Pencil, ArrowRight } from "lucide-react"
+import { Loader2, Search, Filter, ChevronRight, MapPin, Banknote, FileCog, Building, ChevronLeft, Pencil, ArrowRight, Send, Upload, User } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -31,29 +31,32 @@ import ReviewAndSubmit from "./ReviewAndSubmit"
 const steps = [
   {
     id: "profile",
-    title: "1. Update Profile",
+    title: "Update Profile",
+    icon: <User className="w-4 h-4 mr-2" />,
   },
   {
     id: "document",
-    title: "2. Upload Requirements",
+    title: "Upload Requirements",
+    icon: <Upload className="w-4 h-4 mr-2" />,
   },
   {
     id: "complete",
-    title: "3. Review Application",
+    title: "Submit Application",
+    icon: <Send className="w-4 h-4 mr-2" />,
   },
 ]
 
 const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPercent}) => (
   <div className="flex flex-col gap-4">
     <Review />
-    <div className="flex justify-end gap-4">
+    <div className="flex justify-between gap-4">
         <Link href={route('applicant.index', {redirect: route('jobs.apply', job.hashed_id)})}>
-            <Button variant="outline" className="text-sm">
+            <Button variant="" className="text-sm">
                 Edit My Profile
             </Button>
         </Link>
         {progressPercent >= 100 && (
-            <Button onClick={handleNext} disabled={currentStep === steps.length - 1}>
+            <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-green-600 hover:bg-green-700 text-white">
                 {currentStep === steps.length - 1 ? (
                     "Submit Application"
                 ) : (
@@ -77,10 +80,10 @@ const StepDocument = ({job, applicant, handlePrevious, handleNext, currentStep})
           onClick={handlePrevious} 
           disabled={currentStep === 0}
         >
-          <ChevronLeft className="h-4 w-4 mr-2" />
+          <ChevronLeft className="h-4 w-4" />
           Previous
         </Button>
-        <Button onClick={handleNext} disabled={currentStep === steps.length - 1}>
+        <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-green-600 hover:bg-green-700 text-white">
             {currentStep === steps.length - 1 ? (
                 "Submit Application"
             ) : (
@@ -103,18 +106,8 @@ const StepReview = ({job, applicant, handlePrevious, handleNext, currentStep}) =
           onClick={handlePrevious} 
           disabled={currentStep === 0}
         >
-          <ChevronLeft className="h-4 w-4 mr-2" />
+          <ChevronLeft className="h-4 w-4" />
           Previous
-        </Button>
-        <Button onClick={handleNext} disabled={currentStep === steps.length - 1}>
-            {currentStep === steps.length - 1 ? (
-                "Submit Application"
-            ) : (
-                <>
-                Continue
-                <ArrowRight className="h-4 w-4" />
-                </>
-            )}
         </Button>
     </div>
   </div>
@@ -176,13 +169,13 @@ const apply = () => {
             </Link>
             <div className="border rounded-lg p-8">
                 <div className="space-y-1">
-                    <p className="text-sm">Applying for</p>
+                    <p className="text-sm font-medium">Applying for</p>
                     <div>
                         <h3 className="text-2xl font-semibold">
                         {job.position_description}{" "}
                         {job.appointment_status === "Permanent" && `(${job.item_no})`}
                         </h3>
-                        <p className="text-lg mb-4">{job.division_name}</p>
+                        <p className="text-lg mb-4 font-medium">{job.division_name}</p>
                         <Sheet key={job.id}>
                             <SheetTrigger>
                                 <span className="text-sm underline font-semibold">View Job Description</span>
@@ -191,7 +184,7 @@ const apply = () => {
                         </Sheet>
                     </div>
                 </div>
-                <div className="w-full lg:w-[50%] mt-8 mb-4">
+                <div className="w-full lg:w-[75%] mt-8 mb-4">
                     <Stepper steps={steps} currentStep={currentStep} onStepClick={handleStepClick} />
                 </div>
 

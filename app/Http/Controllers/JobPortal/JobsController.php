@@ -315,6 +315,81 @@ class JobsController extends Controller
         ]);
     }
 
+    public function submit($hashedId)
+    {
+        $conn = DB::connection('mysql');
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $vacancy = $conn2->table('vacancy as v')
+        ->select([
+            'v.id as id',
+            'v.*',
+            'p.date_published',
+            'p.date_closed',
+        ])
+        ->leftJoin('publication_vacancies as pv', 'pv.vacancy_id', '=', 'v.id')
+        ->leftJoin('publication as p', 'p.id', '=', 'pv.publication_id')
+        ->whereRaw("SHA1(v.id) = ?", [$hashedId])
+        ->first();
+
+        if (!$vacancy) {
+            abort(404, 'Job not found');
+        }
+
+        if (now()->toDateString() > $vacancy->date_closed) {
+            abort(404, 'Job not found');
+        }
+
+        $applicant = $conn->table('applicant')
+        ->where('user_id', auth()->user()->id)
+        ->first();
+
+        if (!$applicant) {
+            abort(404, 'Applicant not found');
+        }
+
+        $application = $conn->table('application')
+        ->where('vacancy_id', $vacancy->id)
+        ->where('user_id', $applicant->user_id)
+        ->first();
+
+        if(!$application) {
+            abort(404, 'Job not found');
+        }
+
+         try{
+            $conn->beginTransaction();
+            $conn2->beginTransaction();
+
+            $application = $conn->table('application')
+            ->where('vacancy_id', $vacancy->id)
+            ->where('user_id', $applicant->user_id)
+            ->update([
+                'status' => 'Submitted',
+                'date_submitted' => now()
+            ]);
+
+            $conn->commit();
+            $conn2->commit();
+            return redirect()->back()->with([
+                'status'  => 'success',
+                'title'   => 'Success',
+                'message' => 'You have successfully submitted your application',
+            ]);
+        } catch (\Exception $e) {
+            $conn->rollBack();
+            $conn2->rollBack();
+            Log::error('Error on submitting application: ' . $e->getMessage());
+
+            return back()->with([
+                'status'  => 'error',
+                'title'   => 'Error',
+                'message' => 'An error occurred while submitting application.',
+            ]);
+        }
+    }
+
     public function getRequirements($hashedId)
     {
         $conn = DB::connection('mysql');

@@ -66,17 +66,26 @@ export default function Pds({redirect}) {
   }, [])
 
   useEffect(() => {
-    if (progress) {
-      const completed = steps
-        .map((step, index) => progress[step.id] === 1 ? index : null)
-        .filter(index => index !== null)
-      setCompletedSteps(completed)
+  if (progress) {
+    const completed = steps
+      .map((step, index) => (progress[step.id] === 1 ? index : null))
+      .filter(index => index !== null)
+    setCompletedSteps(completed)
 
-      if (completed.length > 0) {
-        setCurrentStep(0)
-      }
+    // Determine initial step
+    if (completed.length === 0) {
+      // No progress yet → start at first step
+      setCurrentStep(0)
+    } else if (completed.length < steps.length - 1) {
+      // Some progress → go to first incomplete step
+      const firstIncomplete = steps.findIndex((step, index) => !completed.includes(index))
+      setCurrentStep(firstIncomplete)
+    } else {
+      // All steps completed → optional, go to review/last step
+      setCurrentStep(steps.length - 1)
     }
-  }, [progress])
+  }
+}, [progress])
 
   useEffect(() => {
 
