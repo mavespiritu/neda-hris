@@ -1,3 +1,4 @@
+import PageTitle from "@/components/PageTitle"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from 'react'
 import { useToast } from "@/hooks/use-toast"
@@ -66,11 +67,11 @@ const VacancyInfo = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-          <h3 className="font-bold text-lg">Vacancy Info</h3>
-          <p className="text-muted-foreground text-sm">You can find all the details about this vacancy here.</p>
-      </div>
-      <div className="flex flex-col gap-4 border rounded-lg p-4">
+      <PageTitle
+          pageTitle="Vacancy Details"
+          description="You can find all the details about this vacancy here."
+      />
+      <div className="flex flex-col gap-4 border rounded-lg p-4 mx-4">
         <h3 className="font-bold text-lg">
           {vacancy.appointment_status === 'Permanent'
             ? 'Competency-Based Job Description'
@@ -150,7 +151,7 @@ const VacancyInfo = () => {
         {vacancy.appointment_status === 'Permanent' && (
           <>
             <h4 className="font-bold">E. Competency Requirements</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start"> 
+            <div className="flex flex-col gap-4"> 
               {Object.entries(compTypeHeaders).map(([type, header]) => {
                 const filtered = competencies.filter(c => c.comp_type === type)
 
@@ -159,7 +160,7 @@ const VacancyInfo = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">{header}</TableHead>
+                          <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 w-[50%]">{header}</TableHead>
                           <TableHead className="bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700">Level</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -167,8 +168,8 @@ const VacancyInfo = () => {
                         {filtered.length > 0 ? (
                           filtered.map((c) => (
                             <TableRow key={c.value}>
-                              <TableCell className="px-4 py-2 text-sm font-medium">{c.competency}</TableCell>
-                              <TableCell className="px-4 py-2 text-sm text-center font-medium">{c.level}</TableCell>
+                              <TableCell className="px-4 py-2 text-sm font-medium w-[50%]">{c.competency}</TableCell>
+                              <TableCell className="px-4 py-2 text-sm font-medium">{c.level}</TableCell>
                             </TableRow>
                           ))
                         ) : (
@@ -186,6 +187,16 @@ const VacancyInfo = () => {
             </div>  
           </>
         )}
+        <h4 className="font-bold">Additional Remarks</h4>
+        <div className="border rounded-lg p-4">
+          <div
+            className="prose prose-sm max-w-none text-sm font-medium
+              [&_.my-bullet-list]:list-disc [&_.my-bullet-list]:pl-6
+              [&_.my-ordered-list]:list-decimal [&_.my-ordered-list]:pl-6
+              [&_.my-list-item]:ml-4"
+            dangerouslySetInnerHTML={{ __html: vacancy.remarks }}
+          />
+        </div>
       </div>
     </div>
   )

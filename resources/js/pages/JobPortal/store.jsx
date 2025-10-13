@@ -18,6 +18,7 @@ export const store = create((set, get) => ({
     },
 
     selectedJob: null,
+    selectedApplication: null,
 
     setJobs: (updater) =>
         set((state) =>
@@ -26,7 +27,7 @@ export const store = create((set, get) => ({
                 : { jobs: updater }
         ),
 
-    setSelectedJob: (job) => set({ selectedJob: job }),
+    setSelectedApplication: (application) => set({ selectedApplication: application }),
 
     fetchVacancies: async(id, {filters = {}} = {}) => {
         set((state) => ({

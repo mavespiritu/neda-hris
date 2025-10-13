@@ -45,7 +45,9 @@ import {
   CalendarCheck,
   Target,
   Trophy,
-  Files
+  Files,
+  ClipboardPenLine,
+  NotebookPen
 } from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
@@ -70,8 +72,18 @@ const AppSidebar = () => {
     },
     {
       title: "My Profile",
-      url: "/my-profile",
+      url: "/profile",
       icon: UserRound,
+    },
+    {
+      title: "My Applications",
+      url: "/applications",
+      icon: ClipboardPenLine,
+    },
+    {
+      title: "Careers",
+      url: "/jobs",
+      icon: NotebookPen,
     },
     /* {
       title: "Search Jobs",
@@ -143,10 +155,10 @@ const AppSidebar = () => {
       icon: Lightbulb,
       roles: ['HRIS_Staff'],
       submenu: [
-        { title: 'Gap Analysis', url: route('cga.index'), roles: ['HRIS_Staff'], icon: Brain },
-        { title: 'Submissions', url: route('cga.review'), roles: ['HRIS_HR', 'HRIS_DC'], icon: Send },
+        { title: 'Gap Analysis', url: '/cga', roles: ['HRIS_Staff'], icon: Brain },
+        { title: 'Submissions', url: '/cga/review', roles: ['HRIS_HR', 'HRIS_DC'], icon: Send },
         /* { title: 'Comparisons', url: '/compare-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: GitCompare }, */
-        { title: 'Libraries', url: route('cga.libraries'), roles: ['HRIS_HR'], icon: Settings2 },
+        { title: 'Libraries', url: '/cga/libraries', roles: ['HRIS_HR'], icon: Settings2 },
       ],
     },
     /* {
@@ -179,7 +191,7 @@ const AppSidebar = () => {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent>
+      <SidebarContent className="bg-white">
         {open && <SidebarHeader className="font-bold pt-4 pl-2 text-lg text-center">DRO1 HRIS</SidebarHeader>}
         <SidebarGroup>
           <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
@@ -209,7 +221,11 @@ const AppSidebar = () => {
                           <SidebarMenuButton asChild title={!open ? item.title : undefined}>
                             <Link
                               href={item.url}
-                              className={`flex items-center gap-2 w-full ${url === item.url ? 'bg-muted' : ''}`}
+                              className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 transition-colors
+                              ${url === item.url 
+                                ? "bg-muted text-foreground font-semibold" 
+                                : "hover:bg-muted hover:text-foreground"
+                              }`}
                             >
                               <item.icon />
                               {open && <span className="font-medium text-sm">{item.title}</span>}
@@ -229,7 +245,14 @@ const AppSidebar = () => {
                                     title={!open ? subitem.title : undefined}
                                     className={`font-medium ${url === subitem.url ? 'bg-muted' : ''}`}
                                   >
-                                    <Link href={subitem.url} className="flex items-center gap-2 w-full">
+                                    <Link 
+                                      href={subitem.url}
+                                      className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 transition-colors
+                                        ${url === subitem.url 
+                                          ? "bg-muted text-foreground font-semibold" 
+                                          : "hover:bg-muted hover:text-foreground"
+                                        }`}
+                                      >
                                       {(subitem.icon ?? Folder) && (
                                         <span className="flex items-center gap-2">
                                           {React.createElement(subitem.icon ?? Folder, { className: "size-4" })}

@@ -3,7 +3,7 @@ import useCrudTable from "@/hooks/useCrudTable"
 import { usePage, router, Link } from '@inertiajs/react'
 import { useState, useEffect, useMemo } from "react"
 import { useHasRole } from "@/hooks/useAuth"
-import { Loader2, Search, Filter, ChevronRight, MapPin, Banknote, FileCog, Building, ChevronLeft, Pencil, ArrowRight, Send, Upload, User } from "lucide-react"
+import { Loader2, Search, Filter, ChevronRight, MapPin, Banknote, FileCog, Building, ChevronLeft, Pencil, ArrowRight, Send, Upload, User, CircleCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -48,15 +48,30 @@ const steps = [
 
 const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPercent}) => (
   <div className="flex flex-col gap-4">
-    <Review />
-    <div className="flex justify-between gap-4">
-        <Link href={route('applicant.index', {redirect: route('jobs.apply', job.hashed_id)})}>
-            <Button variant="" className="text-sm">
-                Edit My Profile
-            </Button>
+    {progressPercent >= 100 && (
+    <div className="rounded-md bg-green-50 p-3 text-sm text-green-700 flex flex-col gap-2 border-l-4 border-green-400">
+        <div className="flex items-start gap-2">
+        <CircleCheck className="w-4 h-4 mt-0.5" />
+        <p className="font-semibold">Profile Complete</p>
+        </div>
+        <p className="pl-6">
+        Your profile is <span className="font-bold">100%</span> complete.  
+        Make sure your information is <span className="font-semibold">up to date</span> before continuing to the next step.
+        </p>
+        <Link
+        href={route("applicant.index", {
+            redirect: route("jobs.apply", job.hashed_id),
+        })}
+        >
+        <Button className="text-sm mt-2 bg-blue-800 hover:bg-blue-700 text-white ml-6">
+            Edit My Profile
+        </Button>
         </Link>
+    </div>)}
+    <Review />
+    <div className="flex justify-end gap-4">
         {progressPercent >= 100 && (
-            <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-blue-600 hover:bg-blue-700 text-white">
                 {currentStep === steps.length - 1 ? (
                     "Submit Application"
                 ) : (
@@ -83,7 +98,7 @@ const StepDocument = ({job, applicant, handlePrevious, handleNext, currentStep})
           <ChevronLeft className="h-4 w-4" />
           Previous
         </Button>
-        <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-green-600 hover:bg-green-700 text-white">
+        <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-blue-600 hover:bg-blue-700 text-white">
             {currentStep === steps.length - 1 ? (
                 "Submit Application"
             ) : (
@@ -154,19 +169,36 @@ const apply = () => {
 
     return (
         <div className="flex flex-col gap-2 h-full">
-            <Link
-                href={route('jobs.index')}
-                className="hidden md:block"
-            >
-                <Button
-                    variant="ghost"
-                    className="flex items-center rounded-md disabled:opacity-50"
-                    size="sm"
+            <div className="flex items-center justify-between">
+                <Link
+                    href={route('jobs.index')}
+                    className="hidden md:block"
                 >
-                    <ChevronLeft className="h-8 w-8" />
-                    <span className="sr-only sm:not-sr-only">Back to Job Search</span>
-                </Button>
-            </Link>
+                    <Button
+                        variant="ghost"
+                        className="flex items-center rounded-md disabled:opacity-50"
+                        size="sm"
+                    >
+                        <ChevronLeft className="h-8 w-8" />
+                        <span className="sr-only sm:not-sr-only">Go to Job Search</span>
+                    </Button>
+                </Link>
+                <Link
+                    href={route('applications.index')}
+                    className="hidden md:block"
+                >
+                    <Button
+                        variant="ghost"
+                        className="flex items-center rounded-md disabled:opacity-50"
+                        size="sm"
+                    >
+                        <span className="sr-only sm:not-sr-only">Go to Applications</span>
+                        <ChevronRight className="h-8 w-8" />
+
+                    </Button>
+                </Link>
+            </div>
+            
             <div className="border rounded-lg p-8">
                 <div className="space-y-1">
                     <p className="text-sm font-medium">Applying for</p>
@@ -189,22 +221,27 @@ const apply = () => {
                 </div>
 
                 {progressPercent < 100 && (
-                    <Alert variant="destructive" className="my-4">
-                        <TriangleAlert className="h-4 w-4" />
-                        <AlertTitle className="font-semibold mb-2">Incomplete Profile</AlertTitle>
-                        <AlertDescription className="mb-2">
-                            Your profile is only{" "}
-                            <span className="font-bold">
-                                {progressPercent}%
-                            </span>{" "}
-                            complete. Please update your profile by clicking the button below before continuing. 
-                        </AlertDescription>
-                        <Link href={route('applicant.index', {redirect: route('jobs.apply', job.hashed_id)})}>
-                            <Button variant="" size="sm" className="text-sm">
-                                Edit My Profile
-                            </Button>
-                        </Link>
-                    </Alert>
+                // 🔴 Incomplete profile alert
+                <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex flex-col gap-2 border-l-4 border-red-400 mb-4">
+                    <div className="flex items-start gap-2">
+                    <TriangleAlert className="w-4 h-4 mt-0.5" />
+                    <p className="font-semibold">Incomplete Profile</p>
+                    </div>
+                    <p className="pl-6">
+                    Your profile is only{" "}
+                    <span className="font-bold">{progressPercent}%</span> complete.  
+                    Please update your profile by clicking the button below before continuing.
+                    </p>
+                    <Link
+                    href={route("applicant.index", {
+                        redirect: route("jobs.apply", job.hashed_id),
+                    })}
+                    >
+                    <Button className="text-sm mt-2 bg-blue-800 hover:bg-blue-700 text-white ml-6">
+                        Edit My Profile
+                    </Button>
+                    </Link>
+                </div>
                 )}
                 <StepContent />
             </div>

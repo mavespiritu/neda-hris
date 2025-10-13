@@ -7,7 +7,7 @@ import GuestLayout from '@/layouts/GuestLayout'
 import Checkbox from '@/components/Checkbox'
 import { Head, Link, useForm } from '@inertiajs/react'
 import { useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 export default function Register() {
     const [showPassword, setShowPassword] = useState(false)
@@ -168,9 +168,16 @@ export default function Register() {
                             </span>
                         </Link>
 
-                        <Button disabled={processing} className="w-full md:w-auto flex justify-center">
-                            {processing ? "Signing up" : "Sign up"}
-                        </Button>
+                        <Button disabled={processing} className="w-full md:w-auto flex justify-center items-center">
+                            {processing ? (
+                                <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Signing up...
+                                </>
+                            ) : (
+                                'Sign up'
+                            )}
+                            </Button>
                     </div>
                 </form>
             </div>

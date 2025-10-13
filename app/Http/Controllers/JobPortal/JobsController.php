@@ -21,6 +21,8 @@ use App\Traits\FetchLearningAndDevelopmentFiles;
 use App\Traits\FetchEducationalBackgroundFiles;
 use App\Traits\FetchWorkExperienceFiles;
 use App\Traits\FetchRequirementFiles;
+use App\Traits\CopiesApplicationData;
+use App\Notifications\NotifyApplicantOfApplicationSubmission;
 
 
 class JobsController extends Controller
@@ -30,6 +32,7 @@ class JobsController extends Controller
     use FetchEducationalBackgroundFiles;
     use FetchWorkExperienceFiles;
     use FetchRequirementFiles;
+    use CopiesApplicationData;
 
     public function index(Request $request)
     {
@@ -54,8 +57,32 @@ class JobsController extends Controller
 
         $vacancies = $conn2->table('vacancy as v')
             ->select([
-                'v.id as id',
-                'v.*',
+                'v.id',
+                'v.reference_no',
+                'v.appointment_status',
+                'v.item_no',
+                'v.position',
+                'v.position_description',
+                'v.division',
+                'v.sg',
+                'v.step',
+                'v.monthly_salary',
+                'v.classification',
+                'v.prescribed_eligibility',
+                'v.prescribed_education',
+                'v.prescribed_experience',
+                'v.prescribed_training',
+                'v.preferred_eligibility',
+                'v.preferred_education',
+                'v.preferred_experience',
+                'v.preferred_training',
+                'v.summary',
+                'v.output',
+                'v.examination',
+                'v.responsibility',
+                'v.status',
+                'v.remarks',
+                'p.id as publication_id',
                 'p.date_published',
                 'p.date_closed',
                 'p.time_closed',
@@ -63,7 +90,29 @@ class JobsController extends Controller
             ->leftJoin('publication_vacancies as pv', 'pv.vacancy_id', '=', 'v.id')
             ->leftJoin('publication as p', 'p.id', '=', 'pv.publication_id')
             ->whereIn('v.id', $vacancyIds)
-            ->paginate(20);
+            ->where('p.is_public', 1);
+
+        if ($search = $request->input('search')) {
+            $vacancies->where(function ($q) use ($search) {
+                $q->where('v.position_description', 'LIKE', "%{$search}%")
+                ->orWhere('v.position', 'LIKE', "%{$search}%")
+                ->orWhere('v.item_no', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($filters = $request->input('filter')) {
+            if (!empty($filters['division'])) {
+                $vacancies->where('v.division', $filters['division']);
+            }
+            if (!empty($filters['sg'])) {
+                $vacancies->where('v.sg', $filters['sg']);
+            }
+            if (!empty($filters['appointment_status'])) {
+                $vacancies->where('v.appointment_status', $filters['appointment_status']);
+            }
+        }
+
+        $vacancies = $vacancies->paginate(5)->withQueryString();
 
         $competencies = $conn2->table('vacancy_competencies as vc')
             ->leftJoin('competency as c', 'vc.competency_id', '=', 'c.comp_id')
@@ -79,15 +128,44 @@ class JobsController extends Controller
             ->get()
             ->groupBy('vacancy_id');
 
-        $vacancies->transform(function ($vacancy) use ($divisions, $competencies) {
+        $requirements = $conn2->table('vacancy_requirements')
+            ->whereIn('vacancy_id', $vacancyIds)
+            ->get()
+            ->groupBy('vacancy_id');
+
+        $applications = $conn->table('application as a')
+        ->select([
+            'a.id',
+            'a.vacancy_id',
+            'a.publication_id',
+            'a.status',
+            'a.date_submitted',
+            's.status as latest_status',
+            's.created_at as status_date'
+        ])
+        ->leftJoin('application_status as s', function ($join) {
+            $join->on('s.application_id', '=', 'a.id')
+                 ->whereRaw('s.id = (
+                    SELECT MAX(id) FROM application_status WHERE application_id = a.id
+                 )');
+        })
+        ->where('a.user_id', auth()->user()->id)
+        ->get()
+        ->groupBy('vacancy_id');
+
+        $vacancies->transform(function ($vacancy) use ($divisions, $competencies, $applications, $requirements) {
             $vacancy->hashed_id = sha1($vacancy->id);
             $vacancy->division_name = $divisions->get($vacancy->division);
 
             $vacancyCompetencies = $competencies->get($vacancy->id, collect());
 
+            $vacancy->requirements = $requirements->get($vacancy->id, collect());
+
             $vacancy->competencies = $vacancyCompetencies->groupBy('comp_type')->map(function ($items) {
                 return $items->values();
             });
+
+            $vacancy->application = $applications->get($vacancy->id)?->first();
 
             return $vacancy;
         });
@@ -97,11 +175,12 @@ class JobsController extends Controller
             ->where('status', 'Submitted')
             ->latest('date_submitted')
             ->first();
-
+            
         return Inertia::render('JobPortal/index', [
             'data' => [
                 'jobs' => $vacancies,
                 'latest_application' => $latestApp,
+                'filters' => $request->only(['search', 'filter']),
             ],
         ]);
     }
@@ -111,99 +190,155 @@ class JobsController extends Controller
         $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
 
+        $vacancy = $conn2->table('vacancy as v')
+        ->select([
+            'v.id',
+            'p.id as publication_id',
+            'p.date_closed'
+        ])
+        ->leftJoin('publication_vacancies as pv', 'pv.vacancy_id', '=', 'v.id')
+        ->leftJoin('publication as p', 'p.id', '=', 'pv.publication_id')
+        ->whereRaw("SHA1(v.id) = ?", [$hashedId])
+        ->first();
+
+        if (!$vacancy) {
+            abort(404, 'Job not found');
+        }
+
+        $existingApp = $conn->table('application')
+            ->where('vacancy_id', $vacancy->id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if ($existingApp) {
+            return redirect()->route('jobs.apply', $hashedId)
+                ->with('status', 'info')
+                ->with('message', 'You already have an application for this job.');
+        }
+
+        $vacancyRequirements = $conn2->table('vacancy_requirements')
+            ->where('vacancy_id', $vacancy->id)
+            ->get();
+
         try{
             $conn->beginTransaction();
 
-            $vacancy = $conn2->table('vacancy as v')
-            ->select([
-                'v.id',
-                'p.id as publication_id',
-                'p.date_closed'
-            ])
-            ->leftJoin('publication_vacancies as pv', 'pv.vacancy_id', '=', 'v.id')
-            ->leftJoin('publication as p', 'p.id', '=', 'pv.publication_id')
-            ->whereRaw("SHA1(v.id) = ?", [$hashedId])
+            $applicant = $conn->table('applicant')
+            ->where('user_id', auth()->user()->id)
             ->first();
 
-            if (!$vacancy) {
-                abort(404, 'Job not found');
+            if (!$applicant) {
+                $applicantId = $conn->table('applicant')->insertGetId([
+                    'user_id' => auth()->user()->id,
+                ]);
+            } else {
+                $applicantId = $applicant->id;
             }
-
-            $existingApp = $conn->table('application')
-                ->where('vacancy_id', $vacancy->id)
-                ->where('user_id', auth()->id())
-                ->first();
-
-            if ($existingApp) {
-                return redirect()->route('jobs.apply', $hashedId)
-                    ->with('status', 'info')
-                    ->with('message', 'You already have an application for this job.');
-            }
-
-            $latestApp = $conn->table('application')
-                ->where('user_id', auth()->user()->id)
-                ->where('status', 'Submitted')
-                ->latest('date_submitted')
-                ->first();
 
             $newAppId = $conn->table('application')->insertGetId([
                 'publication_id' => $vacancy->publication_id,
                 'vacancy_id'     => $vacancy->id,
-                'user_id'        => auth()->id(),
+                'user_id'        => auth()->user()->id,
                 'type'           => $request['type'] ?? 'manual',
-                'date_submitted' => now(),
+                'date_created'   => now(),
                 'status'         => 'Draft',
             ]);
 
-            if($request->has('type') && $request['type'] === 'reuse' && $latestApp){
+            $conn->table('application_status')
+            ->insert([
+                'application_id' => $newAppId,
+                'status' => 'Draft',
+                'created_by' => auth()->user()->id,
+                'created_at' => now()
+            ]);
 
-                $copySingle = function ($table) use ($conn, $latestApp, $newAppId) {
-                    $record = $conn->table($table)->where('application_id', $latestApp->id)->first();
-                    if ($record) {
-                        $data = (array) $record;
-                        unset($data['id']);
-                        $data['application_id'] = $newAppId;
-                        $conn->table($table)->insert($data);
+            $filesToCopy = collect();
+
+            if($request['type'] === 'reuse') {
+
+                $lastApplication = $conn->table('application')
+                ->where('user_id', auth()->id())
+                ->where('status', 'Submitted')
+                ->where('id', '<>', $newAppId)
+                ->orderByDesc('date_submitted')
+                ->first();
+
+                if ($lastApplication && $vacancyRequirements->count() > 0) {
+
+                    // Get all previous requirements that match this applicant and last vacancy
+                    $latestRequirements = $conn->table('application_requirement')
+                    ->where('applicant_id', $applicantId)
+                    ->where('vacancy_id', $lastApplication->vacancy_id)
+                    ->whereIn('requirement_id', $vacancyRequirements->pluck('requirement_id'))
+                    ->get();
+
+                    if ($latestRequirements->isNotEmpty()) {
+                        // Collect requirement data for insert (new vacancy)
+                        $requirementsToInsert = $latestRequirements->map(function ($req) use ($newAppId, $vacancy, $applicantId) {
+                            return [
+                                'applicant_id'   => $applicantId,
+                                'vacancy_id'     => $vacancy->id,
+                                'requirement_id' => $req->requirement_id,
+                                'requirement'    => $req->requirement,
+                                'sub_requirement_id' => $req->sub_requirement_id,   
+                                'created_by'     => auth()->id(),
+                                'created_at'     => now(),
+                            ];
+                        });
+
+                        $conn->table('application_requirement')->insert($requirementsToInsert->toArray());
+
+                        // Fetch the newly inserted ones (latest IDs by created_at)
+                        $newRequirements = $conn->table('application_requirement')
+                            ->where('applicant_id', $applicantId)
+                            ->where('vacancy_id', $vacancy->id)
+                            ->orderByDesc('id')
+                            ->take($requirementsToInsert->count())
+                            ->get();
+
+                        // Map old requirement_id → new id for easy reference
+                        $idMap = $latestRequirements->pluck('requirement_id', 'id')->mapWithKeys(function ($requirement_id, $oldId) use ($newRequirements) {
+                            $new = $newRequirements->firstWhere('requirement_id', $requirement_id);
+                            return [$oldId => $new?->id];
+                        });
+
+                        // Fetch old files
+                        $requirementIds = $latestRequirements->pluck('id');
+                        $requirementFiles = $conn->table('file')
+                        ->whereIn('itemId', $requirementIds)
+                        ->where('model', 'like', 'Vacancy_' . $lastApplication->vacancy_id . '\_%')
+                        ->get();
+
+                        if ($requirementFiles->isNotEmpty()) {
+                            // Prepare new files
+                            $filesToInsert = $requirementFiles->map(function ($file) use ($vacancy, $idMap) {
+                                $newModel = preg_replace(
+                                    '/^Vacancy_(\d+)_/',
+                                    'Vacancy_' . $vacancy->id . '_',
+                                    $file->model
+                                );
+
+                                return [
+                                    'name'        => $file->name,
+                                    'model'       => $newModel,
+                                    'itemId'      => $idMap[$file->itemId] ?? null,
+                                    'hash'        => $file->hash,
+                                    'size'        => $file->size,
+                                    'type'        => $file->type,
+                                    'mime'        => $file->mime,
+                                    'is_main'     => $file->is_main,
+                                    'date_upload' => now()->timestamp,
+                                    'sort'        => $file->sort,
+                                    'path'        => $file->path,
+                                ];
+                            })->filter(fn($f) => !is_null($f['itemId']));
+
+                            if ($filesToInsert->isNotEmpty()) {
+                                $conn->table('file')->insert($filesToInsert->toArray());
+                            }
+                        }
                     }
-                };
-
-                $copyMultiple = function ($table) use ($conn, $latestApp, $newAppId) {
-                    $records = $conn->table($table)->where('application_id', $latestApp->id)->get();
-                    if ($records->isNotEmpty()) {
-                        $data = $records->map(function ($record) use ($newAppId) {
-                            $row = (array) $record;
-                            unset($row['id']);
-                            $row['application_id'] = $newAppId;
-                            return $row;
-                        })->toArray();
-                        $conn->table($table)->insert($data);
-                    }
-                };
-
-                foreach ([
-                    'application_applicant', 
-                    'application_father', 
-                    'application_mother', 
-                    'application_spouse'
-                ] as $table) {
-                    $copySingle($table);
                 }
-
-                foreach ([
-                    'application_child', 
-                    'application_education', 
-                    'application_eligibility', 
-                    'application_learning', 
-                    'application_other_info', 
-                    'application_question', 
-                    'application_reference', 
-                    'application_voluntary_work', 
-                    'application_work_experience', 
-                ] as $table) {
-                    $copyMultiple($table);
-                }
-
-                
             }
 
             $conn->commit();
@@ -235,16 +370,6 @@ class JobsController extends Controller
             ->get()
             ->pluck('division_name', 'division_id');
 
-        $applicant = $conn->table('applicant')
-        ->where('user_id', auth()->user()->id)
-        ->first();
-
-        if (!$applicant) {
-            $conn->table('applicant')->insert([
-                'user_id' => auth()->user()->id,
-            ]);
-        }
-
         $vacancy = $conn2->table('vacancy as v')
         ->select([
             'v.id as id',
@@ -267,12 +392,31 @@ class JobsController extends Controller
             abort(404, 'Job not found');
         }
 
-        $application = $conn->table('application')
-        ->where('vacancy_id', $vacancy->id)
-        ->where('user_id', $applicant->user_id)
+        $applicant = $conn->table('applicant')
+        ->where('user_id', auth()->user()->id)
         ->first();
 
-        if(!$application) {
+        if (!$applicant) {
+            abort(404, 'Applicant not found');
+        }
+
+        $application = $conn->table('application as a')
+            ->leftJoin('application_status as s', function ($join) {
+                $join->on('s.application_id', '=', 'a.id')
+                    ->whereRaw('s.id = (
+                        SELECT MAX(id) FROM application_status WHERE application_id = a.id
+                    )');
+            })
+            ->where('a.vacancy_id', $vacancy->id)
+            ->where('a.user_id', auth()->user()->id)
+            ->select('a.*', 's.status as latest_status')
+            ->first();
+
+        if (!$application) {
+            abort(404, 'Job not found');
+        }
+
+        if ($application && strtolower(trim($application->latest_status)) !== 'draft') {
             abort(404, 'Job not found');
         }
     
@@ -360,26 +504,72 @@ class JobsController extends Controller
 
          try{
             $conn->beginTransaction();
-            $conn2->beginTransaction();
 
-            $application = $conn->table('application')
-            ->where('vacancy_id', $vacancy->id)
-            ->where('user_id', $applicant->user_id)
-            ->update([
-                'status' => 'Submitted',
-                'date_submitted' => now()
-            ]);
+            if ($application) {
+                /* update application status as Submitted */
+                $conn->table('application')
+                    ->where('id', $application->id)
+                    ->update([
+                        'status' => 'Submitted',
+                        'date_submitted' => now()
+                    ]);
+
+                /* insert new status as Application Received */
+                $conn->table('application_status')
+                    ->insert([
+                        'application_id' => $application->id,
+                        'status' => 'Application Received',
+                        'created_by' => auth()->user()->id,
+                        'created_at' => now()
+                    ]);
+
+                $copies = [
+                    ['applicant', 'application_applicant', true],
+                    ['applicant_child', 'application_child'],
+                    ['applicant_education', 'application_education'],
+                    ['applicant_eligibility', 'application_eligibility'],
+                    ['applicant_father', 'application_father', true],
+                    ['applicant_learning', 'application_learning'],
+                    ['applicant_mother', 'application_mother', true],
+                    ['applicant_other_info', 'application_other_info'],
+                    ['applicant_question', 'application_question'],
+                    ['applicant_reference', 'application_reference'],
+                    ['applicant_spouse', 'application_spouse', true],
+                    ['applicant_voluntary_work', 'application_voluntary_work'],
+                    ['applicant_work_experience', 'application_work_experience'],
+                ];
+
+                foreach ($copies as $copy) {
+                    [$source, $target, $single] = array_pad($copy, 3, null);
+
+                    $this->copiesApplicationData($source, $target, $applicant->id, $application->id, $single);
+                }
+            }
 
             $conn->commit();
-            $conn2->commit();
-            return redirect()->back()->with([
-                'status'  => 'success',
-                'title'   => 'Success',
-                'message' => 'You have successfully submitted your application',
-            ]);
+
+            try {
+                // notify applicant
+                app(\App\Http\Controllers\JobPortal\NotificationController::class)
+                    ->submitApplication($application->id);
+
+                // notify HR
+                app(\App\Http\Controllers\JobPortal\NotificationController::class)
+                    ->receiveApplication($application->id);
+
+            } catch (\Throwable $notifyError) {
+                \Log::error('Notification sending failed: ' . $notifyError->getMessage());
+            }
+
+            return redirect()->route('applications.index')
+                ->with('status', 'success')
+                ->with('title', 'Success!')
+                ->with('message', 'You have successfully submitted your application');
+
+
         } catch (\Exception $e) {
             $conn->rollBack();
-            $conn2->rollBack();
+
             Log::error('Error on submitting application: ' . $e->getMessage());
 
             return back()->with([
@@ -436,10 +626,10 @@ class JobsController extends Controller
         ->where('connected_to', 'Work Experience')
         ->first();
 
-        $educations = $this->fetchEducationalBackgroundFiles($applicant, $vacancy->id, $application->type ?? 'manual');
-        $eligibilities = $this->fetchCivilServiceEligibilityFiles($applicant, $vacancy->id, $application->type ?? 'manual');
-        $learnings = $this->fetchLearningAndDevelopmentFiles($applicant, $vacancy->id, $application->type ?? 'manual');
-        $works = $this->fetchWorkExperienceFiles($applicant, $vacancy->id, $application->type ?? 'manual');
+        $educations = $this->fetchEducationalBackgroundFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
+        $eligibilities = $this->fetchCivilServiceEligibilityFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
+        $learnings = $this->fetchLearningAndDevelopmentFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
+        $works = $this->fetchWorkExperienceFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
 
         $requirements = $conn2->table('vacancy_requirements')
         ->select([
@@ -707,12 +897,16 @@ class JobsController extends Controller
                     ->where('model', 'Vacancy_'.$vacancy->id.'_'.$requirement->requirement)
                     ->first();
 
+                    $fileCount = $conn->table('file')
+                    ->where('path', $file->path)
+                    ->count();
+
                     if ($vacancyFile) {
                         $conn->table('application_requirement')
                             ->where('id', $vacancyFile->itemId)
                             ->delete();
 
-                        if (!empty($vacancyFile->path)) {
+                        if (!empty($vacancyFile->path) && $fileCount === 2) {
                             Storage::delete($vacancyFile->path);
                         }
 

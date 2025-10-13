@@ -48,8 +48,18 @@ import {
     }
 
     return (
-      <header className="flex gap-2 justify-between sticky top-0 p-2 items-center h-16 shrink-0 border-b bg-blue-800 z-50 text-white">
-        <SidebarTrigger className="ml-2" />
+      <header
+        className={`flex gap-2 justify-between sticky top-0 items-center h-16 shrink-0 border-b bg-blue-600 z-50 text-white ${
+          user?.ipms_id
+            ? "p-2"
+            : "px-4 sm:px-8 md:px-16 lg:px-32"
+        }`}
+      >
+        {user?.ipms_id ?
+         <SidebarTrigger className="ml-2" /> : 
+        <span className=" font-semibold text-lg">
+          DRO1 HRIS
+        </span>}
         <div className="flex flex-end items-center gap-2">
           <div className="flex-col hidden md:flex">
             <span className="text-sm font-semibold">

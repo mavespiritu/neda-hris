@@ -7,9 +7,8 @@ const SubHeader = () => {
   const { url } = usePage() // get current path
 
   const menuItems = [
-    { name: "Home", href: route("dashboard"), icon: Home },
+    { name: "My Applications", href: route("applications.index"), icon: Home },
     { name: "My Profile", href: route("applicant.index"), icon: User },
-    { name: "My Applications", href: route("applicant.index"), icon: Folder },
     { name: "Search Jobs", href: route("jobs.index"), icon: Search },
   ]
 
@@ -54,7 +53,7 @@ const SubHeader = () => {
 
       {/* Mobile dropdown */}
       {isOpen && (
-        <div className="absolute top-16 left-0 w-full bg-white border-b shadow-md md:hidden z-50">
+        <div className="absolute top-10 left-0 w-full bg-white border-b shadow-md md:hidden z-50">
           <div className="flex flex-col p-4 gap-4">
             {menuItems.map((item) => {
               const Icon = item.icon

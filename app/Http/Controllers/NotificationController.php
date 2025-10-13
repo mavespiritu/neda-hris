@@ -31,6 +31,9 @@ use App\Notifications\NotifyStaffOfRaaApproval;
 use App\Notifications\NotifyStaffOfRaaDisapproval;
 use App\Notifications\NotifyStaffOfRaaReturn;
 
+use App\Notifications\NotifyApplicantOfApplicationSubmission;
+use App\Notifications\NotifyHROfApplicationSubmission;
+
 class NotificationController extends Controller
 {
     public function submitGapAnalysis(Request $request)

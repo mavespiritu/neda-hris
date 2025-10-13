@@ -68,7 +68,7 @@ const WorkExperienceFiles = ({req}) => {
             <div className="ml-8">
                 <Table>
                     <TableHeader className="border-b">
-                        <TableRow className="bg-muted">
+                        <TableRow className="bg-muted text-xs">
                             <TableHead className="w-[40%] border-l">
                                 <div className="flex flex-col">
                                     <span>(a) Dept/Agency/Office/Company</span>
@@ -85,7 +85,7 @@ const WorkExperienceFiles = ({req}) => {
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
                         <TableCell className="border-l">
-                            <div className="flex flex-col font-medium">
+                            <div className="flex flex-col">
                                 <span>(a) {sub.agency}</span>
                                 <span>(b) {sub.position}</span>
                                 <span>(c) P{formatNumberWithCommas(sub.monthly_salary)}</span>

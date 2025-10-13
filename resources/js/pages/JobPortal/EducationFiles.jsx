@@ -68,7 +68,7 @@ const EducationFiles = ({req}) => {
             <div className="ml-8">
                 <Table>
                     <TableHeader className="border-b">
-                        <TableRow className="bg-muted">
+                        <TableRow className="bg-muted text-xs">
                             <TableHead className="w-[40%] border-l">
                                 <div className="flex flex-col">
                                     <span>(a) Level</span>
@@ -85,7 +85,7 @@ const EducationFiles = ({req}) => {
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
                         <TableCell className="border-l">
-                            <div className="flex flex-col font-medium">
+                            <div className="flex flex-col">
                                 <span>(a) {sub.level}</span>
                                 <span>(b) {sub.school}</span>
                                 <span>(c) {sub.course}</span>

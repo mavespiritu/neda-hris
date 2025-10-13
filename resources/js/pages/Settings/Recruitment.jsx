@@ -125,8 +125,8 @@ const Recruitment = () => {
         <CardContent className="border-t divide-y">
           <div className="flex justify-between items-start gap-4 px-4 py-6">
             <div className="flex flex-col basis-1/3">
-              <span className="text-sm font-semibold">Requirements</span>
-              <span className="text-xs text-muted-foreground">Set list of requirements</span>
+              <span className="text-sm font-semibold">Default Requirements</span>
+              <span className="text-xs text-muted-foreground">Set list of default requirements</span>
             </div>
             <div className="border rounded-lg flex-1 w-2/3 overflow-auto">
               <Table>

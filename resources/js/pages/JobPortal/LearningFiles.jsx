@@ -65,7 +65,7 @@ const LearningFiles = ({req}) => {
             <div className="ml-8">
                 <Table>
                     <TableHeader className="border-b">
-                        <TableRow className="bg-muted">
+                        <TableRow className="bg-muted text-xs">
                             <TableHead className="w-[40%] border-l">Title of Learning and Development Interventions / Training Programs</TableHead>
                             <TableHead className="w-[20%]">Date</TableHead>
                             <TableHead className="w-[30%]">Attachment</TableHead>
@@ -75,7 +75,7 @@ const LearningFiles = ({req}) => {
                     <TableBody>
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
-                        <TableCell className="border-l font-medium">{sub.seminar_title}</TableCell>
+                        <TableCell className="border-l">{sub.seminar_title}</TableCell>
                         <TableCell>
                             {formatDateRange(sub.from_date, sub.to_date)}
                         </TableCell>

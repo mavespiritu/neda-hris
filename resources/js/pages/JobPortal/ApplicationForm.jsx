@@ -1,22 +1,29 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useForm } from "@inertiajs/react"
+import { useEffect } from "react"
 import { Loader2 } from "lucide-react"
 
 const ApplicationForm = ({ open, onClose, job }) => {
-  const { data, setData, post, processing } = useForm({
+  const { data, setData, post, processing, reset } = useForm({
     job_id: job?.id,
-    type: "",
+    type: null,
   })
+
+  // 🔹 Watch for `type` change and submit automatically when set
+  useEffect(() => {
+    if (data.type) {
+      post(route("jobs.store", job.hashed_id), {
+        onSuccess: () => {
+          reset()
+          onClose()
+        },
+      })
+    }
+  }, [data.type]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = (appType) => {
     setData("type", appType)
-
-    post(route("jobs.store", job.hashed_id), {
-      onSuccess: () => {
-        onClose()
-      },
-    })
   }
 
   const renderButtonContent = (label, appType) => {
@@ -37,8 +44,13 @@ const ApplicationForm = ({ open, onClose, job }) => {
         <DialogHeader>
           <DialogTitle>Start your application</DialogTitle>
         </DialogHeader>
+
         <div className="space-y-4">
-          <p className="font-medium">{job.position_description}</p>
+          <div>
+            <p className="font-medium">{job.position_description}</p>
+            <p className="text-sm">{job.item_no}</p>
+          </div>
+
           <p className="text-sm">
             Please choose how you want to apply by clicking on your preferred option below.
           </p>

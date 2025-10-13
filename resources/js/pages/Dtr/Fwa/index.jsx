@@ -23,7 +23,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatDateWithTime, formatTime12 } from "@/lib/utils.jsx"
 import { CalendarDays } from "lucide-react"
-import { AlertCircleIcon } from "lucide-react"
+import { AlertCircleIcon, CircleAlert } from "lucide-react"
 
 const breadcrumbItems = [
   { label: "Home", href: "/" },
@@ -107,16 +107,16 @@ const Fwa = () => {
       />
 
       {!isFlexiplaceToday && (
-        <Alert className="hidden lg:flex border-red-500 text-red-500">
-          <AlertCircleIcon className="h-4 w-4" stroke="red" />
-          <div className="flex flex-col gap-2">
-            <AlertTitle className="text-sm font-semibold">
-              Unable to record time entry today
-            </AlertTitle>
-
-            <AlertDescription className="text-xs flex flex-col gap-1">
-              You cannot use this kiosk for Flexiplace today. Possible reasons:
-
+        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex flex-col gap-2 border-l-4 border-red-400 mt-6">
+          <div className="flex items-start gap-2">
+              <CircleAlert className="w-4 h-4 mt-0.5" />
+              <p className="font-semibold">
+                  Unable to record time entry today
+              </p>
+          </div>
+          <p className="pl-6">
+            You cannot use this kiosk for Flexiplace today. Possible reasons:
+            <div className="flex flex-col gap-1 mt-2">
               {!data.schedule && (
                 <span>
                   • No Flexiplace schedule found. Check your schedule{" "}
@@ -144,9 +144,9 @@ const Fwa = () => {
                   </a>.
                 </span>
               )}
-            </AlertDescription>
-          </div>
-        </Alert>
+              </div>
+          </p>
+        </div>
       )}
 
       <div className="flex-grow flex items-center justify-center">

@@ -8,21 +8,23 @@ const GuestHeader = () => {
     const { auth } = usePage().props
 
     const isLoggedIn = !!auth?.user
-    
-    console.log(usePage().props)
 
     return (
-        <header className="h-[80px] border-b flex justify-between items-center px-4 md:px-8 lg:px-16 xl:px-32">
+        <header className="h-[80px] border-b flex justify-between items-center px-12 md:px-24 lg:px-48 xl:px-96">
             {/* Logo */}
             <div className="flex items-center">
-                <Link href="/" className="font-bold text-xl">NEDA RO1 HRIS</Link>
+                <img src="/images/logo.png" alt="DEPDev Logo" className="w-14 h-auto object-contain mr-4" />
+                <Link href="/" className="flex flex-col">
+                    <span className="text-xl font-bold">Job Portal</span>
+                    <span className="text-sm">DEPDev Regional Office 1</span>
+                </Link>
             </div>
 
             {/* Desktop Menu */}
-            <div className="hidden md:flex gap-6 items-center font-medium">
+            <div className="hidden md:flex gap-6 items-center font-medium text-sm">
                 {!isLoggedIn ? (
                 <>
-                    <Link href={route('jobs.index')} className="hover:text-gray-800">Search Jobs</Link>
+                    <Link href={route('home')} className="hover:text-gray-800">Search Jobs</Link>
                     <Link href={route('register')} className="hover:text-gray-800">Create an Account</Link>
                     <Link href={route('login')}>
                     <Button>Sign in</Button>
@@ -30,7 +32,7 @@ const GuestHeader = () => {
                 </>
                 ) : (
                 <>
-                    <Link href={route('jobs.index')} className="hover:text-gray-800">Search Jobs</Link>
+                    <Link href={route('home')} className="hover:text-gray-800">Search Jobs</Link>
                     <Link href={route('applicant.index')} className="hover:text-gray-800">My Profile</Link>
                     <Link href={route('logout')} method="post" as="button">
                     <Button variant="outline">Logout</Button>

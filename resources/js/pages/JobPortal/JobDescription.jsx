@@ -47,22 +47,34 @@ const JobDescription = ({action, job, latestApp}) => {
                 {job.appointment_status === "Permanent" && `(${job.item_no})`}
                 </h3>
                 <span className="text-lg font-normal mb-4">{job.division_name ?? ""}</span>
-                <div className="flex items-center gap-2 mb-6">
+                <div className="flex flex-col gap-4 mb-6">
                     {action === "apply" && (
-                        latestApp ? (
-                            <Button className="w-fit" onClick={() => setOpenAppForm(true)}>
-                                Apply Now
+                    <>
+                        {job.application ? (
+                        (job.application.latest_status || "").trim().toLowerCase() === "draft" ? (
+                            <Button
+                            className="w-fit bg-blue-800 hover:bg-blue-700"
+                            onClick={() => router.get(route("jobs.apply", job.hashed_id))}
+                            >
+                            Continue Application
                             </Button>
                         ) : (
-                            <Button
-                            className="w-fit"
-                            onClick={() =>
-                                router.post(route("jobs.store", job.hashed_id))
-                            }
-                            >
-                            Apply Now
-                            </Button>
+                            <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-lg w-fit">
+                            You already submitted application to this job posting
+                            </span>
                         )
+                        ) : (
+                        <Button
+                            className="w-fit"
+                            onClick={() => {
+                            if (latestApp) setOpenAppForm(true)
+                            else router.post(route("jobs.store", job.hashed_id))
+                            }}
+                        >
+                            Apply Now
+                        </Button>
+                        )}
+                    </>
                     )}
                     <span className="text-sm font-medium">Deadline of Submission is <span className="text-red-500 font-semibold underline">{formatDate(job.date_closed)}</span></span>
                 </div>
@@ -187,6 +199,18 @@ const JobDescription = ({action, job, latestApp}) => {
                         </div>
                     </div>
                 )}
+                {job.remarks && <div className="space-y-2">
+                    <h3 className="text-lg font-semibold">Additional Remarks</h3>
+                    <div className="border rounded-lg p-4">
+                    <div
+                        className="prose prose-sm max-w-none text-sm font-medium
+                        [&_.my-bullet-list]:list-disc [&_.my-bullet-list]:pl-6
+                        [&_.my-ordered-list]:list-decimal [&_.my-ordered-list]:pl-6
+                        [&_.my-list-item]:ml-4"
+                        dangerouslySetInnerHTML={{ __html: job.remarks }}
+                    />
+                    </div>
+                </div>}
             </div>
         </ScrollArea>
         <ApplicationForm

@@ -8,7 +8,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\JobPortal\MyProfileController;
 
 Route::middleware(['web', 'auth.any'])->group(function () {
-    Route::get('/my-profile', [MyProfileController::class, 'index'])->name('applicant.index');
+    Route::get('/profile', [MyProfileController::class, 'index'])->name('applicant.index');
 
     Route::get('/applicant/profile', [MyProfileController::class, 'showApplicantInformation'])->name('applicant.show-applicant-information');
 

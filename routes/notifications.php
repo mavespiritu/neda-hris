@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\NotificationController as GeneralNotificationController;
 use App\Http\Controllers\Vacancies\NotificationController as VacancyNotificationController;
+use App\Http\Controllers\JobPortal\NotificationController as JobPortalNotificationController;
 
 Route::middleware(['web', 'auth.any'])->group(function () {
     Route::post('/notification/submit-gap-analysis', [GeneralNotificationController::class, 'submitGapAnalysis'])->name('notification.submit-gap-analysis');
@@ -29,4 +30,7 @@ Route::middleware(['web', 'auth.any'])->group(function () {
     Route::post('/notification/{id}/approve-vacancy/{userId}', [VacancyNotificationController::class, 'approve'])->name('notification.approve-vacancy');
     Route::post('/notification/{id}/return-vacancy/{userId}', [VacancyNotificationController::class, 'return'])->name('notification.return-vacancy');
     Route::post('/notification/{id}/disapprove-vacancy/{userId}', [VacancyNotificationController::class, 'disapprove'])->name('notification.disapprove-vacancy');
+
+    Route::post('/notification/{id}/submit-application', [JobPortalNotificationController::class, 'submitApplication'])->name('notification.submit-application');
+    Route::post('/notification/{id}/receive-application', [JobPortalNotificationController::class, 'receiveApplication'])->name('notification.receive-application');
 });

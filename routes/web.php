@@ -5,6 +5,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use Inertia\Inertia;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\MyCgaController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Auth\GoogleController;
+use Illuminate\Http\Request;
 
 /* Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -25,11 +27,13 @@ use App\Http\Controllers\Auth\GoogleController;
     ]);
 }); */
 
-Route::get('/', function () {
-    return auth()->check()
-        ? redirect('/dashboard')
-        : Inertia::render('Home');
-});
+Route::get('/', function (Request $request) {
+    if (auth()->check()) {
+        return redirect('/dashboard');
+    }
+
+    return app(HomeController::class)->index($request);
+})->name('home');
 
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
@@ -38,7 +42,15 @@ Route::middleware(['web', 'auth'])->group(function () {
 
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard/index');
+    if (auth()->check()) {
+        $user = auth()->user();
+
+        if (!empty($user->ipms_id)) {
+            return Inertia::render('Dashboard/index');
+        } else {
+            return redirect('/applications');
+        }
+    }
 })->middleware(['auth.any', 'verified'])->name('dashboard');
 
 /*
@@ -102,8 +114,11 @@ require __DIR__ . '/applicant.php';
 require __DIR__ . '/publications.php';
 require __DIR__ . '/vacancies.php';
 require __DIR__ . '/vacancies.requirements.php';
+require __DIR__ . '/vacancies.applicants.php';
 require __DIR__ . '/trainings.php';
 
 require __DIR__ . '/jobs.php';
+require __DIR__ . '/applications.php';
 
 require __DIR__ . '/file.php';
+require __DIR__ . '/issue.php';

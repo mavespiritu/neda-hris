@@ -12,7 +12,8 @@ import {
   Check,
   HomeIcon as House,
   ChevronDown,
-  ArrowRight
+  ArrowRight,
+  CircleAlert
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -245,24 +246,46 @@ export default function Pds({redirect}) {
           </div>
         </div>
         <div className="flex-1 min-h-[300px]">
-          <div className="w-full border rounded-lg p-4 mb-4">
-            <p className="text-base font-semibold">
-              Your profile is{" "}
-              <span
-                className={`font-bold text-lg ${
-                  progressPercent === 100 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {progressPercent}%
-              </span>{" "}
-              completed.
-            </p>
-            <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className={`rounded-md p-4 text-sm flex flex-col gap-3 mb-4 border-l-4 transition-colors duration-300
+              ${
+                progressPercent < 50
+                  ? "bg-red-50 text-red-700 border-red-400"
+                  : progressPercent < 80
+                  ? "bg-yellow-50 text-yellow-700 border-yellow-400"
+                  : "bg-green-50 text-green-700 border-green-400"
+              }`}
+          >
+            <div className="flex items-center gap-2">
+              <CircleAlert className="w-4 h-4 mt-0.5" />
+              <p className="font-semibold">
+                Your profile is{" "}
+                <span
+                  className={`font-bold text-lg ${
+                    progressPercent < 50
+                      ? "text-red-600"
+                      : progressPercent < 80
+                      ? "text-yellow-600"
+                      : "text-green-600"
+                  }`}
+                >
+                  {progressPercent}%
+                </span>{" "}
+                completed.
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all duration-300 ${
-                  progressPercent === 100 ? "bg-green-600" : "bg-red-600"
+                className={`h-full transition-all duration-500 ease-in-out ${
+                  progressPercent < 50
+                    ? "bg-red-600"
+                    : progressPercent < 80
+                    ? "bg-yellow-500"
+                    : "bg-green-600"
                 }`}
-                style={{ width: `${progressPercent}%` }}
+                style={{ width: `${Math.min(progressPercent, 100)}%` }}
               />
             </div>
           </div>

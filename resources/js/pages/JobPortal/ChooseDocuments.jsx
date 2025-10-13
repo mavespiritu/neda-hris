@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Files, Upload, Paperclip, Trash2, Loader2 } from "lucide-react"
+import { Files, Upload, Paperclip, Trash2, Loader2, CircleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -74,9 +74,12 @@ const ChooseDocuments = ({ job, applicant }) => {
         </h3>
         <div className="text-muted-foreground text-sm">
           <div className="space-y-2 text-sm text-muted-foreground mt-4">
-          <p className="font-semibold text-red-600 flex items-center gap-1">
-            📣 IMPORTANT REMINDERS IN UPLOADING YOUR DOCUMENTS
-          </p>
+          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2 border-l-4 border-red-400 mb-4">
+            <CircleAlert className="w-4 h-4 mt-0.5" />
+            <p className="font-semibold">
+              IMPORTANT REMINDERS IN UPLOADING YOUR DOCUMENTS
+            </p>
+          </div>
           <ul className="list-disc list-inside">
             <li>
               Combine the PDF copies of your files per application requirement using this link:{" "}
@@ -98,12 +101,31 @@ const ChooseDocuments = ({ job, applicant }) => {
             <li>
               Read the CSC Guide to Filling-out the Personal Data Sheet:{" "}
               <a
-                href="https://web.csc.gov.ph/2014-02-21-08-28-23/pdf-files/category/184-click-here-to-download-attached-guide-to-filling-up-the-pds"
+                href="https://csc.gov.ph/phocadownload/userupload/hrpso/2025-ORAOHRA/ANNEX%20H-3%20-%20CS%20Form%20No.%20212%20Revised%202025%20-%20Attachment%20-%20%20Guide%20%20to%20Filling%20Up%20the%20Personal%20Data%20Sheet%20new.pdf"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:underline"
               >
                 CSC Guide
+              </a>
+            </li>
+            <li>Use the CSC-prescribed template of{" "} 
+              <a
+                href="https://csc.gov.ph/downloads/category/540-csc-form-212-revised-2025-personal-data-sheet?download=3404:cs-form-no-212-revised-2025-personal-data-sheet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                CS Form No. 212 Personal Data Sheet (PDS)
+              </a>
+              {" "}and{" "} 
+              <a
+                href="https://csc.gov.ph/downloads/category/540-csc-form-212-revised-2025-personal-data-sheet?download=3405:cs-form-no-212-attachment-work-experience-sheet"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                CS Form No. 212 Work Experience Sheet (Attachment to PDS)
               </a>
             </li>
             <li>
@@ -115,8 +137,16 @@ const ChooseDocuments = ({ job, applicant }) => {
         </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
+      <div className="border rounded-lg relative overflow-hidden">
+
+        {requirements.isLoading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm z-10 h-200">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600 mb-2" />
+            <p className="text-xs font-medium text-muted-foreground">Loading Requirements...</p>
+          </div>
+        )}
+
+        <Table className={requirements.isLoading ? "blur-[1px]" : ""}>
           <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="w-[60%]">Requirement</TableHead>
@@ -141,7 +171,7 @@ const ChooseDocuments = ({ job, applicant }) => {
               requirements.data.map((req, index) => (
                 <React.Fragment key={index}>
                   <TableRow>
-                    <TableCell className="font-semibold">{req.requirement}</TableCell>
+                    <TableCell className="font-semibold">{index + 1}. {req.requirement}</TableCell>
                     <TableCell>
                       {req.subItems?.length > 0 ? (
                         <span className="text-xs text-muted-foreground"></span>

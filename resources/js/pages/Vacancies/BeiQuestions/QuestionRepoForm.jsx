@@ -254,7 +254,7 @@ const QuestionRepoForm = ({
                         }}
                         disabled={selectedRows.length === 0}
                     >
-                        Save changes
+                        Copy Question
                     </Button>
                 </DialogFooter>
             </div>
