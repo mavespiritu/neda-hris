@@ -43,12 +43,10 @@ class MyProfileController extends Controller
 
     public function index()
     {
-        return Inertia::render('MyProfile/index', [
-            
-        ]);
+        return Inertia::render('MyProfile/index');
     }
 
-    public function getProgress()
+    public function getProgress(Request $request)
     {
         $conn = DB::connection('mysql');
 
@@ -59,15 +57,13 @@ class MyProfileController extends Controller
         ->where('type', $user->ipms_id ? 'Staff' : 'Applicant')
         ->first();
 
-        $progress = [];
+        $applicantId = $request->query('applicantId') ?? $applicant->id;
 
-        if($applicant){
-            $progress = $conn->table('applicant_pds')
-                ->where('applicant_id', $applicant->id)
+        $progress = $conn->table('applicant_pds')
+                ->where('applicant_id',$applicantId)
                 ->pluck('status', 'step');
-        }
 
-        return response()->json($progress);
+        return response()->json($progress ?? []);
     }
 
     public function getPds()
@@ -103,7 +99,7 @@ class MyProfileController extends Controller
         }
     }
 
-    public function getPersonalInformation()
+    public function getPersonalInformation(Request $request)
     {
         $appConn = DB::connection('mysql');
         $staffConn = DB::connection('mysql3');
@@ -111,9 +107,9 @@ class MyProfileController extends Controller
         $user = Auth::user();
 
         $basicInformation = (object) [
-            'emp_id' => $user->ipms_id,
+            'emp_id' => '',
             'type' => 'Applicant',
-            'email_address' => $user->email,
+            'email_address' => '',
             'last_name' => null,
             'first_name' => null,
             'middle_name' => null,
@@ -154,62 +150,63 @@ class MyProfileController extends Controller
         ];
 
         try {
+            
             if ($user->ipms_id) {
-                // Try to get from applicant first
-                $_app = $this->fetchApplicantPersonalInfo($appConn, $this->id, 'Staff');
+                    // Try to get from applicant first
+                    $_app = $this->fetchApplicantPersonalInfo($appConn, $this->id, 'Staff');
 
-                if ($_app) {
-                    $basicInformation = (object) $_app;
+                    if ($_app) {
+                        $basicInformation = (object) $_app;
+                    } else {
+                        // Get from staff
+                        $staffData = $this->fetchStaffPersonalInfo($staffConn, $user->ipms_id);
+                        $_staff = $staffData['personal'];
+                        $_perm = $staffData['permanent'];
+                        $_res = $staffData['residential'];
+
+                        if ($_staff) {
+                            $basicInformation->type = 'Staff';
+                            $basicInformation->emp_id = $_staff->emp_id;
+                            $basicInformation->last_name = $_staff->lname;
+                            $basicInformation->first_name = $_staff->fname;
+                            $basicInformation->middle_name = $_staff->mname;
+                            $basicInformation->birth_date = $_staff->birth_date;
+                            $basicInformation->birth_place = $_staff->birth_place;
+                            $basicInformation->gender = $_staff->gender;
+                            $basicInformation->civil_status = $_staff->civil_status;
+                            $basicInformation->height = $_staff->height;
+                            $basicInformation->weight = $_staff->weight;
+                            $basicInformation->blood_type = $_staff->blood_type.'+';
+                            $basicInformation->gsis_no = $_staff->GSIS;
+                            $basicInformation->pag_ibig_no = $_staff->Pag_ibig;
+                            $basicInformation->philhealth_no = $_staff->Philhealth;
+                            $basicInformation->sss_no = $_staff->SSS;
+                            $basicInformation->tin_no = $_staff->TIN;
+                            $basicInformation->citizenship = $_staff->citizenship;
+                            $basicInformation->mobile_no = $_staff->cell_no;
+                        }
+
+                        if ($_perm) {
+                            $basicInformation->permanent_house_no = $_perm->house_no;
+                            $basicInformation->permanent_street = $_perm->street;
+                            $basicInformation->permanent_subdivision = $_perm->subdivision;
+                            $basicInformation->permanent_zip = $_perm->zipcode;
+                        }
+
+                        if ($_res) {
+                            $basicInformation->residential_house_no = $_res->house_no;
+                            $basicInformation->residential_street = $_res->street;
+                            $basicInformation->residential_subdivision = $_res->subdivision;
+                            $basicInformation->residential_zip = $_res->zipcode;
+                        }
+                    }
                 } else {
-                    // Get from staff
-                    $staffData = $this->fetchStaffPersonalInfo($staffConn, $user->ipms_id);
-                    $_staff = $staffData['personal'];
-                    $_perm = $staffData['permanent'];
-                    $_res = $staffData['residential'];
+                    $_app = $this->fetchApplicantPersonalInfo($appConn, auth()->user()->id, 'Applicant');
 
-                    if ($_staff) {
-                        $basicInformation->type = 'Staff';
-                        $basicInformation->emp_id = $_staff->emp_id;
-                        $basicInformation->last_name = $_staff->lname;
-                        $basicInformation->first_name = $_staff->fname;
-                        $basicInformation->middle_name = $_staff->mname;
-                        $basicInformation->birth_date = $_staff->birth_date;
-                        $basicInformation->birth_place = $_staff->birth_place;
-                        $basicInformation->gender = $_staff->gender;
-                        $basicInformation->civil_status = $_staff->civil_status;
-                        $basicInformation->height = $_staff->height;
-                        $basicInformation->weight = $_staff->weight;
-                        $basicInformation->blood_type = $_staff->blood_type.'+';
-                        $basicInformation->gsis_no = $_staff->GSIS;
-                        $basicInformation->pag_ibig_no = $_staff->Pag_ibig;
-                        $basicInformation->philhealth_no = $_staff->Philhealth;
-                        $basicInformation->sss_no = $_staff->SSS;
-                        $basicInformation->tin_no = $_staff->TIN;
-                        $basicInformation->citizenship = $_staff->citizenship;
-                        $basicInformation->mobile_no = $_staff->cell_no;
-                    }
-
-                    if ($_perm) {
-                        $basicInformation->permanent_house_no = $_perm->house_no;
-                        $basicInformation->permanent_street = $_perm->street;
-                        $basicInformation->permanent_subdivision = $_perm->subdivision;
-                        $basicInformation->permanent_zip = $_perm->zipcode;
-                    }
-
-                    if ($_res) {
-                        $basicInformation->residential_house_no = $_res->house_no;
-                        $basicInformation->residential_street = $_res->street;
-                        $basicInformation->residential_subdivision = $_res->subdivision;
-                        $basicInformation->residential_zip = $_res->zipcode;
+                    if ($_app) {
+                        $basicInformation = (object) $_app;
                     }
                 }
-            } else {
-                $_app = $this->fetchApplicantPersonalInfo($appConn, auth()->user()->id, 'Applicant');
-
-                if ($_app) {
-                    $basicInformation = (object) $_app;
-                }
-            }
 
             return response()->json($basicInformation);
 
@@ -273,7 +270,9 @@ class MyProfileController extends Controller
             'personalInformation.gender.required' => 'The sex is required.',
             'personalInformation.civil_status.required' => 'The civil status is required.',
             'personalInformation.height.required' => 'The height is required.',
+            'personalInformation.height.numeric' => 'The height must be a number.',
             'personalInformation.weight.required' => 'The weight is required.',
+            'personalInformation.weight.numeric' => 'The weight must be a number.',
             'personalInformation.blood_type.required' => 'The blood type is required.',
             'personalInformation.gsis_no.required' => 'The GSIS number is required.',
             'personalInformation.pag_ibig_no.required' => 'The PAG-IBIG number is required.',
@@ -323,9 +322,9 @@ class MyProfileController extends Controller
         }
 
         $data['email_address'] = $data['email_address'] ?? Auth::user()->email;
-        $data['emp_id'] = $data['emp_id'] ?? Auth::user()->ipms_id;
+        $data['emp_id'] = null;
 
-        $type = $request->personalInformation['type'] ?? 'Applicant';
+        $type = 'Applicant';
 
         $conn->table('applicant')->updateOrInsert(
             [
@@ -449,6 +448,8 @@ class MyProfileController extends Controller
                 $familyBackground->children = $applicantChildrenData;
             } elseif ($isStaffDb) {
                 $staffChildrenData = $this->fetchStaffChildren($staffConn, $user->ipms_id);
+
+                $children = [];
                 
                 if($staffChildrenData->isNotEmpty()) {
                     foreach($staffChildrenData as $child) {
@@ -707,7 +708,7 @@ class MyProfileController extends Controller
                     if (!empty($entry['from_year']) && !empty($entry['to_year'])
                         && (int)$entry['to_year'] < (int)$entry['from_year']) {
                         $validator->errors()->add(
-                            "educationalBackground.$level.$index.to_date",
+                            "educationalBackground.$level.$index.to_year",
                             "The end year must be after or equal to the start year."
                         );
                     }
@@ -1285,6 +1286,8 @@ class MyProfileController extends Controller
         $learningAndDevelopments = $request['learningAndDevelopment'];
 
         foreach ($learningAndDevelopments as $learningAndDevelopment) {
+
+            unset($learningAndDevelopment['training_title']);
 
             $cleanedHours = preg_replace('/[^0-9.]/', '', $learningAndDevelopment['hours']);
             $learningAndDevelopment['hours'] = (float) $cleanedHours;

@@ -110,6 +110,7 @@ require __DIR__ . '/notifications.php';
 require __DIR__ . '/settings.php';
 
 require __DIR__ . '/applicant.php';
+require __DIR__ . '/applicants.php';
 
 require __DIR__ . '/publications.php';
 require __DIR__ . '/vacancies.php';

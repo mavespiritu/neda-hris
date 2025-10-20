@@ -31,28 +31,23 @@ const FamilyBackground = ({ data, setData, errors = {} }) => {
       ext_name: "",
       birth_date: ""
     }
-    setData(prevData => ({
-      ...prevData,
-      children: [...prevData.children, newChild]
-    }))
+
+    setData("children", [...data.children, newChild])
+
     addChild()
   }
 
   const handleUpdateChild = (index, field, value) => {
-    setData(prevData => ({
-      ...prevData,
-      children: prevData.children.map((child, i) => 
-        i === index ? { ...child, [field]: value } : child
-      )
-    }))
+    const updatedChildren = data.children.map((child, i) =>
+    i === index ? { ...child, [field]: value } : child
+  )
+
+  setData("children", updatedChildren)
     updateChild(index, field, value)
   }
 
   const handleRemoveChild = (index) => {
-    setData(prevData => ({
-      ...prevData,
-      children: prevData.children.filter((_, i) => i !== index)
-    }))
+    setData("children", updatedChildren)
     removeChild(index)
   }
 

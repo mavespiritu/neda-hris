@@ -49,8 +49,8 @@ const Documents = ({ applicantId }) => {
         <Table className={requirements.isLoading ? "blur-[1px]" : ""}>
           <TableHeader className="bg-muted">
             <TableRow>
-              <TableHead className="w-[60%]">Requirement</TableHead>
-              <TableHead className="w-[30%]">Attachment</TableHead>
+              <TableHead className="w-[60%] uppercase font-semibold">Requirement</TableHead>
+              <TableHead className="w-[30%] uppercase font-semibold">Attachment</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

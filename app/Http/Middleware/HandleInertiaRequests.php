@@ -38,19 +38,6 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => fn () => $authUser ? array_merge(
                     $authUser->only(['id', 'name', 'email', 'last_name', 'first_name', 'middle_name', 'ipms_id']),
-                        /* method_exists($request->user(), 'getAllRolesRecursive') ? [
-                            'roles' => $request->user()->getAllRolesRecursive()->pluck('name')->toArray(),
-                            'permissions' => $request->user()->getAllPermissionsRecursive()->pluck('name')->toArray(),
-                        ] : [
-                            'roles' => [],
-                            'permissions' => [],
-                        ] */
-                    /* [
-                        'roles' => $request->user()->roles->pluck('name')->toArray(),
-                    ],
-                    [
-                        'permissions' => $request->user()->getAllPermissions()->pluck('name')->toArray(),
-                    ] */
                     $authUser instanceof User ? [
                         'roles' => $authUser->getAllRolesRecursive()->pluck('name')->toArray(),
                         'permissions' => $authUser->getAllPermissionsRecursive()->pluck('name')->toArray(),
@@ -60,11 +47,24 @@ class HandleInertiaRequests extends Middleware
                     ]
                 ) : null,
             ],
-            'flash' => [
-                'status' => fn () => $request->session()->get('status'),
-                'title' => fn () => $request->session()->get('title'),
-                'message' => fn () => $request->session()->get('message')
-            ],
+            'flash' => function () use ($request) {
+                // Get all flashed session data
+                $flashed = $request->session()->get('_flash.old', []);
+
+                // Laravel doesn’t store flash keys directly; we get values manually
+                $all = collect($request->session()->all())
+                    ->only($flashed)
+                    ->toArray();
+
+                // Fallback if session driver behaves differently
+                if (empty($all)) {
+                    $all = collect($request->session()->all())
+                        ->reject(fn ($_, $key) => str_starts_with($key, '_'))
+                        ->toArray();
+                }
+
+                return $all;
+            },
         ];
     }
 }

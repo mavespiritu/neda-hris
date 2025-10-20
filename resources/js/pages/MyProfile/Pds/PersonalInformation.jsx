@@ -422,7 +422,7 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
                 isInvalid={errors['personalInformation.email_address']}
                 id="email_address"
                 value={data.email_address}
-                disabled={true}
+                //disabled={true}
               />
               {errors['personalInformation.email_address'] && <p className="text-red-500 text-xs mt-1">{errors['personalInformation.email_address']}</p>}
             </div>
@@ -546,7 +546,7 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
           Is residential address the same with permanent address?
         </div>
         {!data.isResidenceSameWithPermanentAddress && (
-        <Fieldset legend="Permanent Address">
+        <Fieldset legend="Permanent Address" className="bg-muted">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Province */}
             <div>

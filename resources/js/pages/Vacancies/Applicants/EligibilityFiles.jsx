@@ -18,16 +18,16 @@ const EligibilityFiles = ({req}) => {
                 <Table>
                     <TableHeader className="border-b">
                         <TableRow className="bg-muted text-xs">
-                            <TableHead className="w-[40%] border-l">Career Service / RA 1080 (Board / Bar) Under Special Laws / CES / CSEE Barangay Eligibility / Driver's License</TableHead>
-                            <TableHead className="w-[20%]">Date of Examination<br/>/ Conferment</TableHead>
-                            <TableHead className="w-[30%]">Attachment</TableHead>
+                            <TableHead className="w-[40%] border-l uppercase font-semibold text-[13px]">Career Service / RA 1080 (Board / Bar) Under Special Laws / CES / CSEE Barangay Eligibility / Driver's License</TableHead>
+                            <TableHead className="w-[20%] uppercase font-semibold text-[13px]">Date of Examination<br/>/ Conferment</TableHead>
+                            <TableHead className="w-[30%] uppercase font-semibold text-[13px]">Attachment</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
-                        <TableCell className="border-l">{sub.eligibility} ({sub.rating})</TableCell>
-                        <TableCell>
+                        <TableCell className="border-l font-medium">{sub.eligibility} ({sub.rating})</TableCell>
+                        <TableCell className="font-medium">
                             {formatDate(sub.exam_date)}
                         </TableCell>
                         <TableCell>

@@ -18,28 +18,28 @@ const EducationFiles = ({req}) => {
                 <Table>
                     <TableHeader className="border-b">
                         <TableRow className="bg-muted text-xs">
-                            <TableHead className="w-[40%] border-l">
-                                <div className="flex flex-col">
+                            <TableHead className="w-[40%] border-l uppercase font-semibold text-[13px]">
+                                <div className="flex flex-col p-2">
                                     <span>(a) Level</span>
                                     <span>(b) Name of School</span>
                                     <span>(c) Basic Education/Degree/Course</span>
                                 </div>
                             </TableHead>
-                            <TableHead className="w-[20%]">Year Graduated</TableHead>
-                            <TableHead className="w-[30%]">Attachment</TableHead>
+                            <TableHead className="w-[20%] uppercase font-semibold text-[13px]">Year Graduated</TableHead>
+                            <TableHead className="w-[30%] uppercase font-semibold text-[13px]">Attachment</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
                         <TableCell className="border-l">
-                            <div className="flex flex-col">
+                            <div className="flex flex-col font-medium">
                                 <span>(a) {sub.level}</span>
                                 <span>(b) {sub.school}</span>
                                 <span>(c) {sub.course}</span>
                             </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium">
                         {sub.year_graduated}
                         </TableCell>
                         <TableCell>

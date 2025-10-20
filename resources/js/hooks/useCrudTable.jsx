@@ -292,7 +292,7 @@ export default function useCrudTable({
         return (
           <TableRow className={cn("group transition hover:bg-muted/50", isSelected && "bg-muted")}>
             {row.getVisibleCells().map((cell) => (
-              <TableCell key={cell.id}>
+              <TableCell key={cell.id} className="font-medium">
                 {cell.column.id === "actions" ? (
                   <div className="flex gap-1 justify-end items-center w-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                     {enableGenerateReport && generateReportEndpoint && (!row.original.isLocked || canModify) && (
@@ -515,7 +515,7 @@ export default function useCrudTable({
                         <TableHead
                           key={header.id}
                           className={cn(
-                            "sticky top-0 text-black select-none bg-secondary",
+                            "sticky top-0 text-black select-none bg-secondary uppercase font-semibold text-[13px]",
                             header.column.columnDef.meta?.className
                           )}
                         >

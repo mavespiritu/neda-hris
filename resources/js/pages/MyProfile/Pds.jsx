@@ -49,6 +49,7 @@ const normalizeData = (data) => {
 const toKebabCase = (str) => str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()
 
 export default function Pds({redirect}) {
+
   const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(0)
   const [completedSteps, setCompletedSteps] = useState([])
@@ -62,9 +63,11 @@ export default function Pds({redirect}) {
     fetchPdsSection(currentSection)
   }, [currentSection])
 
-  useEffect(() => {
+
+   useEffect(() => {
     fetchProgress()
-  }, [])
+  }, []) 
+
 
   useEffect(() => {
   if (progress) {
@@ -108,6 +111,7 @@ export default function Pds({redirect}) {
       ...prev,
       [currentSection]: normalizeData(pdsState[currentSection])
     }))
+    
   }, [pdsState[currentSection]])
 
   const totalSteps = steps.length // exclude last submit step
