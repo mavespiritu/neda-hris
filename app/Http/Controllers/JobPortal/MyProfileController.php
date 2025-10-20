@@ -449,6 +449,8 @@ class MyProfileController extends Controller
                 $familyBackground->children = $applicantChildrenData;
             } elseif ($isStaffDb) {
                 $staffChildrenData = $this->fetchStaffChildren($staffConn, $user->ipms_id);
+
+                $children = [];
                 
                 if($staffChildrenData->isNotEmpty()) {
                     foreach($staffChildrenData as $child) {
@@ -1285,6 +1287,8 @@ class MyProfileController extends Controller
         $learningAndDevelopments = $request['learningAndDevelopment'];
 
         foreach ($learningAndDevelopments as $learningAndDevelopment) {
+
+            unset($learningAndDevelopment['training_title']);
 
             $cleanedHours = preg_replace('/[^0-9.]/', '', $learningAndDevelopment['hours']);
             $learningAndDevelopment['hours'] = (float) $cleanedHours;

@@ -796,7 +796,7 @@ const usePdsStore = create((set, get) => ({
           learningAndDevelopment: [
             ...state.pdsState.learningAndDevelopment,
             {
-                training_title: "",
+                seminar_title: "",
                 from_date: "",
                 to_date: "",
                 hours: "",

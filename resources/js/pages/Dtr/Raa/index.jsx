@@ -321,7 +321,7 @@ const Raa = () => {
         initialData: targets,
         filters,
         options: {
-            enableAdd: true,
+            enableAdd: false,
             enableEdit: true,
             enableView: false,
             enableViewAsLink: false,
