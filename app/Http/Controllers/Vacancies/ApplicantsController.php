@@ -256,6 +256,7 @@ class ApplicantsController extends Controller
 
         $educations = $conn->table('application_education')
             ->where('application_id', $application->id)
+            ->whereNotIn('level', ['Elementary', 'Secondary'])
             ->orderByDesc('to_year')
             ->get();
 
@@ -264,10 +265,11 @@ class ApplicantsController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $learnings = $conn->table('application_learning')
-            ->where('application_id', $application->id)
-            ->orderByDesc('from_date')
-            ->get();
+        $totalTrainingHours = $conn->table('application_learning')
+        ->where('application_id', $application->id)
+        ->sum('hours_');
+
+        dd($educations);
 
         $workExperiences = $conn->table('application_work_experience')
             ->where('application_id', $application->id)

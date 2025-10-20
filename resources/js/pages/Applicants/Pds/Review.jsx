@@ -14,7 +14,7 @@ import { useState, useEffect } from 'react'
 import { useForm, Link } from '@inertiajs/react'
 import Question from "./Question"
 import { formatDate, formatNumberWithCommas } from "@/lib/utils.jsx"
-import { getProvinceName, getCitymunName, getBarangayName } from '../api'
+import { getProvinceName, getCitymunName, getBarangayName } from '@/api/psgc'
 import {
   Table,
   TableBody,

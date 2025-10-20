@@ -18,28 +18,28 @@ const WorkExperienceFiles = ({req}) => {
                 <Table>
                     <TableHeader className="border-b">
                         <TableRow className="bg-muted text-xs">
-                            <TableHead className="w-[40%] border-l">
-                                <div className="flex flex-col">
+                            <TableHead className="w-[40%] border-l uppercase font-semibold text-[13px]">
+                                <div className="flex flex-col p-2">
                                     <span>(a) Dept/Agency/Office/Company</span>
                                     <span>(b) Position</span>
                                     <span>(c) Monthly Salary</span>
                                 </div>
                             </TableHead>
-                            <TableHead className="w-[20%]">Duration</TableHead>
-                            <TableHead className="w-[30%]">Attachment</TableHead>
+                            <TableHead className="w-[20%] uppercase font-semibold text-[13px]">Duration</TableHead>
+                            <TableHead className="w-[30%] uppercase font-semibold text-[13px]">Attachment</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
-                        <TableCell className="border-l">
+                        <TableCell className="border-l font-medium">
                             <div className="flex flex-col">
                                 <span>(a) {sub.agency}</span>
                                 <span>(b) {sub.position}</span>
                                 <span>(c) P{formatNumberWithCommas(sub.monthly_salary)}</span>
                             </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium">
                         {formatDateRange(sub.from_date,sub.to_date)}
                         </TableCell>
                         <TableCell>

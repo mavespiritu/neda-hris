@@ -31,12 +31,6 @@ import {
 
 const MyProfile = () => {
 
-  /* const canViewPage = useHasRole(['HRIS_HR', 'HRIS_Administrator'])
-
-  if (!canViewPage) {
-    return <p className="font-semibold flex justify-center items-center h-full">You do not have permission to view this page.</p>
-  } */
-
   const breadcrumbItems = [
     { label: 'My Profile', href: '/' },
   ]
@@ -55,7 +49,7 @@ const MyProfile = () => {
   return (
     <div className="flex flex-col gap-4">
       <PageTitle pageTitle="My Profile" description="Make sure your personal data sheet is updated before submitting an application." />
-      <Pds redirect={redirect}/>
+      <Pds redirect={redirect} />
     </div>
   )
 }

@@ -236,7 +236,6 @@ trait FetchOtherInformation
                     unset($subQ);
                 }
             }
-            unset($q);
 
             return $questions;
     }

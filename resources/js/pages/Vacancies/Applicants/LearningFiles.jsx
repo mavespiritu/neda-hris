@@ -18,16 +18,16 @@ const LearningFiles = ({req}) => {
                 <Table>
                     <TableHeader className="border-b">
                         <TableRow className="bg-muted text-xs">
-                            <TableHead className="w-[40%] border-l">Title of Learning and Development Interventions / Training Programs</TableHead>
-                            <TableHead className="w-[20%]">Date</TableHead>
-                            <TableHead className="w-[30%]">Attachment</TableHead>
+                            <TableHead className="w-[40%] border-l uppercase font-semibold text-[13px]">Title of Learning and Development Interventions / Training Programs</TableHead>
+                            <TableHead className="w-[20%] uppercase font-semibold text-[13px]">Date</TableHead>
+                            <TableHead className="w-[30%] uppercase font-semibold text-[13px]">Attachment</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                     {req.subItems.map((sub, i) => (
                         <TableRow key={i}>
-                        <TableCell className="border-l">{sub.seminar_title}</TableCell>
-                        <TableCell>
+                        <TableCell className="border-l font-medium">{sub.seminar_title}</TableCell>
+                        <TableCell className="font-medium">
                             {formatDateRange(sub.from_date, sub.to_date)}
                         </TableCell>
                         <TableCell>

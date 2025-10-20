@@ -1,5 +1,6 @@
 // src/Pages/JobPortal/Applicants/AssessApplicantForm.jsx
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
+import axios from "axios"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,14 @@ import clsx from "clsx"
 
 const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [profileData, setProfileData] = useState({
+    education: [],
+    training: [],
+    experience: [],
+    eligibility: [],
+  })
+
   const [form, setForm] = useState({
     remarks: "",
     prescribed: {
@@ -40,6 +49,31 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
       eligibility: { status: false, remarks: "" },
     },
   })
+
+  // 🧩 Fetch applicant qualifications from backend
+  useEffect(() => {
+  if (!open || !applicant?.id) return
+  const fetchQualifications = async () => {
+    try {
+      setIsLoadingProfile(true)
+      const { data } = await axios.get(
+        route("vacancies.applicants.qualifications", applicant.id)
+      )
+      setProfileData({
+        education: data.educations || [],
+        training: data.learnings || [],
+        experience: data.workExperiences || [],
+        eligibility: data.eligibilities || [],
+      })
+    } catch (error) {
+      console.error("Error fetching qualifications:", error)
+    } finally {
+      setIsLoadingProfile(false)
+    }
+  }
+
+  fetchQualifications()
+}, [open, applicant?.id])
 
   const handleQualificationChange = (section, key, field, value) => {
     setForm((prev) => ({
@@ -57,7 +91,6 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
-
     try {
       await new Promise((resolve) => setTimeout(resolve, 800))
       console.log("Assessment saved for:", applicant?.name, form)
@@ -93,23 +126,76 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
     return allPassed ? "Passed" : "Failed"
   }, [form.preferred])
 
-  // Overall status (optional)
-  const overallStatus = prescribedStatus === "Passed" && preferredStatus === "Passed" ? "Passed" : "Failed"
+  const overallStatus =
+    prescribedStatus === "Passed" && preferredStatus === "Passed" ? "Passed" : "Failed"
+
+  const renderProfileColumn = (key) => {
+    if (isLoadingProfile) return <span className="text-gray-400 text-xs italic">Loading...</span>
+
+    const items = profileData[key] || []
+    if (!items.length) return <span className="text-gray-400 text-xs italic">No record</span>
+
+    // Custom display per type
+    switch (key) {
+      case "education":
+        return (
+          <ul className="text-xs list-disc ml-4">
+            {items.map((edu, i) => (
+              <li key={i}>
+                {edu.degree || edu.course} – {edu.school_name} ({edu.to_year})
+              </li>
+            ))}
+          </ul>
+        )
+      case "training":
+        return (
+          <ul className="text-xs list-disc ml-4">
+            {items.map((t, i) => (
+              <li key={i}>
+                {t.title} ({t.hours_no} hrs)
+              </li>
+            ))}
+          </ul>
+        )
+      case "experience":
+        return (
+          <ul className="text-xs list-disc ml-4">
+            {items.map((exp, i) => (
+              <li key={i}>
+                {exp.position_title} – {exp.company_name}
+              </li>
+            ))}
+          </ul>
+        )
+      case "eligibility":
+        return (
+          <ul className="text-xs list-disc ml-4">
+            {items.map((e, i) => (
+              <li key={i}>
+                {e.eligibility} ({e.rating || "No rating"})
+              </li>
+            ))}
+          </ul>
+        )
+      default:
+        return null
+    }
+  }
 
   const renderQualificationTable = (sectionName, sectionLabel, qualifications, status) => (
     <div className="flex flex-col gap-2">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">{sectionLabel}</h3>
         <div className="flex gap-2 items-center">
-            <span className="text-xs">Status:</span>
-            <div
+          <span className="text-xs">Status:</span>
+          <div
             className={clsx(
-                "font-semibold text-base",
-                status === "Passed" ? "text-green-600" : "text-red-600"
+              "font-semibold text-base",
+              status === "Passed" ? "text-green-600" : "text-red-600"
             )}
-            >
+          >
             {status}
-            </div>
+          </div>
         </div>
       </div>
 
@@ -117,10 +203,10 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted">
-              <TableHead className="w-[20%]">Qualification</TableHead>
-              <TableHead className="w-[25%]">Required</TableHead>
-              <TableHead className="w-[10%] text-center">Status</TableHead>
-              <TableHead className="w-[45%]">Remarks</TableHead>
+              <TableHead className="w-[30%]">Qualification</TableHead>
+              <TableHead className="w-[25%]">From Profile</TableHead>
+              <TableHead className="w-[15%] text-center">Status</TableHead>
+              <TableHead className="w-[30%]">Remarks</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,7 +225,9 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
                     )}
                   </div>
                 </TableCell>
-                <TableCell></TableCell>
+
+                <TableCell className="align-top pt-3">{renderProfileColumn(q.key)}</TableCell>
+
                 <TableCell className="text-center align-top pt-3">
                   <Switch
                     checked={form[sectionName][q.key].status}
@@ -148,6 +236,7 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
                     }
                   />
                 </TableCell>
+
                 <TableCell className="align-top pt-3">
                   <Textarea
                     value={form[sectionName][q.key].remarks}
@@ -195,18 +284,23 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Scrollable content */}
         <ScrollArea className="flex-1 pr-4">
           <form onSubmit={handleSubmit} className="flex flex-col gap-6 pb-4">
-            {/* Prescribed section */}
-            {renderQualificationTable("prescribed", "CSC-Prescribed Qualifications", prescribedQualifications, prescribedStatus)}
-
-            {/* Preferred section only visible if prescribed all passed */}
-            {prescribedStatus === "Passed" && (
-              renderQualificationTable("preferred", "Preferred Qualifications", preferredQualifications, preferredStatus)
+            {renderQualificationTable(
+              "prescribed",
+              "CSC-Prescribed Qualifications",
+              prescribedQualifications,
+              prescribedStatus
             )}
 
-            {/* Hide general remarks until prescribed passed */}
+            {prescribedStatus === "Passed" &&
+              renderQualificationTable(
+                "preferred",
+                "Preferred Qualifications",
+                preferredQualifications,
+                preferredStatus
+              )}
+
             {prescribedStatus === "Passed" && (
               <div>
                 <label className="block text-sm font-medium mb-1">General Remarks</label>

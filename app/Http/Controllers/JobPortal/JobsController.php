@@ -239,6 +239,7 @@ class JobsController extends Controller
                 'publication_id' => $vacancy->publication_id,
                 'vacancy_id'     => $vacancy->id,
                 'user_id'        => auth()->user()->id,
+                'applicant_id'   => $applicantId,
                 'type'           => $request['type'] ?? 'manual',
                 'date_created'   => now(),
                 'status'         => 'Draft',
