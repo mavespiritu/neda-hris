@@ -506,12 +506,12 @@ class ApplicantsController extends Controller
 
             'father.last_name' => 'required',
             'father.first_name' => 'required',
-            'father.birth_date' => 'required|date',
+            //'father.birth_date' => 'required|date',
 
             'mother.last_name' => 'required',
             'mother.first_name' => 'required',
             'mother.maiden_name' => 'required',
-            'mother.birth_date' => 'required|date',
+            //'mother.birth_date' => 'required|date',
 
             'children.*.last_name' => 'required',
             'children.*.first_name' => 'required',
@@ -526,14 +526,14 @@ class ApplicantsController extends Controller
 
             'father.last_name.required' => 'The father\'s last name is required.',
             'father.first_name.required' => 'The father\'s first name is required.',
-            'father.birth_date.required' => 'The father\'s birth date is required.',
-            'father.birth_date.date' => 'The father\'s birth date must be a valid date.',
+            //'father.birth_date.required' => 'The father\'s birth date is required.',
+            //'father.birth_date.date' => 'The father\'s birth date must be a valid date.',
 
             'mother.last_name.required' => 'The mother\'s last name is required.',
             'mother.first_name.required' => 'The mother\'s first name is required.',
             'mother.maiden_name.required' => 'The mother\'s maiden name is required.',
-            'mother.birth_date.required' => 'The mother\'s birth date is required.',
-            'mother.birth_date.date' => 'The mother\'s birth date must be a valid date.',
+            //'mother.birth_date.required' => 'The mother\'s birth date is required.',
+            //'mother.birth_date.date' => 'The mother\'s birth date must be a valid date.',
 
             'children.*.last_name.required' => 'Each child\'s last name is required.',
             'children.*.first_name.required' => 'Each child\'s first name is required.',
@@ -545,6 +545,10 @@ class ApplicantsController extends Controller
         $father = $request['father'];
         $mother = $request['mother'];
         $children = $request['children'];
+
+        $spouse['hasSpouse'] = $spouse['isThereSpouse'];
+
+        unset($spouse['isThereSpouse']);
 
         $spouse['hasSpouse'] = $request['isThereSpouse'];
 
@@ -863,24 +867,23 @@ class ApplicantsController extends Controller
     }
 
     private function storeCivilServiceEligibilty($request, $conn, $applicantId)
-    {
-   
+    {   
         $validated = $request->validate([
             'civilServiceEligibility.*.eligibility' => 'required',
             'civilServiceEligibility.*.rating' => 'required',
-            'civilServiceEligibility.*.exam_date' => 'required|date',
+            //'civilServiceEligibility.*.exam_date' => 'required|date',
             'civilServiceEligibility.*.exam_place' => 'required',
             'civilServiceEligibility.*.license_no' => 'required',
-            'civilServiceEligibility.*.validity_date' => 'required|date',
+            //'civilServiceEligibility.*.validity_date' => 'required|date',
         ], [
             'civilServiceEligibility.*.eligibility.required' => 'Each eligibility\'s title is required.',
             'civilServiceEligibility.*.rating.required' => 'Each eligibility\'s rating is required.',
-            'civilServiceEligibility.*.exam_date.required' => 'Each eligibility\'s examination date is required.',
-            'civilServiceEligibility.*.exam_date.date' => 'Must be a valid date',
+            //'civilServiceEligibility.*.exam_date.required' => 'Each eligibility\'s examination date is required.',
+            //'civilServiceEligibility.*.exam_date.date' => 'Must be a valid date',
             'civilServiceEligibility.*.exam_place.required' => 'Each eligibility\'s examination place is required.',
             'civilServiceEligibility.*.license_no.required' => 'Each eligibility\'s license number is required.',
-            'civilServiceEligibility.*.validity_date.required' => 'Each eligibility\'s validity date is required.',
-            'civilServiceEligibility.*.validity_date.date' => 'Must be a valid date',   
+            //'civilServiceEligibility.*.validity_date.required' => 'Each eligibility\'s validity date is required.',
+            //'civilServiceEligibility.*.validity_date.date' => 'Must be a valid date',   
         ]);
 
         try{
@@ -898,12 +901,12 @@ class ApplicantsController extends Controller
             foreach ($eligibilities as $eligibility) {
                 $data = [
                     'applicant_id' => $applicantId,
-                    'eligibility' => $eligibility['eligibility'],
-                    'rating' => $eligibility['rating'],
-                    'exam_date' => $eligibility['exam_date'],
-                    'exam_place' => $eligibility['exam_place'],
-                    'license_no' => $eligibility['license_no'],
-                    'validity_date' => $eligibility['validity_date'],
+                    'eligibility' => $eligibility['eligibility'] ?? null,
+                    'rating' => $eligibility['rating'] ?? null,
+                    'exam_date' => $eligibility['exam_date'] ?? null,
+                    'exam_place' => $eligibility['exam_place'] ?? null,
+                    'license_no' => $eligibility['license_no'] ?? null,
+                    'validity_date' => $eligibility['validity_date'] ?? null,
                 ];
 
                 if (isset($eligibility['id']) && in_array($eligibility['id'], $existingIds)) {

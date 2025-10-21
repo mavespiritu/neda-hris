@@ -2,16 +2,12 @@ import { Card, CardDescription, CardContent, CardFooter, CardHeader, CardTitle }
 import { Label } from "@/components/ui/label"
 import DatePicker from "@/components/DatePicker"
 import { Button } from "@/components/ui/button"
-import { Fieldset } from "@/components/Fieldset"
 import { FileText, Plus, Trash2 } from 'lucide-react'
-import SingleComboBox from "@/components/SingleComboBox"
-import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import TextInput from "@/components/TextInput"
-import { YearPicker } from "@/components/YearPicker"
 import PageTitle from "@/components/PageTitle"
 import { useForm, usePage, Link } from '@inertiajs/react'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { 
     ChevronLeft,
     Loader2
@@ -38,11 +34,17 @@ const CivilServiceEligibility = () => {
 
   const { data, setData, put, processing, errors } = useForm({
     step: 'civilServiceEligibility',
-    civilServiceEligibility,
+    civilServiceEligibility: civilServiceEligibility?.map(item => ({
+      _key: `${Date.now()}-${Math.random()}`, // assign stable key for existing entries too
+      ...item
+    })) || [],
   })
+
+  console.log(data)
 
   const handleAddEligibility = () => {
     const newEligibility = {
+      _key: `${Date.now()}-${Math.random()}`, // unique key
       eligibility: "",
       rating: "",
       exam_date: "",
@@ -62,13 +64,12 @@ const CivilServiceEligibility = () => {
   }
 
   const handleRemoveEligibility = (index) => {
-    const updated = data.eligibilities.filter((_, i) => i !== index)
+    const updated = data.civilServiceEligibility.filter((_, i) => i !== index)
     setData("civilServiceEligibility", updated)
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    
     put(route('applicants.update', applicant.id)) 
   }
 
@@ -108,7 +109,7 @@ const CivilServiceEligibility = () => {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
               {data.civilServiceEligibility?.map((child, index) => (
-                <Card key={index}>
+                <Card key={child._key}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-semibold">
                       Civil Service Eligibility Entry # {index + 1}
@@ -120,7 +121,6 @@ const CivilServiceEligibility = () => {
                         className="flex"
                         size="sm"
                         >
-                        
                         <Trash2 className="h-4 w-4" />
                         <span className="hidden md:block">Remove</span>
                     </Button>
@@ -135,7 +135,7 @@ const CivilServiceEligibility = () => {
                           onChange={(e) => handleUpdateEligibility(index, 'eligibility', e.target.value)}
                           isInvalid={!!errors[`civilServiceEligibility.${index}.eligibility`]}
                         />
-                        {errors[`${index}.eligibility`] && (
+                        {errors[`civilServiceEligibility.${index}.eligibility`] && (
                           <p className="text-red-500 text-xs mt-1">
                             {errors[`civilServiceEligibility.${index}.eligibility`]}
                           </p>
