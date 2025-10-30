@@ -1339,7 +1339,7 @@ class ApplicantsController extends Controller
                         ->where('id', $learningAndDevelopment['id'])
                         ->update($data);
 
-                    $submittedIds[] = $voluntaryWork['id'];
+                    $submittedIds[] = $learningAndDevelopment['id'];
                 } else {
                     $newId = $conn->table('applicant_learning')->insertGetId($data);
 
