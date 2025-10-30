@@ -562,7 +562,7 @@ class JobsController extends Controller
                 \Log::error('Notification sending failed: ' . $notifyError->getMessage());
             }
 
-            return redirect()->route('applications.index')
+            return redirect()->route('my-applications.index')
                 ->with('status', 'success')
                 ->with('title', 'Success!')
                 ->with('message', 'You have successfully submitted your application');

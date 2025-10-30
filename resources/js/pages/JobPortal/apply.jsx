@@ -184,7 +184,7 @@ const apply = () => {
                     </Button>
                 </Link>
                 <Link
-                    href={route('applications.index')}
+                    href={route('my-applications.index')}
                     className="hidden md:block"
                 >
                     <Button

@@ -28,30 +28,29 @@ use Illuminate\Http\Request;
 }); */
 
 Route::get('/', function (Request $request) {
-    if (auth()->check()) {
-        return redirect('/dashboard');
+    if (auth('web')->check() || auth('applicant')->check()) {
+        return Inertia::location('/dashboard');
     }
 
     return app(HomeController::class)->index($request);
 })->name('home');
 
-Route::middleware(['web', 'auth'])->group(function () {
-    Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
-});
-
-
 Route::get('/dashboard', function () {
     if (auth()->check()) {
         $user = auth()->user();
 
-        if (!empty($user->ipms_id)) {
+        if (!is_null($user->ipms_id)) {
             return Inertia::render('Dashboard/index');
         } else {
-            return redirect('/applications');
+            return redirect('/my-applications');
         }
     }
 })->middleware(['auth.any', 'verified'])->name('dashboard');
+
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -111,6 +110,7 @@ require __DIR__ . '/settings.php';
 
 require __DIR__ . '/applicant.php';
 require __DIR__ . '/applicants.php';
+require __DIR__ . '/applications.php';
 
 require __DIR__ . '/publications.php';
 require __DIR__ . '/vacancies.php';
@@ -119,7 +119,7 @@ require __DIR__ . '/vacancies.applicants.php';
 require __DIR__ . '/trainings.php';
 
 require __DIR__ . '/jobs.php';
-require __DIR__ . '/applications.php';
+require __DIR__ . '/jobs.applications.php';
 
 require __DIR__ . '/file.php';
 require __DIR__ . '/issue.php';

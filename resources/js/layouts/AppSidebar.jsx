@@ -78,7 +78,7 @@ const AppSidebar = () => {
     },
     {
       title: "My Applications",
-      url: "/applications",
+      url: "/my-applications",
       icon: ClipboardPenLine,
     },
     {

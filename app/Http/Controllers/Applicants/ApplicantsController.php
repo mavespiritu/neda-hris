@@ -546,10 +546,6 @@ class ApplicantsController extends Controller
         $mother = $request['mother'];
         $children = $request['children'];
 
-        $spouse['hasSpouse'] = $spouse['isThereSpouse'];
-
-        unset($spouse['isThereSpouse']);
-
         $spouse['hasSpouse'] = $request['isThereSpouse'];
 
         try{
