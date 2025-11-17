@@ -136,7 +136,7 @@ const Applications = () => {
                           {app.latest_status === "Draft" ? (
                             <>
                               <button
-                                onClick={() => router.get(route("jobs.apply", { hashedId: app.hashed_id }))} 
+                                onClick={() => router.post(route("jobs.store", { hashedId: app.hashed_id }))} 
                                 className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100"
                               >
                                 Continue Application
