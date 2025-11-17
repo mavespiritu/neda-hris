@@ -49,6 +49,8 @@ import PaginationControls from "@/components/PaginationControls"
 const Applications = () => {
   const { flash, data: { applications } } = usePage().props
 
+  console.log(applications)
+
   const {
     data,
     current_page,
@@ -103,7 +105,9 @@ const Applications = () => {
                   onClick={() => setSelectedApplication(app)}
                 >
                   <TableCell className="font-medium text-blue-600">
-                    {`${app.reference_no}-${app.item_no}`}
+                    {app.appointment_status === "Permanent"
+                      ? `${app.reference_no}-${app.item_no}`
+                      : `${app.reference_no}-${app.position}`}
                   </TableCell>
                   <TableCell>{app.position}</TableCell>
                   <TableCell className="capitalize">

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils.jsx"
 import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
+import Form from "./Form"
 import Filter from "./Filter"
 import useCrudTable from "@/hooks/useCrudTable"
 import StatusBadge from '@/components/StatusBadge'
@@ -30,7 +31,7 @@ const Applications = () => {
 
     const { toast } = useToast()
 
-    /* const appointmentStatuses = useMemo(() => [
+    const appointmentStatuses = useMemo(() => [
         { label: 'Permanent', value: 'Permanent'},
         { label: 'Casual', value: 'Casual'},
         { label: 'Contractual', value: 'Contractual'},
@@ -46,18 +47,9 @@ const Applications = () => {
         { value: 'PMED', label: 'Monitoring and Evaluation Division'},
         { value: 'PDIPBD', label: 'Project Development, Investment Programming and Budgeting Division'},
         { value: 'PFPD', label: 'Policy Formulation and Planning Division'},
-    ], []) */
+    ], [])
 
     const { auth: { user }, data: { applications } } = usePage().props
-
-    const canSelectVacancy = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
-
-    const [confirmAction, setConfirmAction] = useState(null)
-    const [selectedRow, setSelectedRow] = useState(null)
-    
-    const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
-        remarks: "",
-    })
 
     const handleAction = (action, row) => {
         setConfirmAction(action)
@@ -119,6 +111,7 @@ const Applications = () => {
         selectedItem,
         handleCloseForm,
         handleCloseFilter,
+        reloadTable
         } = useCrudTable({
         columns,
         routeName: route('applications.index'),
@@ -139,8 +132,6 @@ const Applications = () => {
         },
         endpoints: {
             viewEndpoint: (id) => route('applications.show', id),
-            addEndpoint: route('applications.create'),
-            editEndpoint: (id) => route('applications.edit', id),
             deleteEndpoint: (id) => route('applications.destroy', id),
             bulkDeleteEndpoint: route('applications.bulk-destroy'),
         },
@@ -156,14 +147,26 @@ const Applications = () => {
             />
 
             <TableView />
+
+            {isFormOpen && (
+                <Form
+                    open={isFormOpen}
+                    mode={formMode}
+                    data={selectedItem}
+                    onClose={() => {
+                        handleCloseForm()
+                        reloadTable()
+                    }}
+                />
+            )}
             {isFilterOpen && (
                 <Filter
                     open={isFilterOpen}
                     onClose={handleCloseFilter}
                     onApply={(appliedFilters) => setFilters(appliedFilters)}
                     initialValues={filters}
-                    /* divisions={divisions}
-                    appointmentStatuses={appointmentStatuses} */
+                    divisions={divisions}
+                    appointmentStatuses={appointmentStatuses}
                 />
             )}
         </div>
