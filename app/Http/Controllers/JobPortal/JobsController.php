@@ -47,7 +47,7 @@ class JobsController extends Controller
 
         $publicationIds = $conn2->table('publication')
         ->where('is_public', 1)
-        ->whereRaw("CONCAT(date_closed, ' ', time_closed) >= NOW()")
+        ->whereRaw("CONCAT(date_closed, ' 23:59:59') >= NOW()")
         ->pluck('id');
 
         $vacancyIds = $conn2->table('publication_vacancies')

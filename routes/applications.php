@@ -15,6 +15,13 @@ Route::middleware(['web', 'auth.any'])->group(function () {
         Route::post('/applications/bulk-destroy', [ApplicationsController::class, 'bulkDestroy'])->name('applications.bulk-destroy');
         
         Route::get('/applications/{id}', [ApplicationsController::class, 'show'])->name('applications.show');
+
+        Route::get('/applications/applicant/search', [ApplicationsController::class, 'searchApplicant'])
+        ->name('applications.applicants.search');
+        Route::get('/applications/vacancy/search', [ApplicationsController::class, 'searchVacancy'])
+        ->name('applications.vacancies.search');
+        Route::get('/applications/applicant/{applicantId}/vacancy/{vacancyId}/requirement', [ApplicationsController::class, 'getRequirements'])
+        ->name('applications.requirements');
 });
 
 

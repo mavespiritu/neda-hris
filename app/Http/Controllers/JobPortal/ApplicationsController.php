@@ -58,6 +58,7 @@ class ApplicationsController extends Controller
             $vacancy = $vacancies->get($app->vacancy_id);
 
             $app->reference_no = $vacancy->reference_no ?? null;
+            $app->appointment_status = $vacancy->appointment_status ?? null;
             $app->item_no = $vacancy->item_no ?? null;
             $app->position = $vacancy->position_description ?? null;
             $app->hashed_id = sha1($vacancy->id);

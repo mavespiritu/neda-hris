@@ -99,7 +99,7 @@ class MyProfileController extends Controller
         }
     }
 
-    public function getPersonalInformation(Request $request)
+    public function getPersonalInformation()
     {
         $appConn = DB::connection('mysql');
         $staffConn = DB::connection('mysql3');

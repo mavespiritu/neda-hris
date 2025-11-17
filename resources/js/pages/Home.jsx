@@ -336,7 +336,7 @@ const Home = () => {
               </Card>
             ))
           ) : (
-            <div className="col-span-full flex items-center justify-center text-sm font-semibold h-40">
+            <div className="col-span-full flex items-center justify-center text-sm font-semibold min-h-80">
               No job posting available
             </div>
           )}
