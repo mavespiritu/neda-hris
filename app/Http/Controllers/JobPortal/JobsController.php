@@ -641,15 +641,28 @@ class JobsController extends Controller
         }
 
         $user = auth()->user();
-        $applicant = $conn->table('applicant')->where('user_id', $user->id)->first();
+
+        $applicant = $conn->table('applicant')
+        ->when(is_null($user->ipms_id), function ($query) {
+            return $query->where('type', 'Applicant');
+        }, function ($query) {
+            return $query->where('type', 'Staff');
+        })
+        ->where('user_id', $user->id)
+        ->first();
 
         if (!$applicant) {
             abort(404, 'Applicant not found');
         }
 
-        $application = $conn->table('application')
+        $application = $conn->table('application as a')
         ->where('vacancy_id', $vacancy->id)
-        ->where('user_id', $applicant->user_id)
+        ->where('a.user_id', $user->id)
+        ->when(is_null($user->ipms_id), function ($query) {
+            return $query->where('a.type', 'Applicant');
+        }, function ($query) {
+            return $query->where('a.type', 'Staff');
+        })
         ->first();
 
         if(!$application) {
