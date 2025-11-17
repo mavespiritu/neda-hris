@@ -205,7 +205,15 @@ class JobsController extends Controller
             abort(404, 'Job not found');
         }
 
+        $user = auth()->user();
+
         $existingApp = $conn->table('application')
+            ->leftJoin('applicant', 'application.applicant_id', '=', 'applicant.id')
+             ->when(is_null($user->ipms_id), function ($query) {
+                return $query->where('applicant.type', 'Applicant');
+            }, function ($query) {
+                return $query->where('applicant.type', 'Staff');
+            })
             ->where('vacancy_id', $vacancy->id)
             ->where('user_id', auth()->id())
             ->first();
@@ -224,13 +232,21 @@ class JobsController extends Controller
             $conn->beginTransaction();
 
             $applicant = $conn->table('applicant')
-            ->where('user_id', auth()->user()->id)
+            ->when(is_null($user->ipms_id), function ($query) {
+                return $query->where('type', 'Applicant');
+            }, function ($query) {
+                return $query->where('type', 'Staff');
+            })
+            ->where('user_id', $user->id)
             ->first();
 
             if (!$applicant) {
-                $applicantId = $conn->table('applicant')->insertGetId([
+                $data = [
                     'user_id' => auth()->user()->id,
-                ]);
+                    'type'    => is_null($user->ipms_id) ? 'Applicant' : 'Staff',
+                ];
+
+                $applicantId = $conn->table('applicant')->insertGetId($data);
             } else {
                 $applicantId = $applicant->id;
             }
