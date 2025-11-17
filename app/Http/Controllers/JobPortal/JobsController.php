@@ -534,7 +534,7 @@ class JobsController extends Controller
             abort(404, 'Applicant not found');
         }
 
-        $application = $conn->table('application')
+        $application = $conn->table('application as a')
         ->where('vacancy_id', $vacancy->id)
         ->where('a.user_id', $user->id)
         ->when(is_null($user->ipms_id), function ($query) {
