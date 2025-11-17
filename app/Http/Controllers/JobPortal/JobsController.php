@@ -393,8 +393,15 @@ class JobsController extends Controller
             abort(404, 'Job not found');
         }
 
+        $user = auth()->user();
+
         $applicant = $conn->table('applicant')
-        ->where('user_id', auth()->user()->id)
+        ->when(is_null($user->ipms_id), function ($query) {
+            return $query->where('type', 'Applicant');
+        }, function ($query) {
+            return $query->where('type', 'Staff');
+        })
+        ->where('user_id', $user->id)
         ->first();
 
         if (!$applicant) {
@@ -409,7 +416,12 @@ class JobsController extends Controller
                     )');
             })
             ->where('a.vacancy_id', $vacancy->id)
-            ->where('a.user_id', auth()->user()->id)
+            ->where('a.user_id', $user->id)
+            ->when(is_null($user->ipms_id), function ($query) {
+                return $query->where('a.type', 'Applicant');
+            }, function ($query) {
+                return $query->where('a.type', 'Staff');
+            })
             ->select('a.*', 's.status as latest_status')
             ->first();
 
@@ -449,8 +461,12 @@ class JobsController extends Controller
 
         $progress = $conn->table('applicant_pds')
             ->leftJoin('applicant', 'applicant.id', '=', 'applicant_pds.applicant_id')
-            ->where('applicant.user_id', auth()->user()->id)
-            ->where('type', auth()->user()->ipms_id ? 'Staff' : 'Applicant')
+            ->where('applicant.user_id', $user->id)
+            ->when(is_null($user->ipms_id), function ($query) {
+                return $query->where('a.type', 'Applicant');
+            }, function ($query) {
+                return $query->where('a.type', 'Staff');
+            })
             ->count();
 
         return Inertia::render('JobPortal/apply', [
@@ -486,8 +502,15 @@ class JobsController extends Controller
             abort(404, 'Job not found');
         }
 
+        $user = auth()->user();
+
         $applicant = $conn->table('applicant')
-        ->where('user_id', auth()->user()->id)
+        ->when(is_null($user->ipms_id), function ($query) {
+            return $query->where('type', 'Applicant');
+        }, function ($query) {
+            return $query->where('type', 'Staff');
+        })
+        ->where('user_id', $user->id)
         ->first();
 
         if (!$applicant) {
@@ -496,7 +519,12 @@ class JobsController extends Controller
 
         $application = $conn->table('application')
         ->where('vacancy_id', $vacancy->id)
-        ->where('user_id', $applicant->user_id)
+        ->where('a.user_id', $user->id)
+        ->when(is_null($user->ipms_id), function ($query) {
+            return $query->where('a.type', 'Applicant');
+        }, function ($query) {
+            return $query->where('a.type', 'Staff');
+        })
         ->first();
 
         if(!$application) {
