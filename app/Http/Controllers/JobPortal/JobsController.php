@@ -215,7 +215,7 @@ class JobsController extends Controller
                 return $query->where('applicant.type', 'Staff');
             })
             ->where('vacancy_id', $vacancy->id)
-            ->where('user_id', auth()->id())
+            ->where('application.user_id', $user->id)
             ->first();
 
         if ($existingApp) {
@@ -425,6 +425,7 @@ class JobsController extends Controller
         }
 
         $application = $conn->table('application as a')
+            ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
             ->leftJoin('application_status as s', function ($join) {
                 $join->on('s.application_id', '=', 'a.id')
                     ->whereRaw('s.id = (
@@ -434,9 +435,9 @@ class JobsController extends Controller
             ->where('a.vacancy_id', $vacancy->id)
             ->where('a.user_id', $user->id)
             ->when(is_null($user->ipms_id), function ($query) {
-                return $query->where('a.type', 'Applicant');
+                return $query->where('ap.type', 'Applicant');
             }, function ($query) {
-                return $query->where('a.type', 'Staff');
+                return $query->where('ap.type', 'Staff');
             })
             ->select('a.*', 's.status as latest_status')
             ->first();
@@ -479,9 +480,9 @@ class JobsController extends Controller
             ->leftJoin('applicant', 'applicant.id', '=', 'applicant_pds.applicant_id')
             ->where('applicant.user_id', $user->id)
             ->when(is_null($user->ipms_id), function ($query) {
-                return $query->where('a.type', 'Applicant');
+                return $query->where('applicant.type', 'Applicant');
             }, function ($query) {
-                return $query->where('a.type', 'Staff');
+                return $query->where('applicant.type', 'Staff');
             })
             ->count();
 
