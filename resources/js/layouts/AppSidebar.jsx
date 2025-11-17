@@ -48,7 +48,8 @@ import {
   Files,
   ClipboardPenLine,
   NotebookPen,
-  Users
+  Users,
+  Briefcase
 } from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
@@ -98,6 +99,7 @@ const AppSidebar = () => {
       roles: ['HRIS_HR', 'HRIS_DC', 'HRIS_ADC'],
       submenu: [
         { title: 'Applicants', url: '/applicants', roles: ['HRIS_HR', 'HRIS_DC'], icon: Users },
+        { title: 'Applications', url: '/applications', roles: ['HRIS_HR', 'HRIS_DC'], icon: Briefcase },
         { title: 'Vacancies', url: '/vacancies', roles: ['HRIS_HR', 'HRIS_DC'], icon: ClipboardList },
         { title: 'Publications', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Pin },
         /* { title: 'Positions', url: '/vacancies', roles: ['HRIS_HR'], icon: IdCard },
