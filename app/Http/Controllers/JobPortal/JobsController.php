@@ -656,12 +656,13 @@ class JobsController extends Controller
         }
 
         $application = $conn->table('application as a')
+        ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
         ->where('vacancy_id', $vacancy->id)
         ->where('a.user_id', $user->id)
         ->when(is_null($user->ipms_id), function ($query) {
-            return $query->where('a.type', 'Applicant');
+            return $query->where('ap.type', 'Applicant');
         }, function ($query) {
-            return $query->where('a.type', 'Staff');
+            return $query->where('ap.type', 'Staff');
         })
         ->first();
 
