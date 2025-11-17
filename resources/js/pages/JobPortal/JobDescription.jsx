@@ -54,7 +54,7 @@ const JobDescription = ({action, job, latestApp}) => {
                         (job.application.latest_status || "").trim().toLowerCase() === "draft" ? (
                             <Button
                             className="w-fit bg-blue-800 hover:bg-blue-700"
-                            onClick={() => router.get(route("jobs.apply", job.hashed_id))}
+                            onClick={() => router.post(route("jobs.store", job.hashed_id))}
                             >
                             Continue Application
                             </Button>
