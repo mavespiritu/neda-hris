@@ -731,7 +731,7 @@ class JobsController extends Controller
     public function storeRequirement($hashedId, Request $request)
     {
         $conn = DB::connection('mysql');  
-        $conn2 = DB::connection('mysql2');  
+        $conn2 = DB::connection('mysql2'); 
 
         $request->validate([
             'newFiles'   => 'required|array|min:1',
