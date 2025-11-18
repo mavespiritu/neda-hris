@@ -10,8 +10,6 @@ const AuthenticatedLayout = ({ children }) => {
   const { auth } = usePage().props
   const user = auth?.user
 
-  console.log(usePage().props)
-
   const [open, setOpen] = useState(() => {
     const savedState = localStorage.getItem('HRIS_sidebarOpen')
     return savedState ? JSON.parse(savedState) : true
