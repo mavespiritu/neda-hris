@@ -150,7 +150,7 @@ class ApplicantsController extends Controller
         }
 
         $applicant = $conn->table('applicant')
-        ->where('user_id', $application->user_id)
+        ->where('user_id', $application->applicant_id)
         ->first();
 
         if (!$applicant) {
