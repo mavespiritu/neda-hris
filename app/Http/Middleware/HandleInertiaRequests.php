@@ -37,7 +37,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => fn () => $authUser ? array_merge(
-                    $authUser->only(['id', 'name', 'email', 'last_name', 'first_name', 'middle_name', 'ipms_id']),
+                    $authUser->only(['id', 'name', 'email', 'last_name', 'first_name', 'middle_name', 'ipms_id','email_verified_at']),
                     $authUser instanceof User ? [
                         'roles' => $authUser->getAllRolesRecursive()->pluck('name')->toArray(),
                         'permissions' => $authUser->getAllPermissionsRecursive()->pluck('name')->toArray(),

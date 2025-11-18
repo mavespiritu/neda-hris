@@ -10,6 +10,8 @@ const AuthenticatedLayout = ({ children }) => {
   const { auth } = usePage().props
   const user = auth?.user
 
+  console.log(usePage().props)
+
   const [open, setOpen] = useState(() => {
     const savedState = localStorage.getItem('HRIS_sidebarOpen')
     return savedState ? JSON.parse(savedState) : true
@@ -33,7 +35,7 @@ const AuthenticatedLayout = ({ children }) => {
 
       <main className="w-full flex flex-col min-h-screen">
         <Header />
-        {!user?.ipms_id && <SubHeader />}
+        {!user?.ipms_id && user?.email_verified_at && <SubHeader />}
         <div
           className={`flex flex-1 flex-col pt-4 pb-8 ${
             user?.ipms_id
