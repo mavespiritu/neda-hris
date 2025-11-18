@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Publications\DpcrController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::get('/dpcrs', [DpcrController::class, 'index'])->name('dpcrs.index');
 

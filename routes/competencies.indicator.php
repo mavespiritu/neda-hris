@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Competencies\IndicatorController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/indicators', [IndicatorController::class, 'index'])->name('indicators.index');
     Route::post('/indicators', [IndicatorController::class, 'store'])->name('indicators.store');
     Route::put('/indicators/{id}', [IndicatorController::class, 'update'])->name('indicators.update');

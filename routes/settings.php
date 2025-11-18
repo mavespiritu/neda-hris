@@ -5,7 +5,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/settings/cga-enable-updating', [SettingsController::class, 'getCgaEnableUpdatingDates'])->name('settings.get-cga-enable-updating');
 
     Route::get('/settings/cga-submission-schedules', [SettingsController::class, 'getCgaSubmissionSchedules'])->name('settings.cga.submission-schedules');

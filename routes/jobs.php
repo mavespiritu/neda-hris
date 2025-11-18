@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\JobPortal\JobsController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/jobs', [JobsController::class, 'index'])->name('jobs.index');
     Route::post('/jobs/{hashedId}', [JobsController::class, 'store'])->name('jobs.store');
     Route::get('/jobs/{hashedId}', [JobsController::class, 'show'])->name('jobs.show');

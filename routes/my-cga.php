@@ -13,7 +13,7 @@ use App\Http\Controllers\CompareCgaController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/my-cga', [MyCgaController::class, 'index'])->name('my-cga');
 
     Route::get('/my-cga/competencies/{id}', [MyCgaController::class, 'showCompetencies'])->name('my-cga.show-competencies');

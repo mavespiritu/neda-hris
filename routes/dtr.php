@@ -11,7 +11,7 @@ use App\Http\Controllers\Dtr\ScheduleController;
 use App\Http\Controllers\Dtr\ReportController as FwaReportController;
 use App\Http\Middleware\AccessControl;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::get('/fwa', [FwaController::class, 'index'])->name('fwa.index');
     Route::post('/fwa', [FwaController::class, 'store'])->name('fwa.store');

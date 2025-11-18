@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Competencies\CompetencyController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/competencies', [CompetencyController::class, 'index'])->name('competencies.index');
     Route::post('/competencies', [CompetencyController::class, 'store'])->name('competencies.store');
     Route::put('/competencies/{id}', [CompetencyController::class, 'update'])->name('competencies.update');

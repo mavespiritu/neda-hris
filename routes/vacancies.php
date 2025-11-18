@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Vacancies\VacancyController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::get('/vacancies/positions', [VacancyController::class, 'getPositions'])->name('vacancies.get-positions');
 

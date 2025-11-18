@@ -13,7 +13,7 @@ use App\Http\Controllers\CompareCgaController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/employees', [EmployeeController::class, 'getEmployees'])->name('employees');
     Route::get('/employees/all-employees', [EmployeeController::class, 'showAllEmployees'])->name('employees.show-all-employees');
     Route::get('/employees/active-employees', [EmployeeController::class, 'showActiveEmployees'])->name('employees.show-active-employees');

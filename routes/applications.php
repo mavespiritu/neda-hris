@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Applications\ApplicationsController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
      Route::get('/applications', [ApplicationsController::class, 'index'])->name('applications.index');
         Route::get('/applications/create', [ApplicationsController::class, 'create'])->name('applications.create');
         Route::post('/applications', [ApplicationsController::class, 'store'])->name('applications.store');

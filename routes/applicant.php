@@ -7,7 +7,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\JobPortal\MyProfileController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/profile', [MyProfileController::class, 'index'])->name('applicant.index');
 
     Route::get('/applicant/profile', [MyProfileController::class, 'showApplicantInformation'])->name('applicant.show-applicant-information');

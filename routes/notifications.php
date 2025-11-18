@@ -7,7 +7,7 @@ use App\Http\Controllers\NotificationController as GeneralNotificationController
 use App\Http\Controllers\Vacancies\NotificationController as VacancyNotificationController;
 use App\Http\Controllers\JobPortal\NotificationController as JobPortalNotificationController;
 
-Route::middleware(['web', 'auth.any'])->group(function () {
+Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::post('/notification/submit-gap-analysis', [GeneralNotificationController::class, 'submitGapAnalysis'])->name('notification.submit-gap-analysis');
     Route::post('/notification/endorse-gap-analysis', [GeneralNotificationController::class, 'endorseGapAnalysis'])->name('notification.endorse-gap-analysis');
     Route::post('/notification/approve-gap-analysis', [GeneralNotificationController::class, 'approveGapAnalysis'])->name('notification.approve-gap-analysis');
