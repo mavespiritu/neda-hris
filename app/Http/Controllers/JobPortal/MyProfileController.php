@@ -322,9 +322,9 @@ class MyProfileController extends Controller
         }
 
         $data['email_address'] = $data['email_address'] ?? Auth::user()->email;
-        $data['emp_id'] = null;
+        $data['emp_id'] = Auth::user()->ipms_id ?? null;
 
-        $type = 'Applicant';
+        $type = Auth::user()->ipms_id ? 'Staff' : 'Applicant';
 
         $conn->table('applicant')->updateOrInsert(
             [
