@@ -37,6 +37,8 @@ class AuthenticatedSessionController extends Controller
 
         // attempt employee login first
 
+        $user = \App\Models\User::where('email', $request->email)->first();
+
         if (Auth::guard('web')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
 
             $request->session()->regenerate();
@@ -46,6 +48,14 @@ class AuthenticatedSessionController extends Controller
         }
 
         // if employee login failed, try applicant login
+
+        $applicant = \App\Models\Applicant::where('email', $request->email)->first();
+
+        if ($applicant && is_null($applicant->email_verified_at)) { 
+            return back()->withErrors([
+                'email' => 'Your account is not verified yet. Check your inbox for the verification email.',
+            ])->onlyInput('email');
+        }
 
         if (Auth::guard('applicant')->attempt($request->only('email', 'password'), $request->boolean('remember'))) {
 
