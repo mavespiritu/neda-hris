@@ -173,7 +173,7 @@ class JobsController extends Controller
         });
 
         $latestApp = $conn->table('application as a')
-            ->leftJoin('applicant as ap', 'application.applicant_id', '=', 'ap.id')
+            ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
             ->where('a.user_id', auth()->user()->id)
             ->where('ap.type', auth()->user()->ipms_id ? 'Staff' : 'Applicant')
             ->where('a.status', 'Submitted')
