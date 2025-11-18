@@ -305,11 +305,12 @@ class ApplicationsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applications.index')->with([
+            return redirect()->back()->with([
                 'status' => 'success',
                 'title' => 'Success!',
                 'message' => 'Application deleted successfully.'
             ]);
+
         } catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to delete application: ' . $e->getMessage());

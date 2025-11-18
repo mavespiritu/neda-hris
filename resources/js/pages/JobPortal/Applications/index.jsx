@@ -49,8 +49,6 @@ import PaginationControls from "@/components/PaginationControls"
 const Applications = () => {
   const { flash, data: { applications } } = usePage().props
 
-  console.log(applications)
-
   const {
     data,
     current_page,

@@ -25,6 +25,7 @@ class ApplicationsController extends Controller
         $conn2 = DB::connection('mysql2');  
 
         $applications = $conn->table('application as a')
+            ->leftJoin('applicant as ap', 'ap.id', '=', 'a.applicant_id')
             ->leftJoinSub(
                 $conn->table('application_status as s1')
                     ->select('s1.application_id', 's1.status', 's1.created_at')
@@ -44,6 +45,7 @@ class ApplicationsController extends Controller
                 'latest_status.created_at as status_date'
             )
             ->where('a.user_id', auth()->user()->id)
+            ->where('ap.type', auth()->user()->ipms_id ? 'Staff' : 'Applicant')
             ->latest('a.date_created')
             ->paginate(5);
 
