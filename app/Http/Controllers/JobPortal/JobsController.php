@@ -143,6 +143,7 @@ class JobsController extends Controller
             's.status as latest_status',
             's.created_at as status_date'
         ])
+        ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
         ->leftJoin('application_status as s', function ($join) {
             $join->on('s.application_id', '=', 'a.id')
                  ->whereRaw('s.id = (
@@ -150,6 +151,7 @@ class JobsController extends Controller
                  )');
         })
         ->where('a.user_id', auth()->user()->id)
+        ->where('ap.type', auth()->user()->ipms_id ? 'Staff' : 'Applicant')
         ->get()
         ->groupBy('vacancy_id');
 
@@ -170,10 +172,12 @@ class JobsController extends Controller
             return $vacancy;
         });
 
-        $latestApp = $conn->table('application')
-            ->where('user_id', auth()->user()->id)
-            ->where('status', 'Submitted')
-            ->latest('date_submitted')
+        $latestApp = $conn->table('application as a')
+            ->leftJoin('applicant as ap', 'application.applicant_id', '=', 'ap.id')
+            ->where('a.user_id', auth()->user()->id)
+            ->where('ap.type', auth()->user()->ipms_id ? 'Staff' : 'Applicant')
+            ->where('a.status', 'Submitted')
+            ->latest('a.date_submitted')
             ->first();
             
         return Inertia::render('JobPortal/index', [
