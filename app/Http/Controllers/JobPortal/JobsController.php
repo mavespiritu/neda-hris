@@ -535,6 +535,7 @@ class JobsController extends Controller
         }
 
        $application = $conn->table('application as a')
+        ->select('a.*')
         ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
         ->where('vacancy_id', $vacancy->id)
         ->where('a.user_id', $user->id)
@@ -772,6 +773,9 @@ class JobsController extends Controller
             $subRequirementIdInput = $request->input('sub_requirement_id');
             $requirementName    = $request['requirement'];
             $model    = $request['model'];
+
+            $requirementIdInput = ($requirementIdInput === "null" || $requirementIdInput === "") ? null : $requirementIdInput;
+            $subRequirementIdInput = ($subRequirementIdInput === "null" || $subRequirementIdInput === "") ? null : $subRequirementIdInput;
 
             $baseWhere = [
                 'applicant_id'   => $applicantId,
