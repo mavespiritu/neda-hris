@@ -2162,7 +2162,7 @@ class MyCgaController extends Controller
             ];
 
             if($supervisors){
-                Notification::sendNow($supervisors, new CompetenciesForReviewSubmitted($payload));
+                Notification::send($supervisors, new CompetenciesForReviewSubmitted($payload));
             } */
 
             return redirect()->back()->with([

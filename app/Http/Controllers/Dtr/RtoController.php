@@ -618,7 +618,7 @@ class RtoController extends Controller
                         'endorser_id' => $user->ipms_id,
                     ];
 
-                    Notification::sendNow($ard, new NotifyArdOfRtoEndorsement($payload));
+                    Notification::send($ard, new NotifyArdOfRtoEndorsement($payload));
                 }
             }
 
@@ -754,7 +754,7 @@ class RtoController extends Controller
                     'supervisor_emails' => $supervisors->pluck('email')->toArray(),
                 ];
 
-                Notification::sendNow($submitter, new NotifyStaffOfRtoApproval($payload));
+                Notification::send($submitter, new NotifyStaffOfRtoApproval($payload));
             }
 
             // Audit log (optional)
