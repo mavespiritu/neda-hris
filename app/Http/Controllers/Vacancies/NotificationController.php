@@ -79,7 +79,7 @@ class NotificationController extends Controller
             ];
 
             if($ard){
-                Notification::sendNow($ard, new NotifyArdOfVacancySubmission($payload));
+                Notification::send($ard, new NotifyArdOfVacancySubmission($payload));
             }
 
             return redirect()->back()->with([
@@ -167,7 +167,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfVacancyApproval($payload));
+                Notification::send($submitter, new NotifyStaffOfVacancyApproval($payload));
             }
 
             return redirect()->back()->with([
@@ -263,7 +263,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfVacancyDisapproval($payload));
+                Notification::send($submitter, new NotifyStaffOfVacancyDisapproval($payload));
             }
 
             return redirect()->back()->with([
@@ -359,7 +359,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfVacancyReturn($payload));
+                Notification::send($submitter, new NotifyStaffOfVacancyReturn($payload));
             }
 
             return redirect()->back()->with([

@@ -764,7 +764,7 @@ class VacancyController extends Controller
                     'approver_id' => $user->ipms_id,
                 ];
 
-                Notification::sendNow($submitter, new NotifyStaffOfVacancyApproval($payload));
+                Notification::send($submitter, new NotifyStaffOfVacancyApproval($payload));
             }
 
             // Audit log (optional)

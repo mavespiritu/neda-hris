@@ -57,7 +57,7 @@ class NotificationController extends Controller
             ];
 
             if($supervisors){
-                Notification::sendNow($supervisors, new NotifySupervisorOfGapAnalysisSubmission($payload));
+                Notification::send($supervisors, new NotifySupervisorOfGapAnalysisSubmission($payload));
             }
 
             return redirect()->back()->with([
@@ -103,11 +103,11 @@ class NotificationController extends Controller
                 ];
 
                 if($staff){
-                    Notification::sendNow($staff, new NotifyStaffOfGapAnalysisEndorsement($payload));
+                    Notification::send($staff, new NotifyStaffOfGapAnalysisEndorsement($payload));
                 }
 
                 if($chief){
-                    Notification::sendNow($chief, new NotifySupervisorOfGapAnalysisEndorsement($payload));
+                    Notification::send($chief, new NotifySupervisorOfGapAnalysisEndorsement($payload));
                 }
             }
 
@@ -150,7 +150,7 @@ class NotificationController extends Controller
                 ];
 
                 if($recipient){
-                    Notification::sendNow($recipient, new NotifyStaffOfGapAnalysisApproval($payload));
+                    Notification::send($recipient, new NotifyStaffOfGapAnalysisApproval($payload));
                 }
             }
 
@@ -193,7 +193,7 @@ class NotificationController extends Controller
                 ];
 
                 if($recipient){
-                    Notification::sendNow($recipient, new NotifyStaffOfGapAnalysisDisapproval($payload));
+                    Notification::send($recipient, new NotifyStaffOfGapAnalysisDisapproval($payload));
                 }
             }
 
@@ -260,7 +260,7 @@ class NotificationController extends Controller
             ];
 
             if($supervisors){
-                Notification::sendNow($supervisors, new NotifySupervisorOfRtoSubmission($payload));
+                Notification::send($supervisors, new NotifySupervisorOfRtoSubmission($payload));
             }
 
             return redirect()->back()->with([
@@ -341,7 +341,7 @@ class NotificationController extends Controller
             ];
 
             if($ard){
-                Notification::sendNow($ard, new NotifyArdOfRtoEndorsement($payload));
+                Notification::send($ard, new NotifyArdOfRtoEndorsement($payload));
             }
 
             return redirect()->back()->with([
@@ -419,7 +419,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfRtoApproval($payload));
+                Notification::send($submitter, new NotifyStaffOfRtoApproval($payload));
             }
 
             return redirect()->back()->with([
@@ -515,7 +515,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfRtoDisapproval($payload));
+                Notification::send($submitter, new NotifyStaffOfRtoDisapproval($payload));
             }
 
             return redirect()->back()->with([
@@ -611,7 +611,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfRtoReturn($payload));
+                Notification::send($submitter, new NotifyStaffOfRtoReturn($payload));
             }
 
             return redirect()->back()->with([
@@ -689,7 +689,7 @@ class NotificationController extends Controller
             ];
 
             if($supervisors){
-                Notification::sendNow($supervisors, new NotifySupervisorOfRaaSubmission($payload));
+                Notification::send($supervisors, new NotifySupervisorOfRaaSubmission($payload));
             }
 
             return redirect()->back()->with([
@@ -782,7 +782,7 @@ class NotificationController extends Controller
             ];
 
             if($ard){
-                Notification::sendNow($ard, new NotifyArdOfRaaEndorsement($payload));
+                Notification::send($ard, new NotifyArdOfRaaEndorsement($payload));
             }
 
             return redirect()->back()->with([
@@ -872,7 +872,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfRaaApproval($payload));
+                Notification::send($submitter, new NotifyStaffOfRaaApproval($payload));
             }
 
             return redirect()->back()->with([
@@ -980,7 +980,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfRaaDisapproval($payload));
+                Notification::send($submitter, new NotifyStaffOfRaaDisapproval($payload));
             }
 
             return redirect()->back()->with([
@@ -1088,7 +1088,7 @@ class NotificationController extends Controller
             ];
 
             if($submitter){
-                Notification::sendNow($submitter, new NotifyStaffOfRaaReturn($payload));
+                Notification::send($submitter, new NotifyStaffOfRaaReturn($payload));
             }
 
             return redirect()->back()->with([

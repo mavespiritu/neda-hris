@@ -767,7 +767,7 @@ class RaaController extends Controller
                         'endorser_id' => $user->ipms_id,
                     ];
 
-                    Notification::sendNow($ard, new NotifyArdOfRaaEndorsement($payload));
+                    Notification::send($ard, new NotifyArdOfRaaEndorsement($payload));
                 }
             }
 
@@ -916,7 +916,7 @@ class RaaController extends Controller
                     'supervisor_emails' => $supervisors->pluck('email')->toArray(),
                 ];
 
-                Notification::sendNow($submitter, new NotifyStaffOfRaaApproval($payload));
+                Notification::send($submitter, new NotifyStaffOfRaaApproval($payload));
             }
 
             // Audit log (optional)

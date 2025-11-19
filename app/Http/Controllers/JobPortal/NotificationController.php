@@ -64,7 +64,7 @@ class NotificationController extends Controller
                 'itemNo' => $vacancy->item_no,
             ];
 
-            Notification::sendNow($user, new NotifyApplicantOfApplicationSubmission($payload));
+            Notification::send($user, new NotifyApplicantOfApplicationSubmission($payload));
         } catch (\Exception $e) {
             Log::error("Failed to send applicant notification for app ID {$id}: {$e->getMessage()}");
         }
@@ -122,7 +122,7 @@ class NotificationController extends Controller
                 'vacancyId' => $vacancy->id,
             ];
 
-            Notification::sendNow($hrs, new NotifyHROfApplicationSubmission($payload));
+            Notification::send($hrs, new NotifyHROfApplicationSubmission($payload));
         } catch (\Exception $e) {
             Log::error("Failed to send HR notification for app ID {$id}: {$e->getMessage()}");
         }
@@ -155,7 +155,7 @@ class NotificationController extends Controller
                 'created_at' => $issue->created_at,
             ];
 
-            Notification::sendNow($admins, new NotifyAdminOfIssueReported($payload));
+            Notification::send($admins, new NotifyAdminOfIssueReported($payload));
         } catch (\Exception $e) {
             Log::error("Failed to send admin notification for issue ID {$id}: {$e->getMessage()}");
         }

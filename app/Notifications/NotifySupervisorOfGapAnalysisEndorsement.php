@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
-class NotifySupervisorOfGapAnalysisEndorsement extends Notification
+class NotifySupervisorOfGapAnalysisEndorsement extends Notification implements ShouldQueue
 {
     use Queueable;
 
