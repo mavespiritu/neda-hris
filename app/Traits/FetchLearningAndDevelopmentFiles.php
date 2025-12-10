@@ -63,26 +63,11 @@ trait FetchLearningAndDevelopmentFiles
         // Old system files
         $oldLearnings = $conn3->table('tblemp_training_program as t')
             ->select([
-                'ti.id as id',
-                't.emp_id',
-                't.seminar_title',
-                't.from_date',
-                't.filename',
-                't.filepath',
-                't.filetype',
-                't.filesize',
+                't.*'
             ])
-            ->leftJoin('tblemp_training_program_id as ti', function ($join) {
-                $join->on('ti.emp_id', '=', 't.emp_id')
-                    ->on('ti.seminar_title', '=', 't.seminar_title')
-                    ->on('ti.from_date', '=', 't.from_date');
-            })
             ->where('t.emp_id', $applicant->emp_id)
             ->where('t.approval', 'yes')
             ->get()
-            ->groupBy(function ($item) {
-                return $item->emp_id . '|' . $item->seminar_title . '|' . $item->from_date;
-            })
             ->map(function ($files) {
                 return $files->map(function ($file) {
                     return (object) [

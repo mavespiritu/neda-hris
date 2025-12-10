@@ -30,7 +30,7 @@ const InfoRow = ({ label, value }) => (
 
 const compTypeHeaders = {
     org: "Organizational",
-    lead: "Leadership / Managerial",
+    mnt: "Leadership / Managerial",
     func: "Technical / Functional"
 }
 

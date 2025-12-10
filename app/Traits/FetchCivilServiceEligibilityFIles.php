@@ -104,26 +104,11 @@ trait FetchCivilServiceEligibilityFiles
         // Old system files
         $oldEligibilities = $conn3->table('tblemp_civil_service as c')
             ->select([
-                'ci.id as id',
-                'c.emp_id',
-                'c.eligibility',
-                'c.exam_date',
-                'c.filename',
-                'c.filepath',
-                'c.filetype',
-                'c.filesize',
+                'c.*',
             ])
-            ->leftJoin('tblemp_civil_service_id as ci', function ($join) {
-                $join->on('ci.emp_id', '=', 'c.emp_id')
-                    ->on('ci.eligibility', '=', 'c.eligibility')
-                    ->on('ci.exam_date', '=', 'c.exam_date');
-            })
             ->where('c.emp_id', $applicant->emp_id)
             ->where('c.approval', 'yes')
             ->get()
-            ->groupBy(function ($item) {
-                return $item->emp_id . '|' . $item->eligibility . '|' . $item->exam_date;
-            })
             ->map(function ($files) {
                 return $files->map(function ($file) {
                     return (object) [

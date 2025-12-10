@@ -30,14 +30,8 @@ trait FetchLearningAndDevelopment
     {
         return $conn->table('tblemp_training_program as e')
             ->select([
-                'ei.id as id',
                 'e.*'
             ])
-            ->leftJoin('tblemp_training_program_id as ei', function ($join) {
-                $join->on('ei.emp_id', '=', 'e.emp_id')
-                     ->on('ei.seminar_title', '=', 'e.seminar_title')
-                     ->on('ei.from_date', '=', 'e.from_date');
-            })
             ->where('e.emp_id', $ipmsId)
             ->where('e.approval', 'yes')
             ->orderBy('e.from_date', 'desc')

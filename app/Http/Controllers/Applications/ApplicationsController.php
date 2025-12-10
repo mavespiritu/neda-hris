@@ -156,6 +156,25 @@ class ApplicationsController extends Controller
         ]);
     }
 
+    public function show(Request $request, $id)
+    {
+        $conn  = DB::connection('mysql');
+        
+        $application = $conn->table('application')
+        ->where('id', $id)
+        ->first();
+
+        if (!$application) {
+            abort(404, 'Application not found');
+        }
+
+        return Inertia::render('Applications/View', [
+            'data' => [
+                'application' => $application,
+            ],
+        ]);
+    }
+
     public function store(Request $request)
     {
         $conn = DB::connection('mysql');

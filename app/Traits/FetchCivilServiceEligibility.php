@@ -28,14 +28,8 @@ trait FetchCivilServiceEligibility
     {
         return $conn->table('tblemp_civil_service as c')
             ->select([
-                'ci.id as id',
                 'c.*'
             ])
-            ->leftJoin('tblemp_civil_service_id as ci', function ($join) {
-                $join->on('ci.emp_id', '=', 'c.emp_id')
-                     ->on('ci.eligibility', '=', 'c.eligibility')
-                     ->on('ci.exam_date', '=', 'c.exam_date');
-            })
             ->where('c.emp_id', $ipmsId)
             ->where('c.approval', 'yes')
             ->get();

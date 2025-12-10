@@ -64,31 +64,11 @@ trait FetchEducationalBackgroundFiles
         // Old system files
         $oldEducations = $conn3->table('tblemp_educational_attainment as e')
             ->select([
-                'ei.id as id',
-                'e.emp_id',
-                'e.level',
-                'e.course',
-                'e.school',
-                'e.from_date',
-                'e.to_date',
-                'e.filename',
-                'e.filepath',
-                'e.filetype',
-                'e.filesize',
+                'e.*'
             ])
-            ->leftJoin('tblemp_educational_attainment_id as ei', function ($join) {
-                $join->on('ei.emp_id', '=', 'e.emp_id')
-                    ->on('ei.level', '=', 'e.level')
-                    ->on('ei.course', '=', 'e.course')
-                    ->on('ei.school', '=', 'e.school')
-                    ->on('ei.from_date', '=', 'e.from_date');
-            })
             ->where('e.emp_id', $applicant->emp_id)
             ->where('e.approval', 'yes')
             ->get()
-            ->groupBy(function ($item) {
-                return $item->emp_id . '|' . $item->level . '|' . $item->course . '|' . $item->school . '|' . $item->from_date;
-            })
             ->map(function ($files) {
                 return $files->map(function ($file) {
                     return (object) [
