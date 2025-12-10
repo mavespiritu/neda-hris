@@ -173,9 +173,9 @@ const EducationalBackground = ({ data, setData, errors = {} }) => {
   const levels = [
     { id: 'elementary', label: 'Elementary' },
     { id: 'secondary', label: 'Secondary' },
-    { id: 'vocational', label: 'Vocational/Trade Course' },
+    { id: 'vocational/trade course', label: 'Vocational/Trade Course' },
     { id: 'college', label: 'College' },
-    { id: 'graduate', label: 'Graduate Studies' },
+    { id: 'graduate studies', label: 'Graduate Studies' },
   ]
 
   const handleAddEducation = (dataKey) => {

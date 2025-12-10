@@ -116,7 +116,7 @@ const usePdsStore = create((set, get) => ({
                 year_graduated: "",
               }
             ],
-            vocational: [],
+            "vocational/trade course": [],
             college: [
                 {
                   is_graduated: false,
@@ -132,7 +132,7 @@ const usePdsStore = create((set, get) => ({
                   year_graduated: "",
                 }
             ],
-            graduate: [],
+            "graduate studies": [],
 
         },
         civilServiceEligibility: [],

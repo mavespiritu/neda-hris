@@ -605,9 +605,9 @@ class MyProfileController extends Controller
         $educationalBackground = (object) [
             'elementary' => [],
             'secondary' => [],
-            'vocational' => [],
+            'vocational/trade course' => [],
             'college' => [],
-            'graduate' => [],
+            'graduate studies' => [],
         ];
 
         try {
