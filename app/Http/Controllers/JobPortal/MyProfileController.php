@@ -620,7 +620,7 @@ class MyProfileController extends Controller
                     $educationalBackground->{$levelKey}[] = $edu;
                 }
             } elseif ($user->ipms_id) {
-                foreach (['Elementary', 'Secondary', 'Vocational', 'College', 'Graduate'] as $level) {
+                foreach (['Elementary', 'Secondary', 'Vocational/Trade Course', 'College', 'Graduate Studies'] as $level) {
                     $data = $this->fetchStaffEducationalBackground($staffConn, $user->ipms_id, $level);
                     if ($data->isNotEmpty()) {
                         foreach ($data as $edu) {
