@@ -68,9 +68,12 @@ trait FetchLearningAndDevelopmentFiles
             ->where('t.emp_id', $applicant->emp_id)
             ->where('t.approval', 'yes')
             ->get()
+            ->keyBy(function ($item) {
+                return $item->emp_id . '|' . $item->seminar_title . '|' . $item->from_date;
+            })
             ->map(function ($file) {
                 return (object) [
-                    'id'       => $file->id ?? null,
+                    'id'       => $file->id,
                     'source'   => 'old',
                     'filename' => $file->filename ?? "",
                     'filepath' => $file->filepath ? str_replace(
@@ -95,7 +98,7 @@ trait FetchLearningAndDevelopmentFiles
             // OLD files (legacy system)
             $key = $applicant->emp_id . '|' . $learn->seminar_title . '|' . $learn->from_date;
             if ($oldLearnings->has($key)) {
-                $files = $files->merge($oldLearnings[$key]);
+                $files->push($oldLearnings[$key]);
             }
 
             $learn->files = $files->values();

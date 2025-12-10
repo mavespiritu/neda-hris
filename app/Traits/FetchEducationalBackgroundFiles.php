@@ -69,6 +69,9 @@ trait FetchEducationalBackgroundFiles
             ->where('e.emp_id', $applicant->emp_id)
             ->where('e.approval', 'yes')
             ->get()
+            ->keyBy(function ($item) {
+                return $item->emp_id . '|' . $item->level . '|' . $item->course . '|' . $item->school . '|' . $item->from_date;
+            })
             ->map(function ($file) {
                 return (object) [
                     'id'       => $file->id ?? null,
@@ -96,7 +99,7 @@ trait FetchEducationalBackgroundFiles
             // OLD files (legacy system, matched by composite key)
             $key = $applicant->emp_id . '|' . $educ->level . '|' . $educ->course . '|' . $educ->school . '|' . $educ->from_date;
             if ($oldEducations->has($key)) {
-                $files = $files->merge($oldEducations[$key]);
+                $files->push($oldEducations[$key]);
             }
 
             $educ->files = $files->values();

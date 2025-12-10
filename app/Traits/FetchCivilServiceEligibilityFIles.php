@@ -109,6 +109,9 @@ trait FetchCivilServiceEligibilityFiles
             ->where('c.emp_id', $applicant->emp_id)
             ->where('c.approval', 'yes')
             ->get()
+            ->keyBy(function ($item) {
+                return $item->emp_id . '|' . $item->eligibility . '|' . $item->exam_date;
+            })
             ->map(function ($file) {
                 return (object) [
                     'id'       => $file->id ?? null,
@@ -136,7 +139,7 @@ trait FetchCivilServiceEligibilityFiles
             // OLD files (legacy system)
             $key = $applicant->emp_id . '|' . $elig->eligibility . '|' . $elig->exam_date;
             if ($oldEligibilities->has($key)) {
-                $files = $files->merge($oldEligibilities[$key]);
+                $files->push($oldEligibilities[$key]);
             }
 
             $elig->files = $files->values();
