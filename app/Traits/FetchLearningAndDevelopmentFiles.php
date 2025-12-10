@@ -87,8 +87,6 @@ trait FetchLearningAndDevelopmentFiles
                 ];
             });
 
-        dd($oldLearnings);
-
         // Attach files to learnings
         $learnings = $learnings->map(function ($learn) use ($newLearningFiles, $oldLearnings, $applicant) {
             $files = collect();
