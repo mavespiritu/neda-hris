@@ -69,21 +69,19 @@ trait FetchEducationalBackgroundFiles
             ->where('e.emp_id', $applicant->emp_id)
             ->where('e.approval', 'yes')
             ->get()
-            ->map(function ($files) {
-                return $files->map(function ($file) {
-                    return (object) [
-                        'id'       => $file->id ?? null,
-                        'source'   => 'old',
-                        'filename' => $file->filename ?? "",
-                        'filepath' => $file->filepath ? str_replace(
-                            ['D:/wamp/www/NPIS/', 'C:/wamp/www/NPIS/'],
-                            '',
-                            $file->filepath
-                        ) : null,
-                        'filetype' => $file->filetype ?? "",
-                        'filesize' => $file->filesize ?? "",
-                    ];
-                });
+            ->map(function ($file) {
+                return (object) [
+                    'id'       => $file->id ?? null,
+                    'source'   => 'old',
+                    'filename' => $file->filename ?? "",
+                    'filepath' => $file->filepath ? str_replace(
+                        ['D:/wamp/www/NPIS/', 'C:/wamp/www/NPIS/'],
+                        '',
+                        $file->filepath
+                    ) : null,
+                    'filetype' => $file->filetype ?? "",
+                    'filesize' => $file->filesize ?? "",
+                ];
             });
 
         // Attach files to each education record
