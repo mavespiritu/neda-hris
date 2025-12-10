@@ -69,7 +69,8 @@ trait FetchLearningAndDevelopmentFiles
             ->where('t.approval', 'yes')
             ->get()
             ->keyBy(function ($item) {
-                return $item->emp_id . '|' . $item->seminar_title . '|' . $item->from_date;
+                $title = preg_replace('/\s+/', ' ', trim($item->seminar_title));  
+                return $item->emp_id . '|' . $title . '|' . trim($item->from_date);
             })
             ->map(function ($file) {
                 return (object) [
@@ -85,6 +86,8 @@ trait FetchLearningAndDevelopmentFiles
                     'filesize' => $file->filesize ?? "",
                 ];
             });
+
+        dd($oldLearnings);
 
         // Attach files to learnings
         $learnings = $learnings->map(function ($learn) use ($newLearningFiles, $oldLearnings, $applicant) {

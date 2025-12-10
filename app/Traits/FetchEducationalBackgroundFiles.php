@@ -70,7 +70,10 @@ trait FetchEducationalBackgroundFiles
             ->where('e.approval', 'yes')
             ->get()
             ->keyBy(function ($item) {
-                return $item->emp_id . '|' . $item->level . '|' . $item->course . '|' . $item->school . '|' . $item->from_date;
+                $course = preg_replace('/\s+/', ' ', trim($item->course));  
+                $school = preg_replace('/\s+/', ' ', trim($item->school));  
+                $level = preg_replace('/\s+/', ' ', trim($item->level));  
+                return $item->emp_id . '|' . $level . '|' . $course . '|' . $school . '|' . trim($item->from_date);
             })
             ->map(function ($file) {
                 return (object) [

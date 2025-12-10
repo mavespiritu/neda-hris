@@ -110,7 +110,8 @@ trait FetchCivilServiceEligibilityFiles
             ->where('c.approval', 'yes')
             ->get()
             ->keyBy(function ($item) {
-                return $item->emp_id . '|' . $item->eligibility . '|' . $item->exam_date;
+                $title = preg_replace('/\s+/', ' ', trim($item->eligibility));  
+                return $item->emp_id . '|' . $title . '|' . trim($item->exam_date);
             })
             ->map(function ($file) {
                 return (object) [
