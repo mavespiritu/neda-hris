@@ -602,12 +602,22 @@ class MyProfileController extends Controller
         $idKey = $isStaffDb ? $user->ipms_id : $user->id;
         $conn = $isStaffDb ? $staffConn : $appConn;
 
+        $levels = [
+            'elementary' => 'Elementary',
+            'secondary' => 'Secondary',
+            'vocational' => 'Vocational/Trade Course',
+            'college' => 'College',
+            'graduate' => 'Graduate Studies',
+        ];
+
+        $levels = array_flip($levels);
+
         $educationalBackground = (object) [
             'elementary' => [],
             'secondary' => [],
-            'vocational/trade course' => [],
+            'vocational' => [],
             'college' => [],
-            'graduate studies' => [],
+            'graduate' => [],
         ];
 
         try {
@@ -616,16 +626,16 @@ class MyProfileController extends Controller
 
             if ($applicantData->isNotEmpty()) {
                 foreach ($applicantData as $edu) {
-                    $levelKey = strtolower($edu->level);
+                    $levelKey = $levels[$edu->level];
                     $educationalBackground->{$levelKey}[] = $edu;
                 }
             } elseif ($user->ipms_id) {
-                foreach (['Elementary', 'Secondary', 'Vocational/Trade Course', 'College', 'Graduate Studies'] as $level) {
-                    $data = $this->fetchStaffEducationalBackground($staffConn, $user->ipms_id, $level);
+                foreach ($levels as $key => $label) {
+                    $data = $this->fetchStaffEducationalBackground($staffConn, $user->ipms_id, $key);
                     if ($data->isNotEmpty()) {
                         foreach ($data as $edu) {
-                            $educationalBackground->{strtolower($level)}[] = (object) [
-                                'level' => $level,
+                            $educationalBackground->{strtolower($label)}[] = (object) [
+                                'level' => $key,
                                 'course' => $edu->course ?? '',
                                 'school' => $edu->school ?? '',
                                 'highest_attainment' => '',
@@ -660,47 +670,47 @@ class MyProfileController extends Controller
         $user = Auth::user();
 
         $levels = [
-            'elementary',
-            'secondary',
-            'vocational',
-            'college',
-            'graduate',
+            'elementary' => 'Elementary',
+            'secondary' => 'Secondary',
+            'vocational' => 'Vocational/Trade Course',
+            'college' => 'College',
+            'graduate' => 'Graduate Studies',
         ];
 
         // Validation rules and messages
         $rules = [];
         $messages = [];
 
-        foreach ($levels as $level) {
-            $rules["educationalBackground.$level.*.course"] = 'required';
-            $rules["educationalBackground.$level.*.school"] = 'required';
-            $rules["educationalBackground.$level.*.highest_attainment"] = 'required';
-            $rules["educationalBackground.$level.*.from_year"] = 'required|digits:4';
-            $rules["educationalBackground.$level.*.to_year"] = 'required|digits:4';
-            $rules["educationalBackground.$level.*.award"] = 'required';
-            $rules["educationalBackground.$level.*.year_graduated"] = 'nullable|digits:4';
+        foreach ($levels as $key => $label) {
+            $rules["educationalBackground.$key.*.course"] = 'required';
+            $rules["educationalBackground.$key.*.school"] = 'required';
+            $rules["educationalBackground.$key.*.highest_attainment"] = 'required';
+            $rules["educationalBackground.$key.*.from_year"] = 'required|digits:4';
+            $rules["educationalBackground.$key.*.to_year"] = 'required|digits:4';
+            $rules["educationalBackground.$key.*.award"] = 'required';
+            $rules["educationalBackground.$key.*.year_graduated"] = 'nullable|digits:4';
 
-            $messages["educationalBackground.$level.*.course.required"] = "Each $level's course is required.";
-            $messages["educationalBackground.$level.*.school.required"] = "Each $level's school is required.";
-            $messages["educationalBackground.$level.*.highest_attainment.required"] = "Each $level's highest level/units earned is required.";
-            $messages["educationalBackground.$level.*.from_year.required"] = "Each $level's start year is required.";
-            $messages["educationalBackground.$level.*.to_year.required"] = "Each $level's end year is required.";
-            $messages["educationalBackground.$level.*.from_year.digits"] = "Must be a 4-digit year.";
-            $messages["educationalBackground.$level.*.to_year.digits"] = "Must be a 4-digit year.";
-            $messages["educationalBackground.$level.*.award.required"] = "Each $level's scholarship/academic honors received is required.";
-            $messages["educationalBackground.$level.*.year_graduated.digits"] = "Each $level's year graduated must be a 4-digit year.";
+            $messages["educationalBackground.$key.*.course.required"] = "Each $key's course is required.";
+            $messages["educationalBackground.$key.*.school.required"] = "Each $key's school is required.";
+            $messages["educationalBackground.$key.*.highest_attainment.required"] = "Each $key's highest level/units earned is required.";
+            $messages["educationalBackground.$key.*.from_year.required"] = "Each $key's start year is required.";
+            $messages["educationalBackground.$key.*.to_year.required"] = "Each $key's end year is required.";
+            $messages["educationalBackground.$key.*.from_year.digits"] = "Must be a 4-digit year.";
+            $messages["educationalBackground.$key.*.to_year.digits"] = "Must be a 4-digit year.";
+            $messages["educationalBackground.$key.*.award.required"] = "Each $key's scholarship/academic honors received is required.";
+            $messages["educationalBackground.$key.*.year_graduated.digits"] = "Each $key's year graduated must be a 4-digit year.";
         }
 
         $validator = \Validator::make($request->all(), $rules, $messages);
 
         $validator->after(function ($validator) use ($request, $levels) {
-            foreach ($levels as $level) {
-                $entries = $request->input("educationalBackground.$level", []);
+            foreach ($levels as $key => $label) {
+                $entries = $request->input("educationalBackground.$key", []);
                 foreach ($entries as $index => $entry) {
                     if (!empty($entry['is_graduated'])) {
                         if (empty($entry['year_graduated'])) {
                             $validator->errors()->add(
-                                "educationalBackground.$level.$index.year_graduated",
+                                "educationalBackground.$key.$index.year_graduated",
                                 "The year graduated is required when you have graduated."
                             );
                         }
@@ -708,7 +718,7 @@ class MyProfileController extends Controller
                     if (!empty($entry['from_year']) && !empty($entry['to_year'])
                         && (int)$entry['to_year'] < (int)$entry['from_year']) {
                         $validator->errors()->add(
-                            "educationalBackground.$level.$index.to_year",
+                            "educationalBackground.$key.$index.to_year",
                             "The end year must be after or equal to the start year."
                         );
                     }
@@ -727,10 +737,10 @@ class MyProfileController extends Controller
 
         // Merge all educational entries and set level
         $allEntries = [];
-        foreach ($levels as $level) {
-            $entries = $request['educationalBackground'][$level] ?? [];
+        foreach ($levels as $key => $label) {
+            $entries = $request['educationalBackground'][$key] ?? [];
             foreach ($entries as &$entry) {
-                $entry['level'] = ucfirst($level);
+                $entry['level'] = $label;
                 $entry['applicant_id'] = $applicant->id;
             }
             unset($entry); // break reference
