@@ -8,8 +8,9 @@ import {
 } from "@/components/ui/table"
 import { formatDate, formatDateRange, formatNumberWithCommas } from "@/lib/utils.jsx"
 import Attachment from "@/components/Attachment"
+import { getTimestamp } from "@/lib/utils.jsx"
 
-const WorkExperienceFiles = ({req}) => {
+const WorkExperienceFiles = ({req, applicant}) => {
 
   return (
     <TableRow>
@@ -50,7 +51,7 @@ const WorkExperienceFiles = ({req}) => {
                                 key={fIndex}
                                 className="flex items-center justify-between"
                                 >
-                                <Attachment file={file} />
+                                <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${sub.agency}_${sub.from_date}_${fIndex}_${getTimestamp()}`} />
                                 </div>
                             ))}
                             </div>

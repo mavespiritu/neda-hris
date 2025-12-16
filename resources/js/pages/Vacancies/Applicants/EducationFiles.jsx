@@ -7,9 +7,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import Attachment from "@/components/Attachment"
+import { getTimestamp } from "@/lib/utils.jsx"
 
-
-const EducationFiles = ({req}) => {
+const EducationFiles = ({req, applicant}) => {
 
   return (
     <TableRow>
@@ -50,7 +50,7 @@ const EducationFiles = ({req}) => {
                                 key={fIndex}
                                 className="flex items-center justify-between"
                                 >
-                                <Attachment file={file} />
+                                <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${sub.level}_${fIndex}_${getTimestamp()}`} />
                                 </div>
                             ))}
                             </div>

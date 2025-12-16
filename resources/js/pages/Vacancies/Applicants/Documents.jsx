@@ -82,7 +82,7 @@ const Documents = ({ applicant }) => {
                               key={fIndex}
                               className="flex justify-between"
                             >
-                              <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${getTimestamp()}`} />
+                              <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${fIndex}_${getTimestamp()}`} />
                             </div>
                           ))}
                         </div>
@@ -92,10 +92,10 @@ const Documents = ({ applicant }) => {
                     </TableCell>
                   </TableRow>
 
-                  {req.connected_to === "Educational Background" && req.subItems?.length > 0 && <EducationFiles req={req} />}
-                  {req.connected_to === "Civil Service Eligibility" && req.subItems?.length > 0 && <EligibilityFiles req={req} />}
-                  {req.connected_to === "Learning and Development" && req.subItems?.length > 0 && <LearningFiles req={req} />}
-                  {req.connected_to === "Work Experience" && req.subItems?.length > 0 && <WorkExperienceFiles req={req} />}
+                  {req.connected_to === "Educational Background" && req.subItems?.length > 0 && <EducationFiles req={req} applicant={applicant} />}
+                  {req.connected_to === "Civil Service Eligibility" && req.subItems?.length > 0 && <EligibilityFiles req={req} applicant={applicant} />}
+                  {req.connected_to === "Learning and Development" && req.subItems?.length > 0 && <LearningFiles req={req} applicant={applicant} />}
+                  {req.connected_to === "Work Experience" && req.subItems?.length > 0 && <WorkExperienceFiles req={req} applicant={applicant} />}
                 </React.Fragment>
               ))
             ) : (
