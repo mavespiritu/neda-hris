@@ -69,7 +69,5 @@ trait CopiesApplicationData
 
         // Execute the insert
         $conn->insert($query, [$sourceApplicantId]);
-
-        \Log::info("Copied data from $sourceTable to $targetTable for applicant_id=$sourceApplicantId as application_id=$newAppId");
     }
 }
