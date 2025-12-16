@@ -135,6 +135,34 @@ export const middleInitial = (middle_name) => {
   
   }
 
+export const formatFullName = (name) => {
+  if (!name) return '';
+
+  const capitalizeWords = (str) =>
+    str
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
+  const [last, rest] = name.split(',').map(s => s.trim());
+
+  if (!rest) return capitalizeWords(last);
+
+  // Keep middle initial uppercase (P.)
+  const formattedRest = rest
+    .split(' ')
+    .map(word =>
+      word.length === 2 && word.endsWith('.')
+        ? word.toUpperCase()
+        : capitalizeWords(word)
+    )
+    .join(' ');
+
+  return `${capitalizeWords(last)}, ${formattedRest}`;
+}
+
 export function cn(...inputs) {
     return twMerge(clsx(inputs))
   }

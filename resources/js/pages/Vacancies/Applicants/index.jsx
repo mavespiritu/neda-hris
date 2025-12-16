@@ -5,7 +5,7 @@ import PageTitle from "@/components/PageTitle"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { formatDateWithTime } from "@/lib/utils.jsx"
+import { formatDateWithTime, formatFullName } from "@/lib/utils.jsx"
 import { store } from "./store"
 import { Button } from "@/components/ui/button"
 import Profile from "./Profile"
@@ -91,7 +91,7 @@ const Applicants = () => {
                 <AccordionTrigger className="flex justify-between px-4 py-3 font-semibold text-left">
                   <div>
                     <span className="text-base">
-                      {idx + 1}. {applicant.name}
+                      {idx + 1}. {formatFullName(applicant.name)}
                     </span>
                   </div>
                   <div className="text-sm text-muted-foreground">
