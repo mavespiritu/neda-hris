@@ -50,7 +50,7 @@ const EducationFiles = ({req, applicant}) => {
                                 key={fIndex}
                                 className="flex items-center justify-between"
                                 >
-                                <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${sub.level}_${fIndex}_${getTimestamp()}`} />
+                                <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${sub.level}_${sub.course}_${fIndex}_${getTimestamp()}`} />
                                 </div>
                             ))}
                             </div>
