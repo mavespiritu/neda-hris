@@ -88,7 +88,7 @@ const Attachment = ({ file }) => {
             e.stopPropagation()
             openFile()
           }}
-          className="ml-auto p-1 rounded hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition"
+          className="ml-auto p-1 rounded hover:bg-gray-200 transition"
           title="View"
         >
           <Eye className="h-4 w-4 text-blue-600" />
@@ -99,7 +99,7 @@ const Attachment = ({ file }) => {
           href={`/storage/${filePath}`}
           download
           onClick={(e) => e.stopPropagation()}
-          className="p-1 rounded hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition"
+          className="p-1 rounded hover:bg-gray-200 transition"
           title="Download"
         >
           <Download className="h-4 w-4 text-gray-600" />
