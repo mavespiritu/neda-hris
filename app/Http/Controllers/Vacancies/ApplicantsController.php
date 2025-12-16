@@ -52,6 +52,9 @@ class ApplicantsController extends Controller
             ->join('application_applicant as aa', 'aa.application_id', '=', 'a.id')
             ->select(
                 'a.id',
+                DB::raw("UPPER(aa.last_name) AS lastname"),
+                DB::raw("UPPER(aa.first_name) AS firstname"),
+                DB::raw("UPPER(LEFT(aa.middle_name, 1)) AS middlename"),
                 DB::raw("
                     CONCAT(
                         UPPER(LEFT(aa.last_name, 1)),

@@ -163,6 +163,21 @@ export const formatFullName = (name) => {
   return `${capitalizeWords(last)}, ${formattedRest}`;
 }
 
+export const getTimestamp = () => {
+  const d = new Date()
+
+  const pad = (n) => String(n).padStart(2, "0")
+
+  return (
+    pad(d.getMonth() + 1) +     // MM
+    pad(d.getDate()) +          // DD
+    d.getFullYear() +           // YYYY
+    pad(d.getHours()) +         // HH
+    pad(d.getMinutes()) +       // II
+    pad(d.getSeconds())         // SS
+  )
+}
+
 export function cn(...inputs) {
     return twMerge(clsx(inputs))
   }

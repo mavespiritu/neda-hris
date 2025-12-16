@@ -26,14 +26,15 @@ import EligibilityFiles from "./EligibilityFiles"
 import LearningFiles from "./LearningFiles"
 import WorkExperienceFiles from "./WorkExperienceFiles"
 import Attachment from "@/components/Attachment"
+import { getTimestamp } from "@/lib/utils.jsx"
 
-const Documents = ({ applicantId }) => {
+const Documents = ({ applicant }) => {
 
   const { requirements, fetchRequirements } = store()
 
   useEffect(() => {
-    fetchRequirements(applicantId)
-  }, [applicantId])
+    fetchRequirements(applicant.id)
+  }, [applicant.id])
 
   return (
     <div className="border rounded-lg p-4 flex flex-col gap-4">
@@ -81,7 +82,7 @@ const Documents = ({ applicantId }) => {
                               key={fIndex}
                               className="flex justify-between"
                             >
-                              <Attachment file={file} />
+                              <Attachment file={file} filename={`${applicant.lastname}_${applicant.firstname}_${applicant.middlename}_${req.requirement}_${getTimestamp()}`} />
                             </div>
                           ))}
                         </div>

@@ -168,7 +168,7 @@ const Applicants = () => {
                 )}
 
                 {activeTab === "documents" && (
-                  <Documents applicantId={selectedApplicant.id} />
+                  <Documents applicant={selectedApplicant} />
                 )}
               </div>
 
