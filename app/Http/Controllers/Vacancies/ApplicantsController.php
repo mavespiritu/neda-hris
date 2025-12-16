@@ -52,7 +52,17 @@ class ApplicantsController extends Controller
             ->join('application_applicant as aa', 'aa.application_id', '=', 'a.id')
             ->select(
                 'a.id',
-                DB::raw("CONCAT(aa.last_name, ', ', aa.first_name, ' ', LEFT(aa.middle_name, 1), '.') as name"),
+                DB::raw("
+                    CONCAT(
+                        aa.last_name, ', ',
+                        aa.first_name,
+                        IF(
+                            aa.middle_name IS NULL OR aa.middle_name = '',
+                            '',
+                            CONCAT(' ', LEFT(aa.middle_name, 1), '.')
+                        )
+                    ) AS name
+                "),
                 'aa.email_address',
                 'aa.mobile_no',
                 'a.date_submitted'

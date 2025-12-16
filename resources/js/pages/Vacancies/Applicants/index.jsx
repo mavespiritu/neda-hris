@@ -51,7 +51,7 @@ const Applicants = () => {
       />
 
       {/* 🔍 Search Bar */}
-      <div className="flex items-center gap-2 w-full max-w-md">
+      {/* <div className="flex items-center gap-2 w-full max-w-md">
         <Input
           placeholder="Search applicant by name or email..."
           value={search}
@@ -61,7 +61,7 @@ const Applicants = () => {
         <Button onClick={handleSearch} className="gap-2">
           <Search className="h-4 w-4" /> Search
         </Button>
-      </div>
+      </div> */}
 
       <div className="flex flex-1 flex-col min-h-0">
         {applicants.isLoading && (
