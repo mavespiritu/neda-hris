@@ -54,12 +54,19 @@ class ApplicantsController extends Controller
                 'a.id',
                 DB::raw("
                     CONCAT(
-                        aa.last_name, ', ',
-                        aa.first_name,
+                        UPPER(LEFT(aa.last_name, 1)),
+                        LOWER(SUBSTRING(aa.last_name, 2)),
+                        ', ',
+                        UPPER(LEFT(aa.first_name, 1)),
+                        LOWER(SUBSTRING(aa.first_name, 2)),
                         IF(
                             aa.middle_name IS NULL OR aa.middle_name = '',
                             '',
-                            CONCAT(' ', LEFT(aa.middle_name, 1), '.')
+                            CONCAT(
+                                ' ',
+                                UPPER(LEFT(aa.middle_name, 1)),
+                                '.'
+                            )
                         )
                     ) AS name
                 "),
