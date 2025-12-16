@@ -20,6 +20,7 @@ const Applicants = () => {
   const [loadingApplicantId, setLoadingApplicantId] = useState(null)
   const [selectedApplicant, setSelectedApplicant] = useState(null)
   const [isAssessDialogOpen, setIsAssessDialogOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("profile")
 
   const handleSearch = () => {
     fetchApplicants(vacancy.id, { search })
@@ -63,7 +64,128 @@ const Applicants = () => {
         </Button>
       </div> */}
 
-      <div className="flex flex-1 flex-col min-h-0">
+      <div className="flex flex-col md:flex-row w-full gap-4 h-full">
+        {/* 30% column */}
+        <div className="md:w-[30%] w-full">
+          {!applicants.data?.data?.length ? (
+            <div className="flex items-center justify-center min-h-full text-sm text-gray-500">
+              No applicants found.
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+
+              {/* Table Header */}
+              <div className="grid grid-cols-[1fr_auto] bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-600">
+                <span>Name</span>
+                <span>Status</span>
+              </div>
+
+              {/* Table Rows */}
+              <div className="divide-y">
+                {applicants.data.data.map((applicant, idx) => (
+                  <div
+                    key={applicant.id}
+                    className={`grid grid-cols-[1fr_auto] px-4 py-3 text-sm cursor-pointer
+                      ${selectedApplicant?.id === applicant.id ? "bg-gray-100" : "hover:bg-gray-50"}
+                    `}
+                    onClick={() => {
+                      setSelectedApplicant(applicant)
+                      setActiveTab("profile")
+                    }}
+                  >
+                    <span className="truncate font-medium">
+                      {idx + 1}. {formatFullName(applicant.name)}
+                    </span>
+
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      For Assessment
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        {/* 70% column */}
+        <div className="md:w-[70%] w-full border rounded-lg p-4">
+          {!selectedApplicant ? (
+            <div className="flex items-center justify-center h-full text-sm text-gray-500">
+              Select an applicant to view details
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="mb-4 space-y-2">
+                <h2 className="text-lg font-semibold">
+                  {formatFullName(selectedApplicant.name)}
+                </h2>
+
+                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    {selectedApplicant.email_address || "No email"}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    {selectedApplicant.mobile_no || "No mobile number"}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Submitted on {formatDateWithTime(selectedApplicant.date_submitted)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="border-b mb-4 flex gap-4">
+                <button
+                  className={`pb-2 text-sm font-medium border-b-2
+                    ${activeTab === "profile"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground"}
+                  `}
+                  onClick={() => setActiveTab("profile")}
+                >
+                  Profile
+                </button>
+
+                <button
+                  className={`pb-2 text-sm font-medium border-b-2
+                    ${activeTab === "documents"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground"}
+                  `}
+                  onClick={() => setActiveTab("documents")}
+                >
+                  Documents
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              <div className="space-y-8">
+                {activeTab === "profile" && (
+                  <Profile applicantId={selectedApplicant.id} />
+                )}
+
+                {activeTab === "documents" && (
+                  <Documents applicantId={selectedApplicant.id} />
+                )}
+              </div>
+
+              <div className="mt-6">
+                <Button
+                  onClick={() => setIsAssessDialogOpen(true)}
+                >
+                  Assess Applicant
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+
+      </div>
+
+      {/* <div className="flex flex-1 flex-col min-h-0">
         {applicants.isLoading && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
             <Loader2 className="h-6 w-6 animate-spin text-white" />
@@ -151,7 +273,7 @@ const Applicants = () => {
             ))}
           </Accordion>
         )}
-      </div>
+      </div> */}
 
       <AssessApplicantForm
         open={isAssessDialogOpen}

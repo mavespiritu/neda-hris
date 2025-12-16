@@ -148,6 +148,7 @@ class ApplicantsController extends Controller
         $conn3 = DB::connection('mysql3');
 
         $user = auth()->user();
+
         if (!$user) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
