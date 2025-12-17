@@ -11,6 +11,17 @@ import { Button } from "@/components/ui/button"
 import Profile from "./Profile"
 import Documents from "./Documents"
 import AssessApplicantForm from "./AssessApplicantForm"
+import ShortlistingResult from "./ShortlistingResult"
+import { router } from "@inertiajs/react"
+import { Download } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 const Applicants = () => {
   const { vacancy } = usePage().props
@@ -21,9 +32,27 @@ const Applicants = () => {
   const [selectedApplicant, setSelectedApplicant] = useState(null)
   const [isAssessDialogOpen, setIsAssessDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("profile")
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const handleSearch = () => {
     fetchApplicants(vacancy.id, { search })
+  }
+
+  const handleDownloadDocuments = () => {
+    if (!selectedApplicant) return
+
+    setIsDownloading(true)
+
+    window.location.href = route(
+      'vacancies.applicants.requirements.download',
+      selectedApplicant.id
+    )
+    setTimeout(() => {
+      setIsDownloading(false)
+    }, 3000)
+
+    setShowConfirm(false)
   }
 
   useEffect(() => {
@@ -108,17 +137,62 @@ const Applicants = () => {
         </div>
         {/* 70% column */}
         <div className="md:w-[70%] w-full border rounded-lg p-4">
-          {!selectedApplicant ? (
-            <div className="flex items-center justify-center h-full text-sm text-gray-500">
-              Select an applicant to view details
-            </div>
-          ) : (
+          {!selectedApplicant ? <ShortlistingResult /> : (
             <>
               {/* Header */}
               <div className="mb-4 space-y-2">
-                <h2 className="text-lg font-semibold">
-                  {formatFullName(selectedApplicant.name)}
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">
+                    {formatFullName(selectedApplicant.name)}
+                  </h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isDownloading}
+                    onClick={() => setShowConfirm(true)}
+                    className="flex items-center gap-2"
+                  >
+                    {isDownloading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Preparing ZIP…
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4" />
+                        Download Documents
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Download all documents?</DialogTitle>
+                      <DialogDescription>
+                        This will download all applicant documents as a ZIP file.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <DialogFooter className="gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => setShowConfirm(false)}
+                        disabled={isDownloading}
+                      >
+                        Cancel
+                      </Button>
+
+                      <Button
+                        onClick={handleDownloadDocuments}
+                        disabled={isDownloading}
+                      >
+                        {isDownloading ? "Downloading…" : "Confirm"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">

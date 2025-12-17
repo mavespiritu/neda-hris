@@ -133,8 +133,21 @@ class User extends Authenticatable
             return true;
         }
 
-        foreach ($this->roles as $role) {
+        /* foreach ($this->roles as $role) {
             if ($role->allPermissionsRecursive()->contains('name', $permission)) {
+                return true;
+            }
+        } */
+
+        foreach ($this->getAllRolesRecursive() as $role) {
+            if (
+                method_exists($role, 'allPermissionsRecursive') &&
+                $role->allPermissionsRecursive()->contains('name', $permission)
+            ) {
+                return true;
+            }
+
+            if ($role->permissions->contains('name', $permission)) {
                 return true;
             }
         }

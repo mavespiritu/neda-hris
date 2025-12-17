@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use App\Policies\ApplicantDocumentPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -20,6 +21,8 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy('applicant-documents', ApplicantDocumentPolicy::class);
+
         Gate::define('view-index', function ($user, $resource, array $options = []) {
             // Allow based on roles
             if (!empty($options['allowed_roles']) && $user->hasAnyRole($options['allowed_roles'])) {

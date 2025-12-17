@@ -10,6 +10,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/vacancy-applicants-pds/{id}', [ApplicantsController::class, 'getPds'])->name('vacancies.applicants.pds');
     Route::get('/vacancy-applicants-requirements/{id}', [ApplicantsController::class, 'getRequirements'])->name('vacancies.applicants.requirements');
     Route::get('/vacancy-applicants-qualifications/{id}', [ApplicantsController::class, 'getQualifications'])->name('vacancies.applicants.qualifications');
+    Route::get('/vacancy-applicants-requirements/{id}/download', [ApplicantsController::class, 'downloadRequirements'])->name('vacancies.applicants.requirements.download');
 });
 
 

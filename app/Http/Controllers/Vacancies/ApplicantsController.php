@@ -22,6 +22,8 @@ use App\Traits\FetchLearningAndDevelopmentFiles;
 use App\Traits\FetchEducationalBackgroundFiles;
 use App\Traits\FetchWorkExperienceFiles;
 use App\Traits\FetchRequirementFiles;
+use App\Policies\ApplicantDocumentPolicy;
+use ZipArchive;
 
 class ApplicantsController extends Controller
 {
@@ -100,6 +102,193 @@ class ApplicantsController extends Controller
         ]);
     }
 
+    private function buildRequirementsData($application)
+    {
+        $conn = DB::connection('mysql');
+        $conn2 = DB::connection('mysql2');
+
+        $applicant = $conn->table('applicant')
+            ->where('id', $application->applicant_id)
+            ->first();
+
+        if (!$applicant) {
+            abort(404, 'Applicant not found');
+        }
+
+        $educationReq = $conn2->table('recruitment_requirements')
+            ->where('connected_to', 'Educational Background')
+            ->first();
+
+        $eligibilityReq = $conn2->table('recruitment_requirements')
+            ->where('connected_to', 'Civil Service Eligibility')
+            ->first();
+
+        $learningReq = $conn2->table('recruitment_requirements')
+            ->where('connected_to', 'Learning and Development')
+            ->first();
+
+        $workReq = $conn2->table('recruitment_requirements')
+            ->where('connected_to', 'Work Experience')
+            ->first();
+
+        $educations = $this->fetchEducationalBackgroundFiles(
+            $applicant,
+            $application->vacancy_id,
+            $application->type
+        );
+
+        $eligibilities = $this->fetchCivilServiceEligibilityFiles(
+            $applicant,
+            $application->vacancy_id,
+            $application->type
+        );
+
+        $learnings = $this->fetchLearningAndDevelopmentFiles(
+            $applicant,
+            $application->vacancy_id,
+            $application->type
+        );
+
+        $works = $this->fetchWorkExperienceFiles(
+            $applicant,
+            $application->vacancy_id,
+            $application->type
+        );
+
+        return $conn2->table('vacancy_requirements')
+            ->select([
+                'vacancy_requirements.*',
+                'recruitment_requirements.connected_to'
+            ])
+            ->leftJoin(
+                'recruitment_requirements',
+                'recruitment_requirements.id',
+                '=',
+                'vacancy_requirements.requirement_id'
+            )
+            ->where('vacancy_id', $application->vacancy_id)
+            ->get()
+            ->map(function ($req) use (
+                $applicant,
+                $application,
+                $educationReq,
+                $educations,
+                $eligibilityReq,
+                $eligibilities,
+                $learningReq,
+                $learnings,
+                $workReq,
+                $works,
+            ) {
+                $req->files = $this->fetchRequirementFiles(
+                    $applicant->id,
+                    $application->vacancy_id,
+                    $req,
+                    $application->type
+                );
+
+                $req->subItems = [];
+
+                if ($educationReq && $req->requirement_id == $educationReq->id) {
+                    $req->subItems = $educations;
+                }
+
+                if ($eligibilityReq && $req->requirement_id == $eligibilityReq->id) {
+                    $req->subItems = $eligibilities;
+                }
+
+                if ($learningReq && $req->requirement_id == $learningReq->id) {
+                    $req->subItems = $learnings;
+                }
+
+                if ($workReq && $req->requirement_id == $workReq->id) {
+                    $req->subItems = $works;
+                }
+
+                return $req;
+            });
+    }
+
+    private function normalizeFilenamePart(?string $value): string
+    {
+        return strtoupper(
+            preg_replace('/[^A-Za-z0-9_-]/', '_', $value ?? 'UNKNOWN')
+        );
+    }
+
+    public function downloadRequirements($id)
+    {
+        Gate::authorize('downloadRequirements', 'applicant-documents');
+
+        $conn = DB::connection('mysql');
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+        
+        $application = $conn->table('application')
+        ->where('id', $id)
+        ->first();
+
+        if(!$application){
+            abort(404, 'Application not found');
+        }
+
+        $applicant = $conn->table('application_applicant')
+        ->where('application_id', $application->id)
+        ->first();
+
+        $vacancy = $conn2->table('vacancy')
+        ->where('id', $application->vacancy_id)
+        ->first();
+
+        $lastName = $this->normalizeFilenamePart(strtoupper($applicant->last_name) ?? 'APPLICANT');
+        $itemNo   = $this->normalizeFilenamePart($vacancy->item_no ?? 'ITEM');
+
+        $zipFileName = sprintf(
+            '%s_%s_%s.zip',
+            $lastName,
+            $itemNo,
+            now()->format('mdYHis')
+        );
+
+        $requirements = $this->buildRequirementsData($application);
+
+        $filePaths = $this->extractFilePaths($requirements);
+
+        $zipPath = storage_path("app/temp/{$zipFileName}");
+
+        if (!is_dir(dirname($zipPath))) {
+            mkdir(dirname($zipPath), 0755, true);
+        }
+
+        $zip = new ZipArchive();
+
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            abort(500, 'Unable to create ZIP file.');
+        }
+
+        foreach ($filePaths as $relativePath) {
+            // Adjust disk if needed (public is most common)
+            $disk = 'public';
+
+            if (!Storage::disk($disk)->exists($relativePath)) {
+                continue; // skip missing files safely
+            }
+
+            $absolutePath = Storage::disk($disk)->path($relativePath);
+
+            // Clean filename inside ZIP
+            $nameInZip = basename($relativePath);
+
+            $zip->addFile($absolutePath, $nameInZip);
+        }
+
+        $zip->close();
+
+        return response()
+            ->download($zipPath)
+            ->deleteFileAfterSend(true);
+    }   
+
     public function getPds($id)
     {
         $user = auth()->user();
@@ -170,85 +359,44 @@ class ApplicantsController extends Controller
             return response()->json(['message' => 'Application not found'], 404);
         }
 
-        $applicant = $conn->table('applicant')
-        ->where('id', $application->applicant_id)
-        ->first();
-
-        if (!$applicant) {
-            return response()->json(['message' => 'Applicant not found'], 404);
-        }
-
-        $educationReq = $conn2->table('recruitment_requirements')
-        ->where('connected_to', 'Educational Background')
-        ->first();
-
-        $eligibilityReq = $conn2->table('recruitment_requirements')
-        ->where('connected_to', 'Civil Service Eligibility')
-        ->first();
-
-        $learningReq = $conn2->table('recruitment_requirements')
-        ->where('connected_to', 'Learning and Development')
-        ->first();
-
-        $workReq = $conn2->table('recruitment_requirements')
-        ->where('connected_to', 'Work Experience')
-        ->first();
-
-        $educations = $this->fetchEducationalBackgroundFiles($applicant, $application->vacancy_id, $application->type);
-        $eligibilities = $this->fetchCivilServiceEligibilityFiles($applicant, $application->vacancy_id, $application->type);
-        $learnings = $this->fetchLearningAndDevelopmentFiles($applicant, $application->vacancy_id, $application->type);
-        $works = $this->fetchWorkExperienceFiles($applicant, $application->vacancy_id, $application->type);
-
-        $requirements = $conn2->table('vacancy_requirements')
-        ->select([
-            'vacancy_requirements.*',
-            'recruitment_requirements.connected_to'
-        ])
-        ->leftJoin(
-            'recruitment_requirements',
-            'recruitment_requirements.id',
-            '=',
-            'vacancy_requirements.requirement_id'
-        )
-        ->where('vacancy_id', $application->vacancy_id)
-        ->get()
-        ->map(function ($req) use (
-            $applicant,
-            $application,
-            $educationReq,
-            $educations,
-            $eligibilityReq,
-            $eligibilities,
-            $learningReq,
-            $learnings,
-            $workReq,
-            $works,
-        ) {
-            $req->files = $this->fetchRequirementFiles($applicant->id, $application->vacancy_id, $req, $application->type);
-
-            $req->subItems = [];
-
-            if ($educationReq && $req->requirement_id == $educationReq->id) {
-                $req->subItems = $educations;
-            }
-
-            if ($eligibilityReq && $req->requirement_id == $eligibilityReq->id) {
-                $req->subItems = $eligibilities;
-            }
-
-            if ($learningReq && $req->requirement_id == $learningReq->id) {
-                $req->subItems = $learnings;
-            }
-
-            if ($workReq && $req->requirement_id == $workReq->id) {
-                $req->subItems = $works;
-            }
-
-            return $req;
-        });
+        $requirements = $this->buildRequirementsData($application);
 
         return response()->json($requirements);
     }
+
+    private function extractFilePaths($requirements): array
+    {
+        return collect($requirements)
+            ->flatMap(function ($req) {
+                $paths = collect();
+
+                // 1️⃣ Requirement-level files
+                if (!empty($req->files)) {
+                    $paths = $paths->merge(
+                        collect($req->files)->pluck('filepath')
+                    );
+                }
+
+                // 2️⃣ Files inside subItems
+                if (!empty($req->subItems)) {
+                    $paths = $paths->merge(
+                        collect($req->subItems)->flatMap(function ($subItem) {
+                            if (!empty($subItem->files)) {
+                                return collect($subItem->files)->pluck('filepath');
+                            }
+                            return [];
+                        })
+                    );
+                }
+
+                return $paths;
+            })
+            ->filter()        // remove null / empty
+            ->unique()        // avoid duplicates
+            ->values()        // reindex
+            ->toArray();
+    }
+
 
     public function getQualifications($id)
     {

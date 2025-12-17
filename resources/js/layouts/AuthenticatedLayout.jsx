@@ -9,7 +9,7 @@ import { usePage } from '@inertiajs/react'
 const AuthenticatedLayout = ({ children }) => {
   const { auth } = usePage().props
   const user = auth?.user
-
+  
   const [open, setOpen] = useState(() => {
     const savedState = localStorage.getItem('HRIS_sidebarOpen')
     return savedState ? JSON.parse(savedState) : true
