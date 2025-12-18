@@ -1263,8 +1263,8 @@ class CgaController extends Controller
         $request->validate([
             'title' => 'required|string|max:100',
             'description' => 'required|string',
-            'start_date' => 'required|date',
-            'end_date' => 'after_or_equal:start_date',
+            //'start_date' => 'required|date',
+            //'end_date' => 'after_or_equal:start_date',
             'newFiles.*' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:5120',
         ],[
             'title.required' => 'The title field is required.',
@@ -1274,10 +1274,10 @@ class CgaController extends Controller
             'description.required' => 'The details field is required.',
             'description.string' => 'The details field must be an acceptable text.',
 
-            'start_date.required' => 'The start date field is required.',
-            'start_date.date' => 'The start date must be a valid date.',
+            //'start_date.required' => 'The start date field is required.',
+            //'start_date.date' => 'The start date must be a valid date.',
             
-            'end_date.after_or_equal' => 'The end date must be a date after or equal to the start date.',
+            //'end_date.after_or_equal' => 'The end date must be a date after or equal to the start date.',
 
             'newFiles.array' => 'Files must be an array.',
             'newFiles.max' => 'You can upload a maximum of 5 files.',
