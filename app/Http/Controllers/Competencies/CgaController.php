@@ -705,7 +705,15 @@ class CgaController extends Controller
 
         $trainings = $trainings
             ->orderBy('seminar_title', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                foreach ($row as $key => $value) {
+                    if (is_string($value)) {
+                        $row->$key = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+                    }
+                }
+                return $row;
+            });
 
          return response()->json($trainings);
     }
