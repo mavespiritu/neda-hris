@@ -276,7 +276,7 @@ const SubmissionTrainings = ({
             id: submission.emp_id,
             filters: newFilters,
         })
-        }, [])
+    }, [])
 
     return (
         <div className="flex flex-col flex-grow gap-4 border rounded-lg p-4">

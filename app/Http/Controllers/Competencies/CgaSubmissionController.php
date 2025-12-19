@@ -610,10 +610,12 @@ class CgaSubmissionController extends Controller
                 return [
                     $year => $submission ? [
                         'id' => $submission->id,
+                        'emp_id' => $submission->emp_id,
                         'status' => $submission->latest_status,
                         'date_created' => $submission->date_created,
                         'date_submitted' => $submission->date_submitted,
                         'position' => $submission->position,
+                        'position_id' => $submission->position_id,
                         'name' => $submission->name,
                         'year' => $submission->year,
                         'acted_by' => $submission->acted_by,
