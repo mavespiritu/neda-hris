@@ -10,25 +10,36 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-export function DateRangePicker({ className, startDate, endDate, onDateChange, invalidStartDateMessage, invalidEndDateMessage }) {
+export function DateRangePicker({
+  className,
+  startDate,
+  endDate,
+  onDateChange,
+  invalidStartDateMessage,
+  invalidEndDateMessage,
+}) {
   const [date, setDate] = useState({
-    from: startDate,
-    to: endDate,
+    from: startDate ?? null,
+    to: endDate ?? null,
   })
-  const [open, setOpen] = useState(false) // control popover open/close
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (startDate && endDate) {
-      setDate({ from: startDate, to: endDate })
+    if (startDate || endDate) {
+      setDate({
+        from: startDate ?? null,
+        to: endDate ?? null,
+      })
     }
   }, [startDate, endDate])
 
   const handleSelect = (range) => {
-    const newRange = range?.from && range?.to
-      ? { from: range.from, to: range.to }
-      : range?.from
-      ? { from: range.from, to: range.from }
-      : { from: null, to: null }
+    const newRange =
+      range?.from && range?.to
+        ? { from: range.from, to: range.to }
+        : range?.from
+        ? { from: range.from, to: range.from }
+        : { from: null, to: null }
 
     setDate(newRange)
 
@@ -48,39 +59,43 @@ export function DateRangePicker({ className, startDate, endDate, onDateChange, i
             id="date"
             variant="outline"
             className={cn(
-              `w-full justify-start text-left font-normal ${invalidStartDateMessage && invalidEndDateMessage ? 'border-red-500' : ''}`,
-              !date && "text-muted-foreground"
+              "w-full justify-start text-left font-normal",
+              invalidStartDateMessage && invalidEndDateMessage && "border-red-500"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
               date.to ? (
                 <>
-                  {format(date.from, "MMMM dd, yyyy")} -{" "}
+                  {format(date.from, "MMMM dd, yyyy")} –{" "}
                   {format(date.to, "MMMM dd, yyyy")}
                 </>
               ) : (
                 format(date.from, "MMMM dd, yyyy")
               )
             ) : (
-              <span>Pick a date</span>
+              <span className="text-muted-foreground">Pick a date</span>
             )}
           </Button>
         </PopoverTrigger>
+
         <PopoverContent className="w-auto p-0" align="start">
           <div className="p-2">
             <Calendar
               initialFocus
               mode="range"
-              defaultMonth={date?.from}
+              captionLayout="dropdown"
+              fromYear={1990}
+              toYear={new Date().getFullYear()}
+              numberOfMonths={2}
+              defaultMonth={date?.from ?? undefined}
               selected={date}
               onSelect={handleSelect}
-              numberOfMonths={2}
             />
+
             <div className="flex justify-end mt-2">
               <Button
                 type="button"
-                variant=""
                 size="sm"
                 onClick={() => setOpen(false)}
               >

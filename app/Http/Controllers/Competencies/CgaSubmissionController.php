@@ -281,18 +281,46 @@ class CgaSubmissionController extends Controller
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
+        // 1️⃣ Get submission history
         $submissions = $conn2->table('submission_history as sh')
-        ->select([
-            'sh.id',
-            'sh.status',
-            DB::raw("DATE_FORMAT(sh.date_acted, '%M %d, %Y %h:%i:%s %p') as date_acted"),
-            DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', e.mname) as name"),
-        ])
-        ->leftJoin($conn3->raw('tblemployee as e'), 'sh.acted_by', '=', 'e.emp_id')
-        ->where('model', 'CGA')
-        ->where('model_id', $id)
-        ->orderBy('sh.id', 'desc')
-        ->get();
+            ->select([
+                'sh.id',
+                'sh.status',
+                'sh.acted_by',
+                DB::raw("DATE_FORMAT(sh.date_acted, '%M %d, %Y %h:%i:%s %p') as date_acted"),
+            ])
+            ->where('model', 'CGA')
+            ->where('model_id', $id)
+            ->orderBy('sh.id', 'desc')
+            ->get();
+
+        // If no submissions, return empty response early
+        if ($submissions->isEmpty()) {
+            return response()->json([]);
+        }
+
+        // 2️⃣ Get all employee IDs used
+        $employeeIds = $submissions->pluck('acted_by')->unique()->filter();
+
+        // 3️⃣ Fetch employees in one query
+        $employees = $conn3->table('tblemployee')
+            ->whereIn('emp_id', $employeeIds)
+            ->select('emp_id', 'lname', 'fname', 'mname')
+            ->get()
+            ->keyBy('emp_id');
+
+        // 4️⃣ Merge employee name into submission history
+        $submissions = $submissions->map(function ($item) use ($employees) {
+            $employee = $employees->get($item->acted_by);
+
+            $item->name = $employee
+                ? trim("{$employee->lname}, {$employee->fname} {$employee->mname}")
+                : 'System';
+
+            unset($item->acted_by); // remove if not needed in response
+
+            return $item;
+        });
 
         return response()->json($submissions);
     }
@@ -471,8 +499,21 @@ class CgaSubmissionController extends Controller
             ->get()
             ->pluck('post_description', 'item_no');
 
-        // 🔹 2. Get latest submissions per emp_id per year (full data)
+        // 🔹 2. Subquery: latest submission ID per emp_id per year
+        $latestPerEmpYear = $conn2->table('staff_competency_review')
+            ->select(
+                'emp_id',
+                'year',
+                DB::raw('MAX(id) as latest_id')
+            )
+            ->whereIn('year', $years)
+            ->groupBy('emp_id', 'year');
+
+        // 🔹 3. Get latest submissions (FULL ROWS)
         $submissions = $conn2->table('staff_competency_review as scr')
+            ->joinSub($latestPerEmpYear, 'latest', function ($join) {
+                $join->on('scr.id', '=', 'latest.latest_id');
+            })
             ->select([
                 'scr.id',
                 'scr.emp_id',
@@ -484,55 +525,56 @@ class CgaSubmissionController extends Controller
                 'scr.endorsed_by',
                 DB::raw("DATE_FORMAT(scr.date_acted, '%M %d, %Y %h:%i:%s %p') as date_acted"),
                 DB::raw("DATE_FORMAT(scr.date_endorsed, '%M %d, %Y %h:%i:%s %p') as date_endorsed"),
-                'scr.date_created', // keep raw for sorting
+                'scr.date_created', // raw for sorting
             ])
-            ->whereIn('scr.year', $years)
-            ->whereRaw('scr.id = (
-                SELECT MAX(scr2.id)
-                FROM staff_competency_review scr2
-                WHERE scr2.emp_id = scr.emp_id
-                AND scr2.year = scr.year
-            )')
             ->get();
 
-        // 🔹 3. Get latest status per submission
+        // 🔹 4. Latest status per submission
         $latestHistories = $conn2->table('submission_history as sh1')
             ->select('sh1.id', 'sh1.model_id', 'sh1.status')
             ->where('sh1.model', 'CGA')
             ->whereIn('sh1.model_id', $submissions->pluck('id'))
             ->whereRaw('sh1.id = (
-                SELECT MAX(sh2.id) FROM submission_history sh2
-                WHERE sh2.model = sh1.model AND sh2.model_id = sh1.model_id
+                SELECT MAX(sh2.id)
+                FROM submission_history sh2
+                WHERE sh2.model = sh1.model
+                AND sh2.model_id = sh1.model_id
             )')
             ->get()
             ->keyBy('model_id');
 
-        // 🔹 4. Attach status, position, and name to submissions
+        // 🔹 5. Employee names
         $employeesData = $conn3->table('tblemployee as e')
             ->select([
                 DB::raw('CAST(e.emp_id AS CHAR) as emp_id'),
                 DB::raw('CONCAT(e.lname, ", ", e.fname, " ", e.mname) as name'),
             ])
             ->where('e.work_status', 'Active')
+            ->where('e.emp_type_id', 'Permanent')
             ->get()
             ->pluck('name', 'emp_id');
 
+        // 🔹 6. Attach derived data
         $submissions->transform(function ($submission) use ($latestHistories, $positions, $employeesData) {
-            $submission->latest_status = $latestHistories[$submission->id]->status ?? $submission->status ?? null;
+            $submission->latest_status = $latestHistories[$submission->id]->status
+                ?? $submission->status
+                ?? null;
+
             $submission->position = $positions[$submission->position_id] ?? null;
             $submission->name = $employeesData[$submission->emp_id] ?? null;
+
             return $submission;
         });
 
-        // 🔹 5. Index submissions by emp_id-year
+        // 🔹 7. Index submissions by emp_id-year
         $submissionsByEmpYear = $submissions->groupBy(function ($s) {
             return $s->emp_id . '-' . $s->year;
         });
 
-        // 🔹 6. Employees with role restriction
+        // 🔹 8. Role restriction
         $rolePriorities = config('roles.priorities');
         $highestRole = collect(Auth::user()->roles->pluck('name'))
-            ->mapWithKeys(fn($role) => [$role => $rolePriorities[$role] ?? 0])
+            ->mapWithKeys(fn ($role) => [$role => $rolePriorities[$role] ?? 0])
             ->sortDesc()
             ->keys()
             ->first();
@@ -540,12 +582,13 @@ class CgaSubmissionController extends Controller
         $employees = $conn3->table('tblemployee as e')
             ->select(
                 'e.emp_id',
-                DB::raw("CONCAT(e.lname, ', ', e.fname, ' ', 
+                DB::raw("CONCAT(e.lname, ', ', e.fname, ' ',
                     IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname,1),'. '), '')
                 ) as name"),
                 'e.division_id as division'
             )
             ->where('e.work_status', 'active')
+            ->where('e.emp_type_id', 'Permanent')
             ->orderBy('division')
             ->orderBy('name');
 
@@ -558,11 +601,12 @@ class CgaSubmissionController extends Controller
 
         $employees = $employees->get();
 
-        // 🔹 7. Attach submissions object (full data) to employees
+        // 🔹 9. Attach submissions per year per employee
         $employees->transform(function ($emp) use ($submissionsByEmpYear, $years) {
             $emp->submissions = collect($years)->mapWithKeys(function ($year) use ($submissionsByEmpYear, $emp) {
                 $key = $emp->emp_id . '-' . $year;
                 $submission = $submissionsByEmpYear->get($key)?->first();
+
                 return [
                     $year => $submission ? [
                         'id' => $submission->id,
@@ -579,6 +623,7 @@ class CgaSubmissionController extends Controller
                     ] : null,
                 ];
             });
+
             return $emp;
         });
 

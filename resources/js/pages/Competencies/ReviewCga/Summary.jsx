@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from "react"
 import { store } from "./store"
-import StatusBadge from '@/components/StatusBadge'
+import StatusBadge from "@/components/StatusBadge"
 import { Card } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Loader2 } from "lucide-react"
 import axios from "axios"
-import { formatDate } from '@/lib/utils.jsx'
+import { formatDate } from "@/lib/utils.jsx"
 
 const Summary = () => {
   const [employees, setEmployees] = useState([])
@@ -48,6 +55,7 @@ const Summary = () => {
               <Loader2 className="h-6 w-6 animate-spin text-white" />
             </div>
           )}
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -58,48 +66,72 @@ const Summary = () => {
                 ))}
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {Object.entries(employeesByDivision).map(([division, divisionEmployees]) => (
-                <>
-                  {/* Division Row */}
-                  <TableRow key={`division-${division}`} className="bg-muted">
-                    <TableCell colSpan={2 + years.length} className="font-bold">
-                      {division}
-                    </TableCell>
-                  </TableRow>
 
-                  {/* Employees */}
-                  {divisionEmployees.map((emp) => (
-                    <TableRow key={emp.emp_id}>
-                      <TableCell /> {/* Division placeholder */}
-                      <TableCell>{emp.name}</TableCell>
-                      {years.map((year) => {
-                        const submission = emp.submissions?.[year]
-                        return (
-                          <TableCell
-                            key={`${emp.emp_id}-${year}`}
-                            className={submission ? "cursor-pointer hover:bg-muted/50" : ""}
-                            onClick={() => submission && setSelectedSubmission(submission)}
-                          >
-                            {submission ? (
-                              <div className="flex flex-col gap-1">
-                                <StatusBadge status={submission.status} />
-                                {submission.status && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDate(submission.date_created)}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                        )
-                      })}
+            <TableBody>
+              {Object.entries(employeesByDivision).map(
+                ([division, divisionEmployees]) => (
+                  <Fragment key={division}>
+                    {/* Division Row */}
+                    <TableRow className="bg-muted">
+                      <TableCell colSpan={2 + years.length} className="font-bold">
+                        {division}
+                      </TableCell>
                     </TableRow>
-                  ))}
-                </>
-              ))}
+
+                    {/* Employees */}
+                    {divisionEmployees.map((emp) => (
+                      <TableRow key={emp.emp_id}>
+                        <TableCell />
+                        <TableCell>{emp.name}</TableCell>
+
+                        {years.map((year) => {
+                          const submission = emp.submissions?.[year]
+
+                          return (
+                            <TableCell
+                              key={`${emp.emp_id}-${year}`}
+                              className={
+                                submission
+                                  ? "cursor-pointer hover:bg-muted/50"
+                                  : ""
+                              }
+                              onClick={() =>
+                                submission &&
+                                setSelectedSubmission(submission)
+                              }
+                            >
+                              {submission ? (
+                                <div className="flex flex-col gap-1">
+                                  <StatusBadge
+                                    status={
+                                      submission.status === null ||
+                                      submission.status === undefined
+                                        ? "Submitted"
+                                        : submission.status
+                                    }
+                                  />
+
+                                  {submission.date_created && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDate(
+                                        submission.date_created
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">
+                                  -
+                                </span>
+                              )}
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    ))}
+                  </Fragment>
+                )
+              )}
             </TableBody>
           </Table>
         </div>
