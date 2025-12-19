@@ -19,7 +19,7 @@ const Summary = () => {
   const [years, setYears] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const { setSelectedSubmission } = store()
+  const { setSelectedSubmission, selectedSubmission } = store()
 
   useEffect(() => {
     setLoading(true)

@@ -19,11 +19,6 @@ const SelectedSubmission = () => {
     setSelectedSubmission
   } = store()
 
-  const handleAction = (action) => {
-    console.log(`Action triggered: ${action}`)
-    // Implement backend request or state update here
-  }
-
   if (!selectedSubmission) {
     return (
       <div className="border rounded-lg h-full">
