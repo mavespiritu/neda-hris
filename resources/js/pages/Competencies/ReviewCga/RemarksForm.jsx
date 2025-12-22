@@ -31,7 +31,7 @@ const RemarksForm = ({ indicator, open, onClose, onSuccess }) => {
             clearErrors()
         }
     }, [open, indicator])
-
+    
     const handleSubmit = (e) => {
         e.preventDefault()
 

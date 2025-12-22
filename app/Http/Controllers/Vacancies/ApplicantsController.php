@@ -216,6 +216,45 @@ class ApplicantsController extends Controller
         );
     }
 
+    private function extractFilePaths($requirements): array
+    {
+        return collect($requirements)
+            ->flatMap(function ($req) {
+                $files = collect();
+
+                // 1️⃣ Requirement-level files (usually "path")
+                if (!empty($req->files)) {
+                    $files = $files->merge(collect($req->files));
+                }
+
+                // 2️⃣ Sub-item files (usually "filepath")
+                if (!empty($req->subItems)) {
+                    $files = $files->merge(
+                        collect($req->subItems)->flatMap(function ($subItem) {
+                            return !empty($subItem->files)
+                                ? collect($subItem->files)
+                                : [];
+                        })
+                    );
+                }
+
+                return $files;
+            })
+            ->map(function ($file) {
+                // Support both keys: filepath (old) and path (new)
+                if (is_array($file)) {
+                    return $file['filepath'] ?? $file['path'] ?? null;
+                }
+
+                // If it's an object
+                return $file->filepath ?? $file->path ?? null;
+            })
+            ->filter(fn ($p) => !empty($p)) // remove null/empty
+            ->unique()
+            ->values()
+            ->toArray();
+    }
+
     public function downloadRequirements($id)
     {
         Gate::authorize('downloadRequirements', 'applicant-documents');
@@ -363,40 +402,6 @@ class ApplicantsController extends Controller
 
         return response()->json($requirements);
     }
-
-    private function extractFilePaths($requirements): array
-    {
-        return collect($requirements)
-            ->flatMap(function ($req) {
-                $paths = collect();
-
-                // 1️⃣ Requirement-level files
-                if (!empty($req->files)) {
-                    $paths = $paths->merge(
-                        collect($req->files)->pluck('filepath')
-                    );
-                }
-
-                // 2️⃣ Files inside subItems
-                if (!empty($req->subItems)) {
-                    $paths = $paths->merge(
-                        collect($req->subItems)->flatMap(function ($subItem) {
-                            if (!empty($subItem->files)) {
-                                return collect($subItem->files)->pluck('filepath');
-                            }
-                            return [];
-                        })
-                    );
-                }
-
-                return $paths;
-            })
-            ->filter()        // remove null / empty
-            ->unique()        // avoid duplicates
-            ->values()        // reindex
-            ->toArray();
-    }
-
 
     public function getQualifications($id)
     {
