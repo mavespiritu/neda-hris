@@ -492,14 +492,18 @@ class CgaSubmissionController extends Controller
         $currentYear = now()->year;
         $years = range($currentYear, $currentYear - 4);
 
-        // 🔹 1. Load positions
+        /**
+         * 🔹 1. Load positions
+         */
         $positions = $conn3->table('tblemp_position_item as epi')
             ->join('tblposition as p', 'p.position_id', '=', 'epi.position_id')
             ->select('epi.item_no', 'p.post_description')
             ->get()
             ->pluck('post_description', 'item_no');
 
-        // 🔹 2. Subquery: latest submission ID per emp_id per year
+        /**
+         * 🔹 2. Latest submission ID per emp per year
+         */
         $latestPerEmpYear = $conn2->table('staff_competency_review')
             ->select(
                 'emp_id',
@@ -509,10 +513,35 @@ class CgaSubmissionController extends Controller
             ->whereIn('year', $years)
             ->groupBy('emp_id', 'year');
 
-        // 🔹 3. Get latest submissions (FULL ROWS)
+        /**
+         * 🔹 3. Subquery: competency averages per submission
+         * (total percentage / number of competencies)
+         */
+        $competencyAverages = $conn2->table('staff_competency_history as sch')
+            ->select([
+                'sch.emp_id',
+                'sch.position_id',
+                'sch.date_created',
+                DB::raw('AVG(sch.percentage) as avg_percentage'),
+                DB::raw('COUNT(sch.competency_id) as competency_count'),
+            ])
+            ->groupBy(
+                'sch.emp_id',
+                'sch.position_id',
+                'sch.date_created'
+            );
+
+        /**
+         * 🔹 4. Get latest submissions with competency average
+         */
         $submissions = $conn2->table('staff_competency_review as scr')
             ->joinSub($latestPerEmpYear, 'latest', function ($join) {
                 $join->on('scr.id', '=', 'latest.latest_id');
+            })
+            ->leftJoinSub($competencyAverages, 'ca', function ($join) {
+                $join->on('ca.emp_id', '=', 'scr.emp_id')
+                    ->on('ca.position_id', '=', 'scr.position_id')
+                    ->on('ca.date_created', '=', 'scr.date_created');
             })
             ->select([
                 'scr.id',
@@ -525,11 +554,17 @@ class CgaSubmissionController extends Controller
                 'scr.endorsed_by',
                 DB::raw("DATE_FORMAT(scr.date_acted, '%M %d, %Y %h:%i:%s %p') as date_acted"),
                 DB::raw("DATE_FORMAT(scr.date_endorsed, '%M %d, %Y %h:%i:%s %p') as date_endorsed"),
-                'scr.date_created', // raw for sorting
+                'scr.date_created',
+
+                // 👇 competency data
+                'ca.avg_percentage',
+                'ca.competency_count',
             ])
             ->get();
 
-        // 🔹 4. Latest status per submission
+        /**
+         * 🔹 5. Latest status per submission
+         */
         $latestHistories = $conn2->table('submission_history as sh1')
             ->select('sh1.id', 'sh1.model_id', 'sh1.status')
             ->where('sh1.model', 'CGA')
@@ -543,7 +578,9 @@ class CgaSubmissionController extends Controller
             ->get()
             ->keyBy('model_id');
 
-        // 🔹 5. Employee names
+        /**
+         * 🔹 6. Employee names
+         */
         $employeesData = $conn3->table('tblemployee as e')
             ->select([
                 DB::raw('CAST(e.emp_id AS CHAR) as emp_id'),
@@ -554,7 +591,9 @@ class CgaSubmissionController extends Controller
             ->get()
             ->pluck('name', 'emp_id');
 
-        // 🔹 6. Attach derived data
+        /**
+         * 🔹 7. Attach derived data
+         */
         $submissions->transform(function ($submission) use ($latestHistories, $positions, $employeesData) {
             $submission->latest_status = $latestHistories[$submission->id]->status
                 ?? $submission->status
@@ -563,15 +602,23 @@ class CgaSubmissionController extends Controller
             $submission->position = $positions[$submission->position_id] ?? null;
             $submission->name = $employeesData[$submission->emp_id] ?? null;
 
+            $submission->avg_percentage = $submission->avg_percentage !== null
+                ? round($submission->avg_percentage, 2)
+                : null;
+
             return $submission;
         });
 
-        // 🔹 7. Index submissions by emp_id-year
+        /**
+         * 🔹 8. Index submissions by emp_id-year
+         */
         $submissionsByEmpYear = $submissions->groupBy(function ($s) {
             return $s->emp_id . '-' . $s->year;
         });
 
-        // 🔹 8. Role restriction
+        /**
+         * 🔹 9. Role restriction
+         */
         $rolePriorities = config('roles.priorities');
         $highestRole = collect(Auth::user()->roles->pluck('name'))
             ->mapWithKeys(fn ($role) => [$role => $rolePriorities[$role] ?? 0])
@@ -601,7 +648,9 @@ class CgaSubmissionController extends Controller
 
         $employees = $employees->get();
 
-        // 🔹 9. Attach submissions per year per employee
+        /**
+         * 🔹 10. Attach submissions per year per employee
+         */
         $employees->transform(function ($emp) use ($submissionsByEmpYear, $years) {
             $emp->submissions = collect($years)->mapWithKeys(function ($year) use ($submissionsByEmpYear, $emp) {
                 $key = $emp->emp_id . '-' . $year;
@@ -622,6 +671,10 @@ class CgaSubmissionController extends Controller
                         'endorsed_by' => $submission->endorsed_by,
                         'date_acted' => $submission->date_acted,
                         'date_endorsed' => $submission->date_endorsed,
+
+                        // 👇 competency output
+                        'avg_percentage' => $submission->avg_percentage,
+                        'competency_count' => $submission->competency_count,
                     ] : null,
                 ];
             });

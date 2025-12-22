@@ -94,7 +94,7 @@ const MyCga = () => {
       setSelectedStaff(employee)
     }
   }, [])
-
+  
   useEffect(() => {
     setSelectedDesignation(null)
     setSelectedCareerPath(null)

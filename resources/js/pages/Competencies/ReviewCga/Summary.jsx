@@ -102,6 +102,7 @@ const Summary = () => {
                             >
                               {submission ? (
                                 <div className="flex flex-col gap-1">
+                                  <span className="text-xs font-bold">{submission.avg_percentage}%</span>
                                   <StatusBadge
                                     status={
                                       submission.status === null ||
