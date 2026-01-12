@@ -115,12 +115,24 @@ class CgaController extends Controller
     {
         $conn2 = DB::connection('mysql2');
         $filters = $request->query('filters', []);
+
         $empId = $id ?? auth()->user()->ipms_id;
         $positionId = $filters['item_no'] ?? null;
         $mode = $filters['mode'] ?? null;
 
-        // -- 1. Handle SUBMITTED MODES --
-        if (in_array($mode, ['edit-submitted', 'add-submitted']) && isset($filters['review_id'])) {
+        // convert query string "true"/"false" to boolean
+        $all = filter_var($filters['all'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $grouped = filter_var($filters['grouped'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        /**
+         * 1) SUBMITTED MODES (only when all is false)
+         * If all=true, we do NOT base on submission history.
+         */
+        if (
+            !$all &&
+            in_array($mode, ['edit-submitted', 'add-submitted']) &&
+            isset($filters['review_id'])
+        ) {
             $submission = $conn2->table('staff_competency_review')
                 ->where('id', $filters['review_id'])
                 ->first();
@@ -145,8 +157,10 @@ class CgaController extends Controller
                 ->get();
 
             return response()->json(
-                $competencies->map(fn($item) => [
+                $competencies->map(fn ($item) => [
+                    'id' => $item->id,
                     'value' => $item->id,
+                    'competency' => $item->competency,
                     'label' => "{$item->competency} ({$item->percentage}%)",
                     'description' => $item->description,
                     'type' => $item->type,
@@ -156,97 +170,154 @@ class CgaController extends Controller
             );
         }
 
-        // -- 2. Default QUERY (add/edit or no mode) --
-        $query = $conn2->table('competency_indicator as ci')
-            ->select([
-                'c.comp_id as id',
-                'c.competency',
-                'c.description',
-                DB::raw('MAX(ci.proficiency) as proficiency'),
-                DB::raw("CASE 
-                            WHEN c.comp_type = 'org' THEN 'Organizational'
-                            WHEN c.comp_type = 'mnt' THEN 'Managerial'
-                            ELSE 'Technical/Functional'
-                        END as type"),
-            ])
-            ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id');
+        /**
+         * 2) DEFAULT QUERY
+         * If all=true: fetch ALL competencies from competency table (ignore position filter)
+         * Else: keep your existing position-based behavior.
+         */
+        if ($all) {
+            // START from competency table to guarantee "all competencies"
+            $query = $conn2->table('competency as c')
+                ->leftJoin('competency_indicator as ci', 'ci.competency_id', '=', 'c.comp_id')
+                ->select([
+                    'c.comp_id as id',
+                    'c.competency',
+                    'c.description',
+                    DB::raw('MAX(ci.proficiency) as proficiency'),
+                    DB::raw("CASE 
+                                WHEN c.comp_type = 'org' THEN 'Organizational'
+                                WHEN c.comp_type = 'mnt' THEN 'Managerial'
+                                ELSE 'Technical/Functional'
+                            END as type"),
+                ])
+                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'c.description');
 
-        if ($positionId) {
-            $query->leftJoin('position_competency_indicator as pci', 'pci.indicator_id', '=', 'ci.id')
-                ->where('pci.position_id', $positionId)
-                ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description');
+            // Percentage for ALL competencies (not position-based)
+            $percentageSql = "ROUND(
+                (
+                    SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                    FROM (
+                        SELECT indicator_id, MAX(id) as latest_id
+                        FROM staff_all_indicator
+                        WHERE emp_id = '" . $empId . "'
+                        GROUP BY indicator_id
+                    ) as latest_ids
+                    JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                    LEFT JOIN competency_indicator as ci_x ON ci_x.id = latest_sai.indicator_id
+                    WHERE latest_sai.compliance = 1
+                    AND ci_x.competency_id = c.comp_id
+                ) / NULLIF(
+                    (
+                        SELECT COUNT(*)
+                        FROM competency_indicator as ci2
+                        WHERE ci2.competency_id = c.comp_id
+                    ), 0
+                ) * 100, 2
+            ) AS percentage";
+
+            $query->addSelect(DB::raw($percentageSql))
+                ->orderBy('c.competency', 'asc')
+                ->orderBy('type', 'asc');
+
+            $competencies = $query->get();
+
+            // when all=true, do NOT apply gap filtering
+            $filtered = $competencies;
+
         } else {
-            $query->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'c.description');
+            // Your original behavior (position-based when provided)
+            $query = $conn2->table('competency_indicator as ci')
+                ->select([
+                    'c.comp_id as id',
+                    'c.competency',
+                    'c.description',
+                    DB::raw('MAX(ci.proficiency) as proficiency'),
+                    DB::raw("CASE 
+                                WHEN c.comp_type = 'org' THEN 'Organizational'
+                                WHEN c.comp_type = 'mnt' THEN 'Managerial'
+                                ELSE 'Technical/Functional'
+                            END as type"),
+                ])
+                ->leftJoin('competency as c', 'c.comp_id', '=', 'ci.competency_id');
+
+            if ($positionId) {
+                $query->leftJoin('position_competency_indicator as pci', 'pci.indicator_id', '=', 'ci.id')
+                    ->where('pci.position_id', $positionId)
+                    ->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'pci.position_id', 'c.description');
+            } else {
+                $query->groupBy('c.comp_id', 'c.competency', 'c.comp_type', 'c.description');
+            }
+
+            $percentageSql = $positionId
+                ? "ROUND(
+                        (
+                            SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                            FROM (
+                                SELECT indicator_id, MAX(id) as latest_id
+                                FROM staff_all_indicator
+                                WHERE emp_id = '" . $empId . "'
+                                GROUP BY indicator_id
+                            ) as latest_ids
+                            JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                            LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
+                            WHERE latest_sai.compliance = 1
+                            AND ci.competency_id = c.comp_id
+                            AND ci.proficiency IN (
+                                SELECT DISTINCT ci3.proficiency
+                                FROM position_competency_indicator as pci3
+                                LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
+                                WHERE ci3.competency_id = c.comp_id
+                                AND pci3.position_id = '" . $positionId . "'
+                            )
+                        ) / NULLIF( 
+                            (
+                                SELECT COUNT(*)
+                                FROM position_competency_indicator as pci2
+                                LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
+                                WHERE ci2.competency_id = c.comp_id
+                                AND pci2.position_id = '" . $positionId . "'
+                            ), 0
+                        ) * 100, 2
+                    ) AS percentage"
+                : "ROUND(
+                        (
+                            SELECT COUNT(DISTINCT latest_sai.indicator_id)
+                            FROM (
+                                SELECT indicator_id, MAX(id) as latest_id
+                                FROM staff_all_indicator
+                                WHERE emp_id = '" . $empId . "'
+                                GROUP BY indicator_id
+                            ) as latest_ids
+                            JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
+                            LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
+                            WHERE latest_sai.compliance = 1
+                            AND ci.competency_id = c.comp_id
+                        ) / NULLIF(
+                            (
+                                SELECT COUNT(*)
+                                FROM competency_indicator as ci2
+                                WHERE ci2.competency_id = c.comp_id
+                            ), 0
+                        ) * 100, 2
+                    ) AS percentage";
+
+            $query->addSelect(DB::raw($percentageSql))
+                ->orderBy('type', 'asc')
+                ->orderBy('c.competency', 'asc');
+
+            $competencies = $query->get();
+
+            // gap-only filtering only for add/edit and only when all=false
+            $filtered = (in_array($mode, ['add', 'edit']))
+                ? $competencies->filter(fn ($item) => $item->percentage < 100)
+                : $competencies;
         }
 
-        // -- 3. Add % calculation --
-        $percentageSql = $positionId 
-            ? "ROUND(
-                    (
-                        SELECT COUNT(DISTINCT latest_sai.indicator_id)
-                        FROM (
-                            SELECT indicator_id, MAX(id) as latest_id
-                            FROM staff_all_indicator
-                            WHERE emp_id = '".$empId."'
-                            GROUP BY indicator_id
-                        ) as latest_ids
-                        JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
-                        LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
-                        WHERE latest_sai.compliance = 1
-                        AND ci.competency_id = c.comp_id
-                        AND ci.proficiency IN (
-                            SELECT DISTINCT ci3.proficiency
-                            FROM position_competency_indicator as pci3
-                            LEFT JOIN competency_indicator as ci3 ON ci3.id = pci3.indicator_id
-                            WHERE ci3.competency_id = c.comp_id
-                            AND pci3.position_id = '".$positionId."'
-                        )
-                    ) / NULLIF( 
-                        (
-                            SELECT COUNT(*)
-                            FROM position_competency_indicator as pci2
-                            LEFT JOIN competency_indicator as ci2 ON ci2.id = pci2.indicator_id
-                            WHERE ci2.competency_id = c.comp_id
-                            AND pci2.position_id = '".$positionId."'
-                        ), 0
-                    ) * 100, 2
-                ) AS percentage"
-            : "ROUND(
-                    (
-                        SELECT COUNT(DISTINCT latest_sai.indicator_id)
-                        FROM (
-                            SELECT indicator_id, MAX(id) as latest_id
-                            FROM staff_all_indicator
-                            WHERE emp_id = '".$empId."'
-                            GROUP BY indicator_id
-                        ) as latest_ids
-                        JOIN staff_all_indicator as latest_sai ON latest_sai.id = latest_ids.latest_id
-                        LEFT JOIN competency_indicator as ci ON ci.id = latest_sai.indicator_id
-                        WHERE latest_sai.compliance = 1
-                        AND ci.competency_id = c.comp_id
-                    ) / NULLIF(
-                        (
-                            SELECT COUNT(*)
-                            FROM competency_indicator as ci2
-                            WHERE ci2.competency_id = c.comp_id
-                        ), 0
-                    ) * 100, 2
-                ) AS percentage";
-
-        $query->addSelect(DB::raw($percentageSql))
-            ->orderBy('type', 'asc')
-            ->orderBy('c.competency', 'asc');
-
-        $competencies = $query->get();
-
-        // -- 4. Filter gap only if mode is add/edit --
-        $filtered = in_array($mode, ['add', 'edit'])
-            ? $competencies->filter(fn($item) => $item->percentage < 100)
-            : $competencies;
-
-        // -- 5. Return grouped result if grouped --
-        if (isset($filters['grouped']) && $filters['grouped']) {
-            $grouped = $filtered->groupBy('type')->map(function ($group) {
+        /**
+         * 3) Return grouped or flat
+         */
+        if ($grouped) {
+            $result = $filtered->groupBy('type')->map(function ($group) {
                 return $group->map(function ($item) {
                     return [
                         'id' => $item->id,
@@ -261,16 +332,15 @@ class CgaController extends Controller
                 })->values();
             });
 
-            return response()->json($grouped);
+            return response()->json($result);
         }
 
-        // -- 6. Otherwise: flat array
         return response()->json(
-            $filtered->map(fn($item) => [
+            $filtered->map(fn ($item) => [
                 'id' => $item->id,
                 'value' => $item->id,
                 'competency' => $item->competency,
-                'label' => "{$item->competency} ({$item->percentage}%)",
+                'label' => "{$item->percentage}%" ? "{$item->competency} ({$item->percentage}%)" : $item->competency,
                 'description' => $item->description,
                 'type' => $item->type,
                 'proficiency' => $item->proficiency,

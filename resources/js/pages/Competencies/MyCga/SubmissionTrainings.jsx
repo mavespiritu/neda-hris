@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-
+import { useHasRole } from '@/hooks/useAuth'
 import {
     Table,
     TableBody,
@@ -57,6 +57,8 @@ const SubmissionTrainings = ({
 }) => {
 
     const { toast } = useToast()
+
+    const canAddTraining = useHasRole(['HRIS_HR'])
 
     const {
         fetchProposedTrainings,
@@ -250,7 +252,7 @@ const SubmissionTrainings = ({
         ...filters,
         review_id: submission.id ?? null
         },
-        enableRowSelection: row => !row.original.status,
+        enableRowSelection: row => !row.original.status || canAddTraining,
         responseType: 'json',
         onJsonResponse: (response) => {
             setProposedTrainings((old) => ({
@@ -283,12 +285,12 @@ const SubmissionTrainings = ({
             <div
             className={cn(
                 "mt-4 flex flex-col md:flex-row gap-4",
-                submission?.status === null
+                (submission.status === null || canAddTraining)
                 ? "justify-between"
                 : "justify-end"
             )}
             >
-                {submission.status === null && (<div className="flex gap-2">
+                {(submission.status === null || canAddTraining) && (<div className="flex gap-2">
                     <Button variant="" onClick={() => openProposedTrainingForm()}>Add Training</Button>
                     <ProposedTrainingForm 
                         submission={submission}
