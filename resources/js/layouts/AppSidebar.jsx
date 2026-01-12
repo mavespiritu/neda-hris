@@ -49,7 +49,10 @@ import {
   ClipboardPenLine,
   NotebookPen,
   Users,
-  Briefcase
+  Briefcase,
+  CalendarDays,
+  CalendarRange,
+  CalendarPlus
 } from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
@@ -91,6 +94,16 @@ const AppSidebar = () => {
       title: "Search Jobs",
       url: "/jobs",
       icon: Search,
+    }, */
+    /* {
+      title: "Leaves",
+      url: "#",
+      icon: CalendarDays,
+      roles: ['HRIS_Staff'],
+      submenu: [
+        { title: 'Add New', url: '/leaves/create', roles: ['HRIS_Staff'], icon: CalendarPlus },
+        { title: 'Applications', url: '/leaves', roles: ['HRIS_Staff', 'HRIS_HR'], icon: CalendarRange },
+      ],
     }, */
     {
       title: "Recruitment",

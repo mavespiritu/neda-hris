@@ -123,3 +123,5 @@ require __DIR__ . '/jobs.applications.php';
 
 require __DIR__ . '/file.php';
 require __DIR__ . '/issue.php';
+
+require __DIR__ . '/leaves.php';

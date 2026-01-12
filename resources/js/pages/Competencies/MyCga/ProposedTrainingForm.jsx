@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react"
 import TextInput from "@/components/TextInput"
 import IntegerInput from "@/components/IntegerInput"
 import AmountInput from "@/components/AmountInput"
+import { useHasRole } from '@/hooks/useAuth'
 
 const ProposedTrainingForm = ({ 
   submission,
@@ -31,6 +32,8 @@ const ProposedTrainingForm = ({
     {value: "Virtual", label: "Virtual"},
     {value: "Synchronous", label: "Synchronous"},
   ]
+
+  const canAddTraining = useHasRole(['HRIS_HR'])
 
   const {
     fetchTrainingOptions,
@@ -109,7 +112,8 @@ const ProposedTrainingForm = ({
         filters: {
           item_no: submission.position_id,
           review_id: actualSubmission?.id ?? null,
-          mode
+          mode,
+          all: canAddTraining
         }
       })
 
