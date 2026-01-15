@@ -143,7 +143,7 @@ const TravelOrders = () => {
 
             <TableView />
 
-            {isFilterOpen && (
+            {/* {isFilterOpen && (
                 <Filter
                     open={isFilterOpen}
                     onClose={handleCloseFilter}
@@ -152,7 +152,7 @@ const TravelOrders = () => {
                     divisions={divisions}
                     appointmentStatuses={appointmentStatuses}
                 />
-            )}
+            )} */}
         </div>
     )
 }
