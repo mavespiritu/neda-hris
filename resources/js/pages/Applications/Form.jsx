@@ -10,8 +10,6 @@ import DatePicker from "@/components/DatePicker"
 
 const Form = ({mode, data, onClose, open}) => {
 
-  console.log(data)
-
   const isEdit = mode === "edit"
 
   const [selectedApplicantInfo, setSelectedApplicantInfo] = useState(null)
@@ -47,8 +45,6 @@ const Form = ({mode, data, onClose, open}) => {
       reset()
     }
   }, [mode, data])
-
-  console.log(data)
 
   // Fetch PSGC names when an applicant is selected
   useEffect(() => {

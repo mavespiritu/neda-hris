@@ -69,7 +69,7 @@ const SingleComboBox = ({
               className={`text-left pr-2 flex items-center gap-2 ${
                 labelWidth || `w-[380px]`
               } truncate overflow-hidden whitespace-nowrap ${
-                !selectedValue ? "text-gray-700" : ""
+                !selectedValue ? "text-gray-400" : ""
               }`}
             >
               {loading ? (

@@ -25,12 +25,10 @@ export function DateRangePicker({
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (startDate || endDate) {
-      setDate({
-        from: startDate ?? null,
-        to: endDate ?? null,
-      })
-    }
+    setDate({
+      from: startDate ?? null,
+      to: endDate ?? null,
+    })
   }, [startDate, endDate])
 
   const handleSelect = (range) => {
@@ -43,12 +41,15 @@ export function DateRangePicker({
 
     setDate(newRange)
 
-    if (onDateChange) {
-      onDateChange(
-        newRange.from ? format(newRange.from, "yyyy-MM-dd") : null,
-        newRange.to ? format(newRange.to, "yyyy-MM-dd") : null
-      )
-    }
+    onDateChange?.(
+      newRange.from ? format(newRange.from, "yyyy-MM-dd") : null,
+      newRange.to ? format(newRange.to, "yyyy-MM-dd") : null
+    )
+  }
+
+  const handleClear = () => {
+    setDate({ from: null, to: null })
+    onDateChange?.(null, null)
   }
 
   return (
@@ -60,7 +61,7 @@ export function DateRangePicker({
             variant="outline"
             className={cn(
               "w-full justify-start text-left font-normal",
-              invalidStartDateMessage && invalidEndDateMessage && "border-red-500"
+              (invalidStartDateMessage || invalidEndDateMessage) && "border-red-500"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -80,7 +81,7 @@ export function DateRangePicker({
         </PopoverTrigger>
 
         <PopoverContent className="w-auto p-0" align="start">
-          <div className="p-2">
+          <div className="p-3">
             <Calendar
               initialFocus
               mode="range"
@@ -91,9 +92,35 @@ export function DateRangePicker({
               defaultMonth={date?.from ?? undefined}
               selected={date}
               onSelect={handleSelect}
+              className="rounded-md border"
+              classNames={{
+                months: "flex flex-col sm:flex-row gap-4",
+                month: "space-y-4 text-xs",
+                caption: "w-full px-2 pt-1 relative",
+                caption_label: "hidden",
+                dropdowns: "grid grid-cols-2 gap-2 w-full",
+                dropdown:
+                  "w-full h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring",
+                dropdown_month: "w-full mb-2",
+                dropdown_year: "w-full",
+                nav: "space-x-1 flex items-center",
+                nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+                nav_button_previous: "absolute left-1 top-1",
+                nav_button_next: "absolute right-1 top-1",
+              }}
             />
 
-            <div className="flex justify-end mt-2">
+            {/* ACTION BUTTONS */}
+            <div className="flex justify-end mt-3 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleClear}
+              >
+                Clear
+              </Button>
+
               <Button
                 type="button"
                 size="sm"

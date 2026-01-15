@@ -1731,6 +1731,8 @@ class CgaController extends Controller
             'no_of_hours' => $request->no_of_hours,
             'cost' => $request->cost,
             'modality' => $request->modality,
+            'created_by' => auth()->user()->ipms_id,
+            'date_created' => Carbon::now(),
         ]);
 
         if($request->review_id){
