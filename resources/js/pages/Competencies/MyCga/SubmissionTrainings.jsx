@@ -108,7 +108,7 @@ const SubmissionTrainings = ({
         cell: ({ row }) => {
             const { status } = row.original
 
-            if (status) {
+            if (status && !canAddTraining) {
               return null 
             }
 
@@ -158,7 +158,7 @@ const SubmissionTrainings = ({
           const isHovered = row.id === hoveredRowId
           const { status } = row.original
 
-          if (status) {
+          if (status && !canAddTraining) {
             return null
           }
 

@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils.jsx"
 import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
-import Form from "./Form"
 import Filter from "./Filter"
 import useCrudTable from "@/hooks/useCrudTable"
 import StatusBadge from '@/components/StatusBadge'
@@ -23,11 +22,10 @@ import RichTextEditor from "@/components/RichTextEditor"
 
 const breadcrumbItems = [
     { label: 'Home', href: '/' },
-    { label: 'Recruitment', href: '#' },
-    { label: 'Applications', href: '/applications' },
+    { label: 'Travel Orders', href: route('travel-orders.index') },
 ]
 
-const Applications = () => {
+const TravelOrders = () => {
 
     const { toast } = useToast()
 
@@ -49,7 +47,7 @@ const Applications = () => {
         { value: 'PFPD', label: 'Policy Formulation and Planning Division'},
     ], [])
 
-    const { auth: { user }, data: { applications } } = usePage().props
+    const { auth: { user }, data: { travelOrders } } = usePage().props
 
     const handleAction = (action, row) => {
         setConfirmAction(action)
@@ -58,35 +56,31 @@ const Applications = () => {
 
     const columns = useMemo(() => [
         {
-            header: "Publication No.",
-            accessorKey: "publication.reference_no",
+            header: "Reference No.",
+            accessorKey: "reference_no",
             meta: { enableSorting: true },
         },
         {
-            header: "Position",
-            accessorKey: "vacancy.position_description",
-            cell: ({ row }) => {
-                const { vacancy } = row.original
+            header: "Purpose",
+            accessorKey: "purpose",
+            meta: { enableSorting: true },
+        },
+        {
+            header: "Division",
+            accessorKey: "division",
+            meta: { enableSorting: true },
+        },
 
-                return (
-                    <div className="flex flex-col gap-1">
-                        <span>{vacancy.position_description}</span>
-                        {vacancy.appointment_status === 'Permanent' && <span>({vacancy.item_no})</span>}
-                    </div>
-                )
-            },
+        {
+            header: "Requested by",
+            accessorKey: "creator",
             meta: { enableSorting: true },
         },
         {
-            header: "Applicant",
-            accessorKey: "name",
-            meta: { enableSorting: true },
-        },
-        {
-            header: "Date Submitted",
+            header: "Date Requested",
             accessorKey: "date_submitted",
             cell: ({ row }) => {
-                const dateSubmitted = row.original.date_submitted
+                const dateSubmitted = row.original.date_created
 
                 return (
                     <div className="flex flex-col gap-1">
@@ -114,8 +108,8 @@ const Applications = () => {
         reloadTable
         } = useCrudTable({
         columns,
-        routeName: route('applications.index'),
-        initialData: applications,
+        routeName: route('travel-orders.index'),
+        initialData: travelOrders,
         filters,
         options: {
             enableAdd: true,
@@ -127,38 +121,28 @@ const Applications = () => {
             enableSearching: true,
             enableFiltering: true,
             enableRowSelection: row => !row.original.isLocked,
-            enableGenerateReport: true,
+            enableGenerateReport: false,
             canModify: true
         },
         endpoints: {
-            viewEndpoint: (id) => route('applications.show', id),
-            deleteEndpoint: (id) => route('applications.destroy', id),
-            bulkDeleteEndpoint: route('applications.bulk-destroy'),
+            addEndpoint: route('travel-orders.create'),
+            viewEndpoint: (id) => route('travel-orders.show', id),
+            deleteEndpoint: (id) => route('travel-orders.destroy', id),
+            bulkDeleteEndpoint: route('travel-orders.bulk-destroy'),
         },
     })
 
     return (
         <div className="h-full flex flex-col">
-            <Head title="Vacancies" />
+            <Head title="Travel Orders" />
             <PageTitle 
-                pageTitle="Applications" 
-                description="Manage information about the applications here." 
+                pageTitle="Travel Orders" 
+                description="Manage information about the travel orders here." 
                 breadcrumbItems={breadcrumbItems} 
             />
 
             <TableView />
 
-            {isFormOpen && (
-                <Form
-                    open={isFormOpen}
-                    mode={formMode}
-                    data={selectedItem}
-                    onClose={() => {
-                        handleCloseForm()
-                        reloadTable()
-                    }}
-                />
-            )}
             {isFilterOpen && (
                 <Filter
                     open={isFilterOpen}
@@ -173,5 +157,5 @@ const Applications = () => {
     )
 }
 
-export default Applications
+export default TravelOrders
 

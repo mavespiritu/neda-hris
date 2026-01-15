@@ -52,7 +52,8 @@ import {
   Briefcase,
   CalendarDays,
   CalendarRange,
-  CalendarPlus
+  CalendarPlus,
+  PlaneTakeoff
 } from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
@@ -153,6 +154,12 @@ const AppSidebar = () => {
         { title: 'Staff 201', url: '/staff-201', roles: ['HRIS_HR'] },
       ],
     }, */
+    {
+      title: "Travel Orders",
+      url: '/travel-orders',
+      icon: PlaneTakeoff,
+      roles: ['HRIS_Staff'],
+    },
     {
       title: "Flexiplace",
       url: "#",
