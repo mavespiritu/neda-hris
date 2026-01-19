@@ -1,10 +1,9 @@
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { useForm } from "@inertiajs/react"
 import Report from "./Report"
 import { Label } from "@/components/ui/label"
 import { Car, MapPin, Hotel, Flag, Trash2 } from "lucide-react"
 import SingleComboBox from "@/components/SingleComboBox"
-import { DateRangePicker } from "@/components/DateRangePicker"
 import TextArea from "@/components/TextArea"
 import MultipleComboBox from "@/components/MultipleComboBox"
 import TextInput from "@/components/TextInput"
@@ -13,6 +12,7 @@ import DestinationForm from "./DestinationForm"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { formatDate } from "@/lib/utils.jsx"
+import DatePicker from "@/components/DatePicker" // ✅ adjust path if needed
 
 const Form = ({ mode, data, travelCategories, employees }) => {
   const isEdit = mode === "edit"
@@ -34,11 +34,29 @@ const Form = ({ mode, data, travelCategories, employees }) => {
     destinations: [],
     other_passengers: "",
     isRequestingVehicle: false,
-    date_created: ""
+    date_created: "",
   })
 
+  // ✅ Normalize employees ONCE and keep stable reference
+  const employeesList = useMemo(() => {
+    return Array.isArray(employees)
+      ? employees
+      : employees && typeof employees === "object"
+        ? Object.values(employees)
+        : []
+  }, [employees])
+
+  // ✅ Memoize combobox items so it doesn't "change" every render
+  const employeeOptions = useMemo(() => {
+    return employeesList.map((e) => ({
+      value: String(e.emp_id).trim(),
+      label: e.name,
+    }))
+  }, [employeesList])
+
+  // ✅ Don't depend on whole `data` object; use stable key only
   useEffect(() => {
-    if (isEdit && data) {
+    if (isEdit && data?.id) {
       setData({
         travel_category_id: data.travel_category_id ?? "",
         start_date: data.start_date ?? "",
@@ -46,7 +64,7 @@ const Form = ({ mode, data, travelCategories, employees }) => {
         purpose: data.purpose ?? "",
         staffs: Array.isArray(data.staffs)
           ? data.staffs
-              .map((s) => s.emp_id ?? s.value ?? s.id)
+              .map((s) => s.emp_id ?? s.value ?? s.id ?? s)
               .filter((v) => v !== undefined && v !== null && v !== "")
           : [],
         destinations: Array.isArray(data.destinations) ? data.destinations : [],
@@ -59,7 +77,7 @@ const Form = ({ mode, data, travelCategories, employees }) => {
       setData("date_created", formatDate(new Date()))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, data])
+  }, [isEdit, data?.id])
 
   const removeDestination = (indexToRemove) => {
     const next = (formData.destinations ?? []).filter((_, idx) => idx !== indexToRemove)
@@ -72,15 +90,18 @@ const Form = ({ mode, data, travelCategories, employees }) => {
     else post(route("travel-orders.store"))
   }
 
-  const handleDateRangeChange = (startDate, endDate) => {
-    setData({
-      ...data,
-      start_date: startDate,
-      end_date: endDate,
-    })
+  // ✅ Optional: keep end_date >= start_date
+  const handleStartDateChange = (val) => {
+    setData("start_date", val || "")
+    // if end_date exists but becomes earlier than start_date, clear it
+    if (val && formData.end_date && formData.end_date < val) {
+      setData("end_date", "")
+    }
   }
 
-  console.log(formData)
+  const handleEndDateChange = (val) => {
+    setData("end_date", val || "")
+  }
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-6 xl:grid-cols-2 items-start">
@@ -101,16 +122,35 @@ const Form = ({ mode, data, travelCategories, employees }) => {
           )}
         </div>
 
-        {/* Date Range */}
+        {/* Dates (two DatePickers) */}
         <div className="space-y-1">
           <Label className="text-sm">Date of Travel</Label>
-          <DateRangePicker
-            startDate={formData.start_date}
-            endDate={formData.end_date}
-            invalidStartDateMessage={errors.start_date}
-            invalidEndDateMessage={errors.end_date}
-            onDateChange={handleDateRangeChange}
-          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Start Date</Label>
+              <DatePicker
+                placeholder="Start date"
+                value={formData.start_date}
+                onDateChange={handleStartDateChange}
+                invalidMessage={errors?.start_date}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">End Date</Label>
+              <DatePicker
+                placeholder="End date"
+                value={formData.end_date}
+                onDateChange={handleEndDateChange}
+                invalidMessage={errors?.end_date}
+                minDate={formData.start_date || undefined}
+                disabled={!formData.start_date}
+                />
+            </div>
+          </div>
+
+          {/* If you still want the old error text style */}
           {errors?.start_date && <span className="text-red-500 text-xs">{errors.start_date}</span>}
           {errors?.end_date && <span className="text-red-500 text-xs">{errors.end_date}</span>}
         </div>
@@ -134,9 +174,10 @@ const Form = ({ mode, data, travelCategories, employees }) => {
           <Label className="flex flex-col gap-1 mb-2">
             <span className="text-sm">Authorized Personnel</span>
             <span>(Include yourself if you are part of the travel)</span>
-         </Label>
+          </Label>
+
           <MultipleComboBox
-            items={employees ?? []} // must be [{value,label}] list
+            items={employeeOptions}
             onChange={(vals) => setData("staffs", vals)}
             placeholder="Select staff"
             name="staff"
@@ -206,13 +247,14 @@ const Form = ({ mode, data, travelCategories, employees }) => {
                 {formData.destinations.map((dest, index) => (
                   <div key={index} className="flex justify-between rounded-md border px-4 py-2">
                     <div className="flex items-center space-x-4 w-full">
-                      {dest.type === 'Local' ? <Hotel className="hidden md:block" /> : <Flag className="hidden md:block" />}
+                      {dest.type === "Local" ? (
+                        <Hotel className="hidden md:block" />
+                      ) : (
+                        <Flag className="hidden md:block" />
+                      )}
 
                       <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {dest.location}
-                        </p>
-
+                        <p className="text-sm font-medium leading-none">{dest.location}</p>
                         <p className="text-xs text-muted-foreground">
                           {dest.type === "International" || dest.country !== "Philippines"
                             ? dest.country
@@ -253,8 +295,8 @@ const Form = ({ mode, data, travelCategories, employees }) => {
       </div>
 
       <div className="min-w-0">
-        <Report data={formData} />
-    </div>
+        <Report data={formData} employees={employees} />
+      </div>
     </form>
   )
 }

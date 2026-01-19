@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Policies\ApplicantDocumentPolicy;
+use App\Policies\RtoPolicy;
+use App\Policies\RaaPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -22,6 +24,9 @@ class AuthServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy('applicant-documents', ApplicantDocumentPolicy::class);
+
+        Gate::define('rto.visibleEmployeeIds', [RtoPolicy::class, 'visibleEmployeeIds']);
+        Gate::define('raa.visibleEmployeeIds', [RaaPolicy::class, 'visibleEmployeeIds']);
 
         Gate::define('view-index', function ($user, $resource, array $options = []) {
             // Allow based on roles

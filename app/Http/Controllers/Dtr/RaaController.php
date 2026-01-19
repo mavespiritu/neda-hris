@@ -21,7 +21,7 @@ use App\Notifications\NotifyArdOfRaaEndorsement;
 use App\Notifications\NotifyStaffOfRaaApproval;
 use Barryvdh\DomPDF\Facade\Pdf;
 use TCPDF;
-
+use Illuminate\Support\Facades\Gate;
 
 class RaaController extends Controller
 {
@@ -40,45 +40,19 @@ class RaaController extends Controller
             'date'          => 'rto.date',               
         ];
 
-        $rolePriorities = config('roles.priorities');
+        $visibleEmployeeIdsQuery = Gate::forUser(Auth::user())
+        ->raw('rto.visibleEmployeeIds');
 
-        $userRoles = Auth::user()->roles->pluck('name')->toArray();
-        $highestRole = collect($userRoles)
-            ->mapWithKeys(fn($role) => [$role => $rolePriorities[$role] ?? 0])
-            ->sortDesc()
-            ->keys()
-            ->first();
-
-        // Employees (for dropdown filter)
         $employeesQuery = $conn3->table('tblemployee')
             ->select([
                 'emp_id',
                 DB::raw('concat(lname, ", ", fname, " ", mname) as name'),
-                'division_id',
+                'division_id'
             ])
-            ->where('work_status', 'active')
+            ->whereIn('emp_id', $visibleEmployeeIdsQuery)
             ->orderBy('lname')
             ->orderBy('fname')
             ->orderBy('mname');
-
-        switch ($highestRole) {
-            case 'HRIS_RD':
-                // RD sees all
-                break;
-            case 'HRIS_ARD':
-                // ARD sees all
-                break;
-            case 'HRIS_HR':
-                // HR sees all
-                break;
-            case 'HRIS_ADC':
-            case 'HRIS_DC':
-                $employeesQuery->where('division_id', Auth::user()->division);
-                break;
-            case 'HRIS_Staff':
-                $employeesQuery->where('emp_id', Auth::user()->ipms_id);
-                break;
-        }
 
         $employees = $employeesQuery->get()->keyBy('emp_id');
         $employeeIds = $employees->keys()->all();

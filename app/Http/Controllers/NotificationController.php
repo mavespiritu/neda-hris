@@ -245,22 +245,45 @@ class NotificationController extends Controller
                 ]);
             }
 
-            $supervisors = User::whereHas('roles', function ($query) {
-                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
-            })
-            ->where('division', $staff->division_id)
-            ->get();
+            $submitter = auth()->user();
 
-            if ($supervisors->isEmpty()) {
-                Log::warning("No supervisors found for division: {$staff->division_id}");
-            }
+            $isArd = $submitter->roles()->where('name', 'HRIS_ARD')->exists();
 
-            $payload = [
-                'rto_id' => $rto->id
-            ];
+            if ($isArd) {
+                // Notify RD (no division filter)
+                $approvers = User::whereHas('roles', function ($query) {
+                        $query->where('name', 'HRIS_RD');
+                    })
+                    ->get();
 
-            if($supervisors){
-                Notification::send($supervisors, new NotifySupervisorOfRtoSubmission($payload));
+                $payload = [
+                    'rto_id' => $rto->id,
+                    'submitter_email' => $submitter->email,
+                    'endorser_id' => $submitter->ipms_id,
+                ];
+
+                if ($approvers->isNotEmpty()) {
+                    Notification::send($approvers, new NotifyArdOfRtoEndorsement($payload));
+                }else{
+                    Log::warning("No HRIS_RD users found for ARD submission. RTO ID: {$rto->id}");
+                }
+            } else {
+                // Default: notify supervisors in the staff's division
+                $approvers = User::whereHas('roles', function ($query) {
+                        $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+                    })
+                    ->where('division', $staff->division_id)
+                    ->get();
+
+                $payload = [
+                    'rto_id' => $rto->id
+                ];
+
+                if ($approvers->isNotEmpty()) {
+                    Notification::send($approvers, new NotifySupervisorOfRtoSubmission($payload));
+                }else{
+                    Log::warning("No supervisors found for division: {$staff->division_id}. RTO ID: {$rto->id}");
+                }
             }
 
             return redirect()->back()->with([
@@ -674,22 +697,45 @@ class NotificationController extends Controller
                 ]);
             }
 
-            $supervisors = User::whereHas('roles', function ($query) {
-                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
-            })
-            ->where('division', $staff->division_id)
-            ->get();
+            $submitter = auth()->user();
 
-            if ($supervisors->isEmpty()) {
-                Log::warning("No supervisors found for division: {$staff->division_id}");
-            }
+            $isArd = $submitter->roles()->where('name', 'HRIS_ARD')->exists();
 
-            $payload = [
-                'raa_id' => $raa->id
-            ];
+            if ($isArd) {
+                // Notify RD (no division filter)
+                $approvers = User::whereHas('roles', function ($query) {
+                        $query->where('name', 'HRIS_RD');
+                    })
+                    ->get();
 
-            if($supervisors){
-                Notification::send($supervisors, new NotifySupervisorOfRaaSubmission($payload));
+                $payload = [
+                    'raa_id' => $raa->id,
+                    'submitter_email' => $submitter->email,
+                    'endorser_id' => $submitter->ipms_id,
+                ];
+
+                if ($approvers->isNotEmpty()) {
+                    Notification::send($approvers, new NotifyArdOfRaaEndorsement($payload));
+                }else{
+                    Log::warning("No HRIS_RD users found for ARD submission. RTO ID: {$rto->id}");
+                }
+            } else {
+                // Default: notify supervisors in the staff's division
+                $approvers = User::whereHas('roles', function ($query) {
+                        $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+                    })
+                    ->where('division', $staff->division_id)
+                    ->get();
+
+                $payload = [
+                    'raa_id' => $raa->id
+                ];
+
+                if ($approvers->isNotEmpty()) {
+                    Notification::send($approvers, new NotifySupervisorOfRaaSubmission($payload));
+                }else{
+                    Log::warning("No supervisors found for division: {$staff->division_id}. RTO ID: {$rto->id}");
+                }
             }
 
             return redirect()->back()->with([
