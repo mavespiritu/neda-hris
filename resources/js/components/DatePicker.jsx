@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react"
-import { format, parse, getYear, getMonth } from "date-fns"
+import React, { useState, useEffect, useMemo } from "react"
+import { format, parse, getYear, getMonth, isValid, startOfDay } from "date-fns"
 import { Calendar as CalendarIcon, X } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -13,54 +13,76 @@ const DatePicker = ({
   onDateChange,
   className,
   invalidMessage,
-  disabled = false
+  disabled = false,
+  minDate, // ✅ NEW: Date or "yyyy-MM-dd"
 }) => {
+  const parseYMD = (v) => {
+    if (!v) return null
+    if (v instanceof Date) return isValid(v) ? v : null
+    if (typeof v === "string") {
+      const d = parse(v, "yyyy-MM-dd", new Date())
+      return isValid(d) ? d : null
+    }
+    return null
+  }
 
-  const [selectedDate, setSelectedDate] = useState(value ? parse(value, 'yyyy-MM-dd', new Date()) : null)
+  const minDateObj = useMemo(() => {
+    const d = parseYMD(minDate)
+    return d ? startOfDay(d) : null
+  }, [minDate])
+
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = parseYMD(value)
+    return d ? startOfDay(d) : null
+  })
   const [isOpen, setIsOpen] = useState(false)
 
-  // Use a key to force the Calendar to re-render when the year or month changes
   const calendarKey = selectedDate ? `${getYear(selectedDate)}-${getMonth(selectedDate)}` : "default"
 
   useEffect(() => {
-    if (value) {
-      setSelectedDate(parse(value, 'yyyy-MM-dd', new Date()))
-    } else {
-      setSelectedDate(null)
-    }
+    const d = parseYMD(value)
+    setSelectedDate(d ? startOfDay(d) : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value])
 
   const handleDateChange = (date) => {
-    setSelectedDate(date)
-    if (onDateChange) {
-      onDateChange(format(date, 'yyyy-MM-dd'))
-    }
+    if (!date) return
+
+    const picked = startOfDay(date)
+
+    // ✅ enforce min date in case user clicks a disabled day somehow
+    if (minDateObj && picked < minDateObj) return
+
+    setSelectedDate(picked)
+    onDateChange?.(format(picked, "yyyy-MM-dd"))
     setIsOpen(false)
   }
 
   const handleYearChange = (year) => {
     const newDate = new Date(selectedDate || new Date())
     newDate.setFullYear(year)
-    setSelectedDate(newDate)
-    if (onDateChange) {
-      onDateChange(format(newDate, 'yyyy-MM-dd'))
-    }
+
+    const d = startOfDay(newDate)
+    if (minDateObj && d < minDateObj) return
+
+    setSelectedDate(d)
+    onDateChange?.(format(d, "yyyy-MM-dd"))
   }
 
   const handleMonthChange = (month) => {
     const newDate = new Date(selectedDate || new Date())
     newDate.setMonth(month)
-    setSelectedDate(newDate)
-    if (onDateChange) {
-      onDateChange(format(newDate, 'yyyy-MM-dd'))
-    }
+
+    const d = startOfDay(newDate)
+    if (minDateObj && d < minDateObj) return
+
+    setSelectedDate(d)
+    onDateChange?.(format(d, "yyyy-MM-dd"))
   }
 
   const handleClear = () => {
     setSelectedDate(null)
-    if (onDateChange) {
-      onDateChange(undefined)
-    }
+    onDateChange?.(undefined)
     setIsOpen(false)
   }
 
@@ -71,7 +93,7 @@ const DatePicker = ({
   ]
 
   return (
-    <div className="flex flex-col space-y-2">
+    <div className={`flex flex-col space-y-2 ${className ?? ""}`}>
       <Popover open={isOpen} onOpenChange={(open) => !disabled && setIsOpen(open)}>
         <PopoverTrigger asChild>
           <Button
@@ -91,12 +113,17 @@ const DatePicker = ({
             <CalendarIcon className="w-4 h-4 ml-2 flex-shrink-0 text-gray-500 hidden sm:block" />
           </Button>
         </PopoverTrigger>
+
         {!disabled && (
           <PopoverContent className="p-0 w-auto">
             <div className="flex justify-between items-center p-2">
               <Select
-                value={selectedDate ? getMonth(selectedDate).toString() : getMonth(new Date()).toString()}
-                onValueChange={(value) => handleMonthChange(parseInt(value))}
+                value={
+                  selectedDate
+                    ? getMonth(selectedDate).toString()
+                    : getMonth(new Date()).toString()
+                }
+                onValueChange={(v) => handleMonthChange(parseInt(v))}
               >
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Month" />
@@ -109,9 +136,14 @@ const DatePicker = ({
                   ))}
                 </SelectContent>
               </Select>
+
               <Select
-                value={selectedDate ? getYear(selectedDate).toString() : getYear(new Date()).toString()}
-                onValueChange={(value) => handleYearChange(parseInt(value))}
+                value={
+                  selectedDate
+                    ? getYear(selectedDate).toString()
+                    : getYear(new Date()).toString()
+                }
+                onValueChange={(v) => handleYearChange(parseInt(v))}
               >
                 <SelectTrigger className="w-[100px]">
                   <SelectValue placeholder="Year" />
@@ -125,14 +157,18 @@ const DatePicker = ({
                 </SelectContent>
               </Select>
             </div>
+
             <Calendar
               key={calendarKey}
               mode="single"
               selected={selectedDate}
               onSelect={(date) => date && handleDateChange(date)}
-              defaultMonth={selectedDate || new Date()}
+              defaultMonth={selectedDate || (minDateObj || new Date())}
               initialFocus
+              // ✅ disables days earlier than minDate
+              disabled={minDateObj ? { before: minDateObj } : undefined}
             />
+
             <div className="flex justify-end p-2 border-t">
               <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
                 <X className="h-4 w-4 mr-1" /> Clear
@@ -141,9 +177,8 @@ const DatePicker = ({
           </PopoverContent>
         )}
       </Popover>
-      {invalidMessage && (
-        <p className="text-xs text-red-500 mt-1">{invalidMessage}</p>
-      )}
+
+      {invalidMessage && <p className="text-xs text-red-500 mt-1">{invalidMessage}</p>}
     </div>
   )
 }

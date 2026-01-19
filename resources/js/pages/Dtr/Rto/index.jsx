@@ -214,12 +214,12 @@ const Rto = () => {
                 actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
             }
-            if (status === "Endorsed" && roles.some(r => ["HRIS_ARD", "HRIS_HR"].includes(r))) {
+            if (status === "Endorsed" && roles.some(r => ["HRIS_RD","HRIS_ARD", "HRIS_HR"].includes(r))) {
                 actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                 actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
             }
-            if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_HR"].includes(r))) {
+            if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_RD", "HRIS_ARD", "HRIS_HR"].includes(r))) {
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
             }
 

@@ -123,26 +123,52 @@ class TravelOrdersController extends Controller
         ->orderBy('title')
         ->get();
 
+        $recommenderUsers = User::whereHas('permissions', function ($query) {
+                $query->whereIn('name', ['HRIS_travel-order.recommending-approver']);
+            })
+            ->pluck('ipms_id')
+            ->toArray();
+
+        $recommendingApprovers = $conn3->table('tblemployee')
+            ->select([
+                'emp_id',
+                DB::raw('concat(fname, " ", LEFT(mname, 1),". ",lname) as name'),
+                'division_id'
+            ])
+            ->whereIn('emp_id', $recommenderUsers)
+            ->where('work_status', 'active')
+            ->orderBy('lname')
+            ->orderBy('fname')
+            ->orderBy('mname')
+            ->get();
+
         $employees = $conn3->table('tblemployee')
             ->select([
                 'emp_id',
-                DB::raw('concat(lname, ", ", fname, " ", mname) as name'),
+                DB::raw('concat(fname, " ", LEFT(mname, 1),". ",lname) as name'),
                 'division_id'
             ])
             ->where('work_status', 'active')
             ->orderBy('lname')
             ->orderBy('fname')
-            ->orderBy('mname');
+            ->orderBy('mname')
+            ->get();
+        
+        $recommenderByDivision = $recommendingApprovers
+            ->groupBy('division_id')
+            ->map(fn ($group) => $group->first());
 
-        $employees = $employees->get()->keyBy('emp_id');
+        $employees = $employees->map(function ($emp) use ($recommenderByDivision) {
+            $emp->recommending = $recommenderByDivision->get($emp->division_id);
+            return $emp;
+        });
+
+        $employees = $employees->keyBy('emp_id');
 
         return Inertia::render('TravelOrders/Create', [
             'data' => [
                 'travelCategories' => $travelCategories,
-                'employees' => $employees->map(fn($emp) => [
-                    'value' => $emp->emp_id,
-                    'label' => $emp->name
-                ])->values(),
+                'employees' => $employees,
             ],
         ]);
     }
