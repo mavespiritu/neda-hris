@@ -186,7 +186,7 @@ class VacancyController extends Controller
                 DB::raw('CONCAT(c.competency, " (Level ", vc.level, ")") as label'),
                 'c.competency',
                 'vc.level',
-                'c.comp_type'
+                'vc.comp_type'
             )
             ->get();
 

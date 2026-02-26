@@ -61,7 +61,7 @@ const VacancyInfo = () => {
 
   const compTypeHeaders = {
     org: "Organizational",
-    lead: "Leadership / Managerial",
+    mnt: "Leadership / Managerial",
     func: "Technical / Functional"
   }
 
