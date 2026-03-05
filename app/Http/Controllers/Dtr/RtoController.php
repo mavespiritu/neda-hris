@@ -687,7 +687,7 @@ class RtoController extends Controller
 
             $user = User::find($link->user_id);
 
-            if (!$rto) {
+            if (!$user) {
                 abort(404, 'User not found');
             }
 

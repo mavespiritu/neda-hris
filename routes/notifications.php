@@ -6,6 +6,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\NotificationController as GeneralNotificationController;
 use App\Http\Controllers\Vacancies\NotificationController as VacancyNotificationController;
 use App\Http\Controllers\JobPortal\NotificationController as JobPortalNotificationController;
+use App\Http\Controllers\TravelOrders\NotificationController as TravelRequestNotificationController;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::post('/notification/submit-gap-analysis', [GeneralNotificationController::class, 'submitGapAnalysis'])->name('notification.submit-gap-analysis');

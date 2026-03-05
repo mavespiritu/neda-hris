@@ -12,8 +12,10 @@ const DefaultLayout = ({ children }) => {
     const { props, url } = usePage()
     const user = props.auth?.user
 
+    const cleanUrl = (url || "").split("#")[0].split("?")[0]
+
     // Render LoginLayout if the current URL is /login
-    if (url === '/login') {
+    if (cleanUrl.startsWith("/login")) {
         return (
             <LoginLayout>
                 {children}

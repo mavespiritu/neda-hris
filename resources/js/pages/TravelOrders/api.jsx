@@ -15,3 +15,14 @@ export const getCitymuns = (payload) => {
     const url = `https://psgc.gitlab.io/api/provinces/${provinceCode}/cities-municipalities/`
     return axios.get(url, {params: {...payload}})
 }
+
+export const getDistricts = (payload) => {
+    const url = 'https://psgc.gitlab.io/api/districts/'
+    return axios.get(url, {params: {...payload}})
+}
+
+export const getDistrictCitymuns = (payload) => {
+    const { districtCode } = payload
+    const url = `https://psgc.gitlab.io/api/districts/${districtCode}/cities-municipalities/`
+    return axios.get(url, {params: {...payload}})
+}
