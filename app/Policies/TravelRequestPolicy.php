@@ -42,6 +42,15 @@ class TravelRequestPolicy
         };
     }
 
+    private function isReviewer(User $user): bool
+    {
+        return DB::connection('mysql2')
+            ->table('travel_order_signatories')
+            ->where('type', 'Reviewer_VR')
+            ->where('signatory', (string) $user->ipms_id)
+            ->exists();
+    }
+
     public function create(User $user): Response
     {
         return $user->hasRole('HRIS_Staff')
@@ -210,6 +219,15 @@ class TravelRequestPolicy
 
         if ((string) $travelRequest->created_by !== (string) $user->ipms_id) {
             return Response::deny('Only the request creator can submit.');
+        }
+
+        return Response::allow();
+    }
+
+    public function filterAny(User $user): Response
+    {
+        if (! $this->isReviewer($user)) {
+            return Response::deny('Not allowed to filter any travel requests.');
         }
 
         return Response::allow();

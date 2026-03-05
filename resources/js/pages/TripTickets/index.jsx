@@ -8,6 +8,13 @@ import { formatDateRange } from "@/lib/utils.jsx"
 import StatusBadge from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
 import CompleteTripForm from "./CompleteTripForm"
+import PageTitle from "@/components/PageTitle"
+import { Head, usePage, router, useForm } from "@inertiajs/react"
+
+const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Trip Tickets', href: route('trip-tickets.index') },
+]
 
 const TripTickets = () => {
   const { tripTickets, setTripTickets, fetchTripTickets } = store()
@@ -146,10 +153,13 @@ const TripTickets = () => {
   })
 
   return (
-    <>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold">Trip Ticket</h3>
-      </div>
+    <div className="h-full flex flex-col">
+      <Head title="Trip Tickets" />
+      <PageTitle 
+          pageTitle="Trip Tickets" 
+          description="Manage information about the trip tickets here." 
+          breadcrumbItems={breadcrumbItems} 
+      />
 
       <TableView />
 
@@ -195,7 +205,7 @@ const TripTickets = () => {
           options={tripTickets.filter_options}
         />
       )}
-    </>
+    </div>
   )
 }
 

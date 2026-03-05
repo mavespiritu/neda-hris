@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label"
 import RichTextEditor from "@/components/RichTextEditor"
 import { formatDateRange } from "@/lib/utils.jsx"
 import { format } from "date-fns"
+import Filter from "./Filter"
 
 
 const breadcrumbItems = [
@@ -31,7 +32,13 @@ const TravelOrders = () => {
 
     const { toast } = useToast()
 
-    const { auth: { user }, data: { travelOrders }, can } = usePage().props
+    const { auth: { user }, data: { travelOrders, filterOptions }, can } = usePage().props
+
+    const [filters, setFilters] = useState({
+    employee_id: "",
+    travel_type: "",
+    travel_category_id: "",
+    })
 
     const canSelectStaff = useHasRole(["HRIS_PRU", "HRIS_DC", "HRIS_ADC"])
 
@@ -186,8 +193,6 @@ const TravelOrders = () => {
         }
     ], [])
 
-    const [filters, setFilters] = useState({})
-
     const { 
         TableView,
         isFormOpen,
@@ -236,16 +241,20 @@ const TravelOrders = () => {
 
             <TableView />
 
-            {/* {isFilterOpen && (
-                <Filter
-                    open={isFilterOpen}
-                    onClose={handleCloseFilter}
-                    onApply={(appliedFilters) => setFilters(appliedFilters)}
-                    initialValues={filters}
-                    divisions={divisions}
-                    appointmentStatuses={appointmentStatuses}
-                />
-            )} */}
+            {isFilterOpen && (
+            <Filter
+                open={isFilterOpen}
+                onClose={handleCloseFilter}
+                onApply={(appliedFilters) =>
+                setFilters((prev) => ({
+                    ...prev,
+                    ...appliedFilters,
+                }))
+                }
+                initialValues={filters}
+                options={filterOptions}
+            />
+            )}
 
             <Dialog 
                 open={!!confirmAction}

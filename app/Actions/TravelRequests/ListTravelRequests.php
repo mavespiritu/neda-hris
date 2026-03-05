@@ -26,11 +26,31 @@ class ListTravelRequests
         $conn3 = DB::connection('mysql3');
         $user = $request->user();
 
-        $query = IndexTableQuery::for($this->baseQuery($conn2, (string) $user->ipms_id))
-            ->allowedFilters([
-                'created_by' => fn ($q, $v) => $q->where('created_by', $v),
-                'start_date' => fn ($q, $v) => $q->whereDate('start_date', Carbon::parse($v)->format('Y-m-d')),
-            ])
+        $canReview = Gate::forUser($user)->allows('tr.filterAny');
+
+        $allowedFilters = [
+            'start_date' => fn ($q, $v) => $q->whereDate('start_date', Carbon::parse($v)->format('Y-m-d')),
+            'travel_type' => fn ($q, $v) => $q->where('travel_type', (string) $v),
+            'travel_category_id' => fn ($q, $v) => $q->where('travel_category_id', (int) $v),
+        ];
+
+        if ($canReview) {
+            $allowedFilters['employee_id'] = function ($q, $v) {
+                $empId = (string) $v;
+                $q->where(function ($qq) use ($empId) {
+                    $qq->where('travel_order.created_by', $empId)
+                        ->orWhereExists(function ($sq) use ($empId) {
+                            $sq->select(DB::raw(1))
+                                ->from('travel_order_staffs as s')
+                                ->whereColumn('s.travel_order_id', 'travel_order.id')
+                                ->where('s.emp_id', $empId);
+                        });
+                });
+            };
+        }
+
+        $query = IndexTableQuery::for($this->baseQuery($conn2, (string) $user->ipms_id, $canReview))
+            ->allowedFilters($allowedFilters)
             ->search(function ($q, string $term) {
                 $q->where(function ($qq) use ($term) {
                     $qq->where('reference_no', 'like', "%{$term}%")
@@ -57,27 +77,39 @@ class ListTravelRequests
         return Inertia::render('TravelOrders/index', [
             'data' => [
                 'travelOrders' => $query,
-                'filters' => $request->only(['created_by', 'start_date', 'employee_name', 'sort', 'direction', 'search']),
+                'filters' => $request->only([
+                    'employee_id',
+                    'travel_type',
+                    'travel_category_id',
+                    'start_date',
+                    'sort',
+                    'direction',
+                    'search',
+                ]),
+                'filterOptions' => $this->filterOptions($conn2, $canReview),
             ],
             'can' => [
                 'create' => Gate::forUser($user)->inspect('tr.create')->allowed(),
+                'review' => $canReview,
             ],
         ]);
     }
 
-    private function baseQuery($conn2, string $userEmpId)
+    private function baseQuery($conn2, string $userEmpId, bool $canReview)
     {
-        return $conn2->table('travel_order')
-            ->where('request_type', 'TO')
-            ->where(function ($q) use ($userEmpId) {
-                $q->where('travel_order.created_by', $userEmpId)
-                  ->orWhereExists(function ($qq) use ($userEmpId) {
-                      $qq->select(DB::raw(1))
-                         ->from('travel_order_staffs as s')
-                         ->whereColumn('s.travel_order_id', 'travel_order.id')
-                         ->where('s.emp_id', $userEmpId);
-                  });
+        $q = $conn2->table('travel_order')->where('request_type', 'TO');
+
+        if ($canReview) return $q;
+
+        return $q->where(function ($w) use ($userEmpId) {
+            $w->where('travel_order.created_by', $userEmpId)
+            ->orWhereExists(function ($sq) use ($userEmpId) {
+                $sq->select(DB::raw(1))
+                    ->from('travel_order_staffs as s')
+                    ->whereColumn('s.travel_order_id', 'travel_order.id')
+                    ->where('s.emp_id', $userEmpId);
             });
+        });
     }
 
     private function decorateItems($items, ActionRequest $request, $conn2, $conn3)
@@ -117,5 +149,58 @@ class ListTravelRequests
 
             return $item;
         });
+    }
+
+    private function filterOptions($conn2, bool $canReview): array
+    {
+        $employeeIds = collect();
+
+        if ($canReview) {
+            $creatorIds = $conn2->table('travel_order')
+                ->where('request_type', 'TO')
+                ->pluck('created_by');
+
+            $staffIds = $conn2->table('travel_order_staffs as s')
+                ->join('travel_order as t', 't.id', '=', 's.travel_order_id')
+                ->where('t.request_type', 'TO')
+                ->pluck('s.emp_id');
+
+            $employeeIds = $creatorIds->merge($staffIds)->filter()->unique()->values();
+        }
+
+        $employeesById = $this->employeeNamesById($employeeIds, 'mysql3');
+
+        $employees = $employeeIds->map(fn ($id) => [
+            'value' => (string) $id,
+            'label' => $this->employeeName($employeesById, $id),
+        ])->sortBy('label')->values();
+
+        $travelTypes = collect([
+            ['value' => 'Local', 'label' => 'Local'],
+            ['value' => 'Foreign', 'label' => 'Foreign'],
+        ]);
+
+        $categories = $conn2->table('travel_order_categories as toc')
+            ->select(['toc.id', 'toc.title'])
+            ->whereIn('toc.id', function ($q) use ($conn2) {
+                $q->from('travel_order')
+                    ->where('request_type', 'TO')
+                    ->whereNotNull('travel_category_id')
+                    ->select('travel_category_id')
+                    ->distinct();
+            })
+            ->orderBy('toc.title')
+            ->get()
+            ->map(fn ($c) => [
+                'value' => (string) $c->id,
+                'label' => (string) $c->title,
+            ])
+            ->values();
+
+        return [
+            'employees' => $employees,
+            'travel_types' => $travelTypes,
+            'travel_categories' => $categories,
+        ];
     }
 }
