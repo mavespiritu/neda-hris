@@ -18,39 +18,73 @@ import StatusBadge from '@/components/StatusBadge'
 import { useToast } from "@/hooks/use-toast"
 import { Label } from "@/components/ui/label"
 import RichTextEditor from "@/components/RichTextEditor"
+import { formatDateRange } from "@/lib/utils.jsx"
+import { format } from "date-fns"
+
 
 const breadcrumbItems = [
     { label: 'Home', href: '/' },
-    { label: 'Travel Orders', href: route('travel-orders.index') },
+    { label: 'Travel Requests', href: route('travel-requests.index') },
 ]
 
 const TravelOrders = () => {
 
     const { toast } = useToast()
 
-    const appointmentStatuses = useMemo(() => [
-        { label: 'Permanent', value: 'Permanent'},
-        { label: 'Casual', value: 'Casual'},
-        { label: 'Contractual', value: 'Contractual'},
-        { label: 'Contract of Service', value: 'Contract of Service'},
-        { label: 'Job Order', value: 'Job Order'},
-        { label: 'Temporary', value: 'Temporary'},
-    ], [])
+    const { auth: { user }, data: { travelOrders }, can } = usePage().props
 
-    const divisions = useMemo(() => [
-        { value: 'DRD', label: 'Development Research, Communication, and Advocacy Division', },
-        { value: 'FAD', label: 'Finance and Administrative Division'},
-        { value: 'ORD', label: 'Office of the Regional Director'},
-        { value: 'PMED', label: 'Monitoring and Evaluation Division'},
-        { value: 'PDIPBD', label: 'Project Development, Investment Programming and Budgeting Division'},
-        { value: 'PFPD', label: 'Policy Formulation and Planning Division'},
-    ], [])
+    const canSelectStaff = useHasRole(["HRIS_PRU", "HRIS_DC", "HRIS_ADC"])
 
-    const { auth: { user }, data: { travelOrders } } = usePage().props
+    const [confirmAction, setConfirmAction] = useState(null)
+    const [selectedRow, setSelectedRow] = useState(null)
+    
+    const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
+        remarks: "",
+    })
 
     const handleAction = (action, row) => {
         setConfirmAction(action)
         setSelectedRow(row)
+    }
+
+    const performAction = (e) => {
+
+        e.preventDefault()
+
+        if (!confirmAction || !selectedRow) return
+
+        const id = selectedRow.original.id
+
+        const actionMap = {
+            Submit: {
+                route: "travel-requests.submit",
+                notification: "notification.submit-travel-request",
+            },
+        }
+
+        const { route: actionRoute, notification } = actionMap[confirmAction] || {}
+
+        if (!actionRoute) return
+
+        post(route(actionRoute, id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast({
+                    title: "Success!",
+                    description: `${confirmAction} successful!`,
+                })
+
+                if (["Endorse", "Approve", "Needs Revision", "Disapprove"].includes(confirmAction)) {
+                    router.post(route(notification, { id, userId: user.ipms_id }))
+                } else {
+                    router.post(route(notification, id))
+                }
+
+                reset()
+                setConfirmAction(null)
+                setSelectedRow(null)
+            },
+        })
     }
 
     const columns = useMemo(() => [
@@ -60,37 +94,96 @@ const TravelOrders = () => {
             meta: { enableSorting: true },
         },
         {
+            header: "Type",
+            accessorKey: "travel_type",
+            meta: { enableSorting: true },
+        },
+        {
             header: "Purpose",
             accessorKey: "purpose",
             meta: { enableSorting: true },
         },
         {
-            header: "Division",
-            accessorKey: "division",
-            meta: { enableSorting: true },
-        },
-
-        {
-            header: "Requested by",
-            accessorKey: "creator",
-            meta: { enableSorting: true },
-        },
-        {
-            header: "Date Requested",
-            accessorKey: "date_submitted",
+            header: "Date of Travel",
+            accessorKey: "start_date",
             cell: ({ row }) => {
-                const dateSubmitted = row.original.date_created
+                const { start_date, end_date } = row.original
 
                 return (
-                    <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium mt-1">
-                            {dateSubmitted && formatDate(dateSubmitted)}
-                        </span>
-                    </div>
+                <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium mt-1">
+                    {formatDateRange(start_date, end_date)}
+                    </span>
+                </div>
                 )
             },
             meta: { enableSorting: true },
         },
+        {
+            header: "Status",
+            accessorKey: "status",
+            meta: { enableSorting: true, className: "w-[15%]" },
+            cell: ({ row }) => {
+                const status = row.original.status
+                const actedBy = row.original.acted_by
+                const actedByName = row.original.acted_by_name
+                const dateActed = row.original.date_acted
+                const remarks = row.original.remarks
+                return (
+                    <div className="flex flex-col gap-1">
+                        <StatusBadge status={status} />
+                        {/* {actedBy && (
+                            <span className="text-xs text-gray-400 mt-1">
+                                By: {actedBy === user.ipms_id ? "You" : actedByName}
+                            </span>
+                        )}
+                        {dateActed && (
+                            <span className="text-xs text-gray-400">
+                                Date: {format(new Date(dateActed), "MMMM d, yyyy")}
+                            </span>
+                        )}
+                        {remarks && (
+                            <span className="text-xs text-gray-400">
+                                Remarks: 
+                                <div
+                                    dangerouslySetInnerHTML={{ __html: remarks }}
+                                />
+                            </span>
+                        )} */}
+                    </div>
+                )
+            }
+        },
+        {
+            header: "Actions",
+            cell: ({ row }) => {
+            
+                const can = row.original?.can || {}
+                const actions = []
+
+                if (can.submit)  actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
+
+                if (actions.length === 0) return null
+
+                return (
+                    <div className="flex flex-col gap-2">
+                    {actions.map((action, i) => (
+                        <Button
+                        key={i}
+                        size="xs"
+                        variant="link"
+                        title={action.label}
+                        onClick={() => handleAction(action.label, row)}
+                        className={`text-xs flex justify-start ${action.label === 'Disapprove' && 'text-red-500'}`}
+                        >
+                            {action.icon}
+                            {action.label}
+                        </Button>
+                    ))}
+                    </div>
+                )
+            }
+        }
     ], [])
 
     const [filters, setFilters] = useState({})
@@ -107,36 +200,37 @@ const TravelOrders = () => {
         reloadTable
         } = useCrudTable({
         columns,
-        routeName: route('travel-orders.index'),
+        routeName: route('travel-requests.index'),
         initialData: travelOrders,
         filters,
         options: {
-            enableAdd: true,
-            enableEdit: true,
-            enableView: false,
-            enableViewAsLink: true,
-            enableDelete: true, 
+            enableAdd: can?.create,
+            enableEdit: (row) => !!row.original?.can?.edit,
+            enableDelete: (row) => !!row.original?.can?.delete,
+            enableViewAsLink: (row) => !!row.original?.can?.view,
             enableBulkDelete: true,
             enableSearching: true,
             enableFiltering: true,
-            enableRowSelection: row => !row.original.isLocked,
-            enableGenerateReport: false,
-            canModify: true
+            enableRowSelection: (row) => !!row.original?.can?.delete,
+            enableGenerateReport: (row) => !!row.original?.can?.view,
+            canModify: canSelectStaff
         },
         endpoints: {
-            addEndpoint: route('travel-orders.create'),
-            viewEndpoint: (id) => route('travel-orders.show', id),
-            deleteEndpoint: (id) => route('travel-orders.destroy', id),
-            bulkDeleteEndpoint: route('travel-orders.bulk-destroy'),
+            addEndpoint: route('travel-requests.create'),
+            viewEndpoint: (id) => route('travel-requests.show', id),
+            editEndpoint: (id) => route('travel-requests.edit', id),
+            deleteEndpoint: (id) => route('travel-requests.destroy', id),
+            bulkDeleteEndpoint: route('travel-requests.bulk-destroy'),
+            generateReportEndpoint: (id) => route('travel-requests.generate', id),
         },
     })
 
     return (
         <div className="h-full flex flex-col">
-            <Head title="Travel Orders" />
+            <Head title="Travel Requests" />
             <PageTitle 
-                pageTitle="Travel Orders" 
-                description="Manage information about the travel orders here." 
+                pageTitle="Travel Requests" 
+                description="Manage information about the travel request here." 
                 breadcrumbItems={breadcrumbItems} 
             />
 
@@ -152,6 +246,53 @@ const TravelOrders = () => {
                     appointmentStatuses={appointmentStatuses}
                 />
             )} */}
+
+            <Dialog 
+                open={!!confirmAction}
+                onOpenChange={(open) => {
+                if (!open) {
+                    setConfirmAction(null)
+                    reset() 
+                    clearErrors()
+                }
+            }}    
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm {confirmAction}</DialogTitle>
+                        <DialogDescription>
+                        Are you sure you want to <b>{confirmAction}</b> this travel order?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={performAction}>
+                        {["Return", "Disapprove"].includes(confirmAction) && (
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="description">Remarks</Label>
+                                <RichTextEditor 
+                                    name="remarks" 
+                                    onChange={(value => setData('remarks', value))}
+                                    isInvalid={errors.remarks}
+                                    id="remarks"
+                                    value={data.remarks}
+                                />
+                                {errors?.remarks && <span className="text-red-500 text-xs">{errors.remarks}</span>}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 mt-4">
+                            <Button variant="ghost" onClick={() => setConfirmAction(null)}>Cancel</Button>
+                            <Button type="submit" disabled={processing}>
+                                {processing ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <span>Please wait</span>
+                                    </>
+                                ) : 'Submit'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

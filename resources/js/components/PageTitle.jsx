@@ -15,7 +15,7 @@ const PageTitle = ({ pageTitle, description, breadcrumbItems }) => {
 
         {/* Title and description */}
         <div className="flex flex-col text-center md:text-left">
-          <h1 className="text-lg font-semibold md:text-xl">{pageTitle}</h1>
+          <h3 className="font-semibold tracking-tight text-lg text-black">{pageTitle}</h3>
           <span className="text-sm text-muted-foreground">{description}</span>
         </div>
       </div>

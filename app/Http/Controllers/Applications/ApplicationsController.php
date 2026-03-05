@@ -40,6 +40,17 @@ class ApplicationsController extends Controller
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $allowedRoles = ['HRIS_HR', 'HRIS_RD', 'HRIS_ARD'];
+        $userRoles = $user->roles->pluck('name')->toArray();
+        if (!array_intersect($allowedRoles, $userRoles)) {
+            return response()->json(['message' => 'Forbidden: Only HR roles can access'], 403);
+        }
+
         $sort       = $request->get('sort');
         $direction  = strtolower($request->get('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         $search     = trim($request->input('search', ''));

@@ -9,6 +9,12 @@ export const getProvinces = (payload) => {
     return axios.get(url, {params: {...payload}})
 }
 
+export const getDistricts = (payload) => {
+
+    const url = `https://psgc.gitlab.io/api/districts/`
+    return axios.get(url, {params: {...payload}})
+}
+
 export const getMunicipalities = (payload) => {
     const { provinceCode } = payload
 

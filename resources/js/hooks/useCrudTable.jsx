@@ -103,8 +103,13 @@ export default function useCrudTable({
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [viewItem, setViewItem] = useState(null)
 
-  const [deleteMode, setDeleteMode] = useState(null) // "single" | "bulk" | null
+  const [deleteMode, setDeleteMode] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+
+  const resolveAbility = useCallback((ability, row) => {
+    if (typeof ability === "function") return !!ability(row)
+    return !!ability
+  }, [])
 
   const handleAdd = useCallback(() => {
     setFormMode("add")
@@ -123,13 +128,8 @@ export default function useCrudTable({
     setSelectedItem(null)
   }, [])
 
-  const handleOpenFilter = useCallback(() => {
-    setIsFilterOpen(true)
-  }, [])
-
-  const handleCloseFilter = useCallback(() => {
-    setIsFilterOpen(false)
-  }, [])
+  const handleOpenFilter = useCallback(() => setIsFilterOpen(true), [])
+  const handleCloseFilter = useCallback(() => setIsFilterOpen(false), [])
 
   const handleView = useCallback((row) => {
     setViewItem(row)
@@ -141,10 +141,6 @@ export default function useCrudTable({
     setIsViewOpen(false)
   }, [])
 
-  /**
-   * Mobile stacked labels:
-   * Prefer meta.mobileLabel, then string header, else column id.
-   */
   const getMobileLabel = useCallback((column) => {
     const metaLabel = column.columnDef?.meta?.mobileLabel
     if (typeof metaLabel === "string" && metaLabel.trim()) return metaLabel
@@ -162,18 +158,43 @@ export default function useCrudTable({
             id: "select",
             header: ({ table }) => (
               <Checkbox
-                checked={table.getIsAllRowsSelected()}
-                onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
-                className="peer border-neutral-400 dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                checked={(() => {
+                  const selectableRows = table.getRowModel().rows.filter((row) => {
+                    return (
+                      resolveAbility(enableRowSelection, row) &&
+                      (!row.original.isLocked || canModify) &&
+                      resolveAbility(enableDelete, row)
+                    )
+                  })
+                  if (selectableRows.length === 0) return false
+                  return selectableRows.every((row) => row.getIsSelected())
+                })()}
+                onCheckedChange={(v) => {
+                  const checked = !!v
+                  table.getRowModel().rows.forEach((row) => {
+                    const canSelect =
+                      resolveAbility(enableRowSelection, row) &&
+                      (!row.original.isLocked || canModify) &&
+                      resolveAbility(enableDelete, row)
+                    if (canSelect) row.toggleSelected(checked)
+                  })
+                }}
+                className="size-4 rounded-[4px] border"
               />
             ),
             cell: ({ row }) => {
-              if (!(!row.original.isLocked || canModify)) return null
+              const canSelect =
+                resolveAbility(enableRowSelection, row) &&
+                (!row.original.isLocked || canModify) &&
+                resolveAbility(enableDelete, row)
+
+              if (!canSelect) return null
+
               return (
                 <Checkbox
                   checked={row.getIsSelected()}
                   onCheckedChange={(v) => row.toggleSelected(!!v)}
-                  className="peer border-neutral-400 dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="size-4 rounded-[4px] border"
                 />
               )
             },
@@ -191,7 +212,6 @@ export default function useCrudTable({
       },
     ]
 
-    // actions is rendered in Row (so cell() can be null)
     const actionsColumn = [
       {
         id: "actions",
@@ -202,7 +222,7 @@ export default function useCrudTable({
     ]
 
     return [...selectionColumn, ...rowNumberColumn, ...columns, ...actionsColumn]
-  }, [columns, enableRowSelection, currentPage, perPage, canModify])
+  }, [columns, enableRowSelection, enableDelete, currentPage, perPage, canModify, resolveAbility])
 
   const {
     table,
@@ -223,7 +243,7 @@ export default function useCrudTable({
     responseType,
     state: { rowSelection },
     onRowSelectionChange: setRowSelection,
-    enableRowSelection,
+    enableRowSelection: !!enableRowSelection,
     onJsonResponse,
   })
 
@@ -246,7 +266,7 @@ export default function useCrudTable({
   )
 
   const handleBulkDelete = useCallback(() => {
-    if (!selectedRows || selectedRows.length === 0) return
+    if (!selectedRows?.length) return
     const ids = selectedRows.map((r) => r.original.id)
 
     router.post(
@@ -265,20 +285,25 @@ export default function useCrudTable({
     )
   }, [bulkDeleteEndpoint, selectedRows, toast, reloadTable])
 
-  /**
-   * ✅ Change: Remove hover requirement for actions on desktop.
-   * - Desktop: actions are ALWAYS visible (no opacity-0 / group-hover)
-   * - Mobile: keep the "..." menu always visible
-   */
   const Row = useMemo(
     () =>
       React.memo(function Row({ row, isSelected }) {
+        const canRowEdit = resolveAbility(enableEdit, row) && (!row.original.isLocked || canModify)
+        const canRowDelete = resolveAbility(enableDelete, row) && (!row.original.isLocked || canModify)
+        const canRowView = resolveAbility(enableView, row)
+        const canRowViewAsLink = resolveAbility(enableViewAsLink, row)
+        const canRowGenerateReport =
+          resolveAbility(enableGenerateReport, row) &&
+          !!generateReportEndpoint &&
+          (!row.original.isLocked || canModify)
+
         return (
           <TableRow
             className={cn(
-              "group transition hover:bg-muted/50",
-              isSelected && "bg-muted",
-              "block border-b p-3 sm:table-row sm:border-0 sm:p-0"
+              "group transition",
+              row.index % 2 === 1 ? "bg-muted/70" : "bg-background",
+              isSelected ? "bg-primary/15 hover:bg-primary/20" : "hover:bg-muted/90",
+              "block border-b p-2 sm:table-row sm:border-0 sm:p-0"
             )}
           >
             {row.getVisibleCells().map((cell) => {
@@ -291,41 +316,38 @@ export default function useCrudTable({
                   key={cell.id}
                   data-label={label}
                   className={cn(
-                    "font-medium",
+                    "font-medium leading-tight",
+                    colId === "actions"
+                      ? "text-[12px]"
+                      : "text-[12px] [&_*]:!text-[12px] [&_*]:!leading-tight",
                     "block sm:table-cell",
-                    "py-2 sm:py-3",
+                    "py-1 sm:py-1.5",
                     !isNoLabel &&
-                      "before:content-[attr(data-label)] before:block sm:before:hidden before:text-[11px] before:uppercase before:tracking-wide before:text-muted-foreground before:mb-1",
+                      "before:content-[attr(data-label)] before:block sm:before:hidden before:text-[9px] before:uppercase before:tracking-wide before:text-muted-foreground before:mb-0.5",
                     isNoLabel && "before:content-none"
                   )}
                 >
                   {colId === "actions" ? (
                     <div className="flex justify-end w-full">
-                      {/* Mobile: menu */}
                       <div className="sm:hidden">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 p-0">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-
                           <DropdownMenuContent align="end" className="w-44">
-                            {enableGenerateReport &&
-                              generateReportEndpoint &&
-                              (!row.original.isLocked || canModify) && (
-                                <DropdownMenuItem
-                                  onSelect={(e) => {
-                                    e.preventDefault()
-                                    window.location.href = generateReportEndpoint(row.original.id)
-                                  }}
-                                >
-                                  <Printer className="mr-2 h-4 w-4" />
-                                  Print
-                                </DropdownMenuItem>
-                              )}
-
-                            {enableEdit && (!row.original.isLocked || canModify) && (
+                            {canRowGenerateReport && (
+                              <DropdownMenuItem
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  window.open(generateReportEndpoint(row.original.id), "_blank", "noopener,noreferrer")
+                                }}
+                              >
+                                <Printer className="mr-2 h-4 w-4" /> Print
+                              </DropdownMenuItem>
+                            )}
+                            {canRowEdit && (
                               <DropdownMenuItem
                                 onSelect={(e) => {
                                   e.preventDefault()
@@ -333,28 +355,23 @@ export default function useCrudTable({
                                   else handleEdit(row.original)
                                 }}
                               >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
+                                <Pencil className="mr-2 h-4 w-4" /> Edit
                               </DropdownMenuItem>
                             )}
-
-                            {enableDelete && (!row.original.isLocked || canModify) && (
+                            {canRowDelete && (
                               <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600"
                                 onSelect={(e) => {
                                   e.preventDefault()
                                   setDeleteTarget(row.original.id)
                                   setDeleteMode("single")
                                 }}
-                                className="text-red-600 focus:text-red-600"
                               >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
                               </DropdownMenuItem>
                             )}
-
-                            {(enableView || enableViewAsLink) && <DropdownMenuSeparator />}
-
-                            {enableView && (
+                            {(canRowView || canRowViewAsLink) && <DropdownMenuSeparator />}
+                            {canRowView && (
                               <DropdownMenuItem
                                 onSelect={(e) => {
                                   e.preventDefault()
@@ -364,15 +381,12 @@ export default function useCrudTable({
                                 View
                               </DropdownMenuItem>
                             )}
-
-                            {enableViewAsLink && (
+                            {canRowViewAsLink && (
                               <DropdownMenuItem
                                 onSelect={(e) => {
                                   e.preventDefault()
                                   const endpoint =
-                                    typeof viewEndpoint === "function"
-                                      ? viewEndpoint(row.original.id)
-                                      : viewEndpoint
+                                    typeof viewEndpoint === "function" ? viewEndpoint(row.original.id) : viewEndpoint
                                   router.visit(endpoint)
                                 }}
                               >
@@ -383,27 +397,23 @@ export default function useCrudTable({
                         </DropdownMenu>
                       </div>
 
-                      {/* Desktop: buttons ALWAYS visible */}
                       <div className="hidden sm:flex gap-1">
-                        {enableGenerateReport &&
-                          generateReportEndpoint &&
-                          (!row.original.isLocked || canModify) && (
+                        {canRowGenerateReport && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 p-0"
+                            onClick={() => window.open(generateReportEndpoint(row.original.id), "_blank", "noopener,noreferrer")}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canRowEdit &&
+                          (editEndpoint ? (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 p-0"
-                              onClick={() => (window.location.href = generateReportEndpoint(row.original.id))}
-                            >
-                              <Printer className="h-4 w-4" />
-                            </Button>
-                          )}
-
-                        {enableEdit && (!row.original.isLocked || canModify) && (
-                          editEndpoint ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => router.visit(editEndpoint(row.original.id))}
                             >
                               <Pencil className="h-4 w-4" />
@@ -412,19 +422,17 @@ export default function useCrudTable({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 p-0"
+                              className="h-7 w-7 p-0"
                               onClick={() => handleEdit(row.original)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                          )
-                        )}
-
-                        {enableDelete && (!row.original.isLocked || canModify) && (
+                          ))}
+                        {canRowDelete && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 p-0"
+                            className="h-7 w-7 p-0"
                             onClick={() => {
                               setDeleteTarget(row.original.id)
                               setDeleteMode("single")
@@ -433,28 +441,19 @@ export default function useCrudTable({
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         )}
-
-                        {enableView && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 gap-2 text-xs inline-flex items-center justify-center rounded-md px-3 py-1 bg-primary text-white hover:bg-primary/90 transition"
-                            onClick={() => handleView(row.original)}
-                          >
+                        {canRowView && (
+                          <Button type="button" size="sm" className="h-7 text-[11px] px-2" onClick={() => handleView(row.original)}>
                             View
                           </Button>
                         )}
-
-                        {enableViewAsLink && (
+                        {canRowViewAsLink && (
                           <Button
                             type="button"
                             size="sm"
-                            className="h-8 gap-2 text-xs inline-flex items-center justify-center rounded-md px-3 py-1 bg-primary text-white hover:bg-primary/90 transition"
+                            className="h-7 text-[11px] px-2"
                             onClick={() => {
                               const endpoint =
-                                typeof viewEndpoint === "function"
-                                  ? viewEndpoint(row.original.id)
-                                  : viewEndpoint
+                                typeof viewEndpoint === "function" ? viewEndpoint(row.original.id) : viewEndpoint
                               router.visit(endpoint)
                             }}
                           >
@@ -484,6 +483,7 @@ export default function useCrudTable({
       getMobileLabel,
       handleEdit,
       handleView,
+      resolveAbility,
       viewEndpoint,
     ]
   )
@@ -539,7 +539,6 @@ export default function useCrudTable({
 
       return (
         <div className="grid grid-rows-[auto,1fr,auto] min-h-[calc(100vh-250px)] max-h-screen flex-1 overflow-hidden gap-2">
-          {/* Top controls */}
           <div className="flex justify-between gap-4">
             <div className="flex-1 gap-2 p-1">
               {enableSearching && (
@@ -551,7 +550,7 @@ export default function useCrudTable({
                     setSearch(e.target.value)
                     setPageIndex(0)
                   }}
-                  className="w-full max-w-md text-sm rounded-md"
+                  className="w-full max-w-md text-sm rounded-md h-8"
                 />
               )}
             </div>
@@ -559,7 +558,7 @@ export default function useCrudTable({
             <div className="flex gap-2 p-1">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="h-8">
                     <Wrench className="h-4 w-4" />
                     <span className="hidden md:block">Actions</span>
                   </Button>
@@ -584,7 +583,7 @@ export default function useCrudTable({
               </DropdownMenu>
 
               {enableFiltering && (
-                <Button type="button" variant="outline" onClick={handleOpenFilter}>
+                <Button type="button" variant="outline" onClick={handleOpenFilter} className="h-8">
                   <FilterIcon className="h-4 w-4" />
                   <span className="hidden md:block">Filters</span>
                 </Button>
@@ -592,12 +591,12 @@ export default function useCrudTable({
 
               {enableAdd &&
                 (addEndpoint ? (
-                  <Button type="button" onClick={() => router.visit(addEndpoint)}>
+                  <Button type="button" onClick={() => router.visit(addEndpoint)} className="h-8">
                     <Plus className="h-4 w-4" />
                     <span className="hidden md:block">Add New</span>
                   </Button>
                 ) : (
-                  <Button type="button" onClick={handleAdd}>
+                  <Button type="button" onClick={handleAdd} className="h-8">
                     <Plus className="h-4 w-4" />
                     <span className="hidden md:block">Add New</span>
                   </Button>
@@ -605,10 +604,8 @@ export default function useCrudTable({
             </div>
           </div>
 
-          {/* Table container */}
           <div className="h-full w-full border rounded-lg overflow-auto">
             <Table className="w-full">
-              {/* Header hidden on mobile */}
               <TableHeader className="hidden sm:table-header-group">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
@@ -616,24 +613,23 @@ export default function useCrudTable({
                       <TableHead
                         key={header.id}
                         className={cn(
-                          "sticky top-0 z-20 bg-secondary text-black select-none uppercase font-semibold text-[13px]",
+                          "sticky top-0 z-20 bg-secondary text-black select-none uppercase font-semibold text-[11px] py-1",
                           header.column.columnDef.meta?.className
                         )}
                       >
                         {header.column.columnDef.meta?.enableSorting === true ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <div className="flex gap-2 w-fit items-center cursor-pointer rounded px-2 py-1 hover:bg-gray-100">
+                              <div className="flex gap-1.5 w-fit items-center cursor-pointer rounded px-1.5 py-0.5 hover:bg-gray-100">
                                 {header.isPlaceholder
                                   ? null
                                   : flexRender(header.column.columnDef.header, header.getContext())}
-
-                                {{
-                                  asc: <ChevronUp className="h-4 w-4" />,
-                                  desc: <ChevronDown className="h-4 w-4" />,
-                                }[header.column.getIsSorted()] ?? (
-                                  <ChevronsUpDown className="h-4 w-4 text-gray-500" />
-                                )}
+                                {(
+                                  {
+                                    asc: <ChevronUp className="h-4 w-4" />,
+                                    desc: <ChevronDown className="h-4 w-4" />,
+                                  }[header.column.getIsSorted()]
+                                ) ?? <ChevronsUpDown className="h-4 w-4 text-gray-500" />}
                               </div>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -675,7 +671,7 @@ export default function useCrudTable({
                   ))
                 ) : (
                   <TableRow className="block sm:table-row">
-                    <TableCell colSpan={finalColumns.length} className="p-4 text-center block sm:table-cell">
+                    <TableCell colSpan={finalColumns.length} className="p-3 text-center block sm:table-cell text-[12px]">
                       No data found.
                     </TableCell>
                   </TableRow>
@@ -708,11 +704,8 @@ export default function useCrudTable({
                 <AlertDialogAction
                   className="bg-destructive text-white hover:bg-destructive/90"
                   onClick={() => {
-                    if (deleteMode === "single" && deleteTarget) {
-                      handleDelete(deleteTarget)
-                    } else if (deleteMode === "bulk") {
-                      handleBulkDelete()
-                    }
+                    if (deleteMode === "single" && deleteTarget) handleDelete(deleteTarget)
+                    else if (deleteMode === "bulk") handleBulkDelete()
                     setDeleteMode(null)
                     setDeleteTarget(null)
                   }}

@@ -107,9 +107,9 @@ class NotifyArdOfRtoEndorsement extends Notification implements ShouldQueue
                         'approveUrl' => $approveUrl
                     ]);
                 
-            if (!empty($this->payload['submitter_email'])) {
+            /* if (!empty($this->payload['submitter_email'])) {
                 $mail->cc($this->payload['submitter_email']);
-            }
+            } */
 
             return $mail;
 

@@ -13,9 +13,11 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
-        \SocialiteProviders\Manager\SocialiteWasCalled::class => [
-            // 👇 Add this line to register Microsoft as a Socialite provider
+        /* \SocialiteProviders\Manager\SocialiteWasCalled::class => [
             'SocialiteProviders\\Microsoft\\MicrosoftExtendSocialite@handle',
+        ], */
+        \App\Events\VehicleRequestStateChanged::class => [
+            \App\Actions\VehicleRequests\DispatchVehicleRequestNotification::class,
         ],
     ];
 

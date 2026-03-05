@@ -53,7 +53,10 @@ import {
   CalendarDays,
   CalendarRange,
   CalendarPlus,
-  PlaneTakeoff
+  PlaneTakeoff,
+  Backpack,
+  Bus,
+  Tags
 } from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
@@ -155,10 +158,14 @@ const AppSidebar = () => {
       ],
     }, */
     {
-      title: "Travel Orders",
-      url: '/travel-orders',
+      title: "Travels",
+      url: "#",
       icon: PlaneTakeoff,
       roles: ['HRIS_Staff'],
+      submenu: [
+        { title: 'Travel Requests', url: '/travel-requests', roles: ['HRIS_Staff'], icon: Backpack },
+        { title: 'Trip Tickets', url: '/trip-tickets', roles: ['HRIS_PRU'], icon: Tags },
+      ],
     },
     {
       title: "Flexiplace",
@@ -213,18 +220,24 @@ const AppSidebar = () => {
     return hasRole && hasPermission
   }
 
+  const isActivePath = (currentUrl, targetUrl) => {
+    if (!targetUrl) return false
+    if (currentUrl === targetUrl) return true
+    return currentUrl.startsWith(targetUrl + "/")
+  }
+
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent className="bg-white">
+      <SidebarContent className="bg-[#FAFAFA] p-2">
         {open && <SidebarHeader className="font-bold pt-4 pl-2 text-lg text-center">DRO1 HRIS</SidebarHeader>}
         <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+          <SidebarGroupLabel className="font-semibold">MAIN MENU</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items
                 .filter(isVisible)
                 .map((item) => {
-                  const isActive = item.submenu?.some(subitem => url === subitem.url);
+                  const isActive = item.submenu?.some((subitem) => isActivePath(url, subitem.url))
                   return (
                     <Collapsible key={item.title} className="group/collapsible" defaultOpen={isActive}>
                       <SidebarMenuItem>
@@ -246,8 +259,8 @@ const AppSidebar = () => {
                             <Link
                               href={item.url}
                               className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 transition-colors
-                              ${url === item.url 
-                                ? "bg-muted text-foreground font-semibold" 
+                              ${isActivePath(url, item.url)
+                                ? "bg-muted text-foreground font-semibold"
                                 : "hover:bg-muted hover:text-foreground"
                               }`}
                             >
@@ -267,13 +280,13 @@ const AppSidebar = () => {
                                     key={subitem.title}
                                     asChild
                                     title={!open ? subitem.title : undefined}
-                                    className={`font-medium ${url === subitem.url ? 'bg-muted' : ''}`}
+                                    className={`font-medium ${isActivePath(url, subitem.url) ? "bg-muted" : ""}`}
                                   >
                                     <Link 
                                       href={subitem.url}
                                       className={`flex items-center gap-2 w-full rounded-md px-2 py-1.5 transition-colors
-                                        ${url === subitem.url 
-                                          ? "bg-muted text-foreground font-semibold" 
+                                        ${isActivePath(url, subitem.url)
+                                          ? "bg-muted text-foreground font-semibold"
                                           : "hover:bg-muted hover:text-foreground"
                                         }`}
                                       >

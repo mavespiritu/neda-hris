@@ -74,7 +74,7 @@ const Applications = () => {
 
   const setPageIndex = (pageIndex) => {
     router.get(
-      route("applications.index"), // adjust route name if needed
+      route("my-applications.index"), // adjust route name if needed
       { page: pageIndex + 1 }, // backend expects 1-based page index
       { preserveState: true, replace: true }
     )

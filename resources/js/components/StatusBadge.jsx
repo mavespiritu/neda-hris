@@ -44,6 +44,21 @@ const statusMap = {
     className: "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
     icon: FileText,
   },
+  Completed: {
+    label: "Completed",
+    className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-700",
+    icon: CheckCircle,
+  },
+  "In Progress": {
+    label: "In Progress",
+    className: "bg-amber-100 text-amber-700 hover:bg-amber-100 hover:text-amber-700",
+    icon: Clock,
+  },
+  "Not Started": {
+    label: "Not Started",
+    className: "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
+    icon: FileText,
+  },
 }
 
 const StatusBadge = ({ status }) => {

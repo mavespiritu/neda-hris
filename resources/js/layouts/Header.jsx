@@ -49,7 +49,7 @@ import {
 
     return (
       <header
-        className={`flex gap-2 justify-between sticky top-0 items-center h-16 shrink-0 border-b bg-blue-600 z-50 text-white ${
+        className={`flex gap-2 justify-between sticky top-0 items-center h-16 shrink-0 border-b z-50 text-black bg-white ${
           user?.ipms_id
             ? "p-2"
             : "px-4 sm:px-8 md:px-16 lg:px-32"
@@ -66,7 +66,7 @@ import {
                 {(!isApplicant && `${user?.first_name} ${user?.last_name}`) 
                     || user?.name}
             </span>
-            <span className="text-xs text-white">{user?.email}</span>
+            <span className="text-xs text-gray-500">{user?.email}</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
