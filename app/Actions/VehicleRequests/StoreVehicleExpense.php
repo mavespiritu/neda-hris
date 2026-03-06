@@ -76,6 +76,7 @@ class StoreVehicleExpense
                 'gas_price' => (float) $data['gas_price'],
                 'toll_fee' => (float) ($data['toll_fee'] ?? 0),
                 'tev' => (float) ($data['tev'] ?? 0),
+                'avg_consumption' => (float) ($vehicle->avg_consumption ?? 0),
                 'created_by' => $actorIpmsId,
             ];
 

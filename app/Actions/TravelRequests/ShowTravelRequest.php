@@ -218,7 +218,7 @@ class ShowTravelRequest
                 'se.tev',
                 'v.vehicle as vehicle_name',
                 'v.plate_no',
-                'v.avg_consumption',
+                'se.avg_consumption',
             ])
             ->leftJoin('travel_order_vehicles as v', 'se.vehicle_id', '=', 'v.id')
             ->where('se.travel_order_id', $id)
