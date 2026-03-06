@@ -29,7 +29,11 @@ class CompleteTripFormBuilder
             throw new \RuntimeException('Trip ticket not found.');
         }
 
-        $destinations = $this->fetchDestinations($conn2, (int) $ticket->travel_order_id)
+        $destinations = $this->fetchDestinations(
+                $conn2, 
+                (int) $ticket->id, 
+                (int) $ticket->travel_order_id
+            )
             ->map(function ($d) {
                 $parts = array_filter([
                     $d->location ?? null,
@@ -76,11 +80,22 @@ class CompleteTripFormBuilder
         ];
     }
 
-    private function fetchDestinations($conn2, int $travelOrderId): Collection
+    private function fetchDestinations($conn2, int $tripTicketId, int $travelOrderId): Collection
     {
+        $rows = $conn2->table('trip_ticket_destinations')
+            ->where('trip_ticket_id', $tripTicketId)
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isNotEmpty()) {
+            return $rows;
+        }
+
+        // fallback for legacy records
         return $conn2->table('travel_order_destinations')
             ->where('travel_order_id', $travelOrderId)
             ->orderBy('id')
             ->get();
     }
+
 }

@@ -25,8 +25,8 @@ class StoreCompleteTrip
             'fuel_filled' => ['nullable', 'numeric', 'min:0'],
             'fuel_price' => ['nullable', 'numeric', 'min:0'],
 
-            'destinations' => ['required', 'array', 'min:1'],
-            'destinations.*.id' => ['required', 'integer'],
+            'destinations' => ['nullable', 'array'],
+            'destinations.*.id' => ['required_with:destinations', 'integer'],
             'destinations.*.departure_time' => ['nullable', 'date_format:H:i'],
             'destinations.*.arrival_time' => ['nullable', 'date_format:H:i'],
         ];
@@ -36,10 +36,11 @@ class StoreCompleteTrip
     {
         $tripTicketId = (int) $request->route('id');
         $data = $request->validated();
+        $destinations = collect($data['destinations'] ?? []);
         $conn2 = DB::connection('mysql2');
 
         $tripTicket = $conn2->table('trip_tickets')
-            ->select(['id', 'travel_order_id'])
+            ->select(['id'])
             ->where('id', $tripTicketId)
             ->first();
 
@@ -49,24 +50,7 @@ class StoreCompleteTrip
             ]);
         }
 
-        $travelOrderId = (int) $tripTicket->travel_order_id;
-
-        $inputDestinationIds = collect($data['destinations'])->pluck('id')->map(fn ($v) => (int) $v)->values();
-
-        $validDestinationIds = $conn2->table('travel_order_destinations')
-            ->where('travel_order_id', $travelOrderId)
-            ->whereIn('id', $inputDestinationIds)
-            ->pluck('id')
-            ->map(fn ($v) => (int) $v)
-            ->values();
-
-        if ($validDestinationIds->count() !== $inputDestinationIds->count()) {
-            throw ValidationException::withMessages([
-                'destinations' => 'One or more destinations are invalid for this trip ticket.',
-            ]);
-        }
-
-        $conn2->transaction(function () use ($conn2, $tripTicketId, $travelOrderId, $data) {
+        $conn2->transaction(function () use ($conn2, $tripTicketId, $data, $destinations) {
             $conn2->table('trip_tickets')
                 ->where('id', $tripTicketId)
                 ->update([
@@ -77,13 +61,13 @@ class StoreCompleteTrip
                     'updated_at' => now(),
                 ]);
 
-            foreach ($data['destinations'] as $d) {
-                $conn2->table('travel_order_destinations')
+            foreach ($destinations as $d) {
+                $conn2->table('trip_ticket_destinations')
                     ->where('id', (int) $d['id'])
-                    ->where('travel_order_id', $travelOrderId)
+                    ->where('trip_ticket_id', $tripTicketId)
                     ->update([
-                        'departure_time' => $d['departure_time'] ?: null,
-                        'arrival_time' => $d['arrival_time'] ?: null,
+                        'departure_time' => ($d['departure_time'] ?? null) ?: null,
+                        'arrival_time' => ($d['arrival_time'] ?? null) ?: null,
                     ]);
             }
         });

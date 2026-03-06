@@ -78,7 +78,7 @@ class StoreTripTicket
                 throw new RuntimeException('Reference number already exists.');
             }
 
-            return (int) $conn2->table('trip_tickets')->insertGetId([
+            $tripTicketId = (int) $conn2->table('trip_tickets')->insertGetId([
                 'travel_order_id' => (int) $data['travel_order_id'],
                 'reference_no' => (string) $data['reference_no'],
                 'vehicle_id' => (int) $data['vehicle_id'],
@@ -90,6 +90,14 @@ class StoreTripTicket
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            $this->copyTravelOrderDestinationsToTripTicket(
+                conn2: $conn2,
+                travelOrderId: (int) $data['travel_order_id'],
+                tripTicketId: $tripTicketId
+            );
+
+            return $tripTicketId;
         });
     }
 
@@ -112,6 +120,47 @@ class StoreTripTicket
         } catch (\Throwable $e) {
             Log::error("StoreTripTicket failed: {$e->getMessage()}");
             return back()->withErrors(['trip_ticket' => 'Failed to create trip ticket.'])->withInput();
+        }
+    }
+
+    private function copyTravelOrderDestinationsToTripTicket($conn2, int $travelOrderId, int $tripTicketId): void
+    {
+        $rows = $conn2->table('travel_order_destinations')
+            ->select([
+                'type',
+                'country',
+                'province',
+                'provinceName',
+                'citymun',
+                'citymunName',
+                'isMetroManila',
+                'district',
+                'districtName',
+                'location',
+            ])
+            ->where('travel_order_id', $travelOrderId)
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($d) => [
+                'travel_order_id' => $travelOrderId,
+                'trip_ticket_id' => $tripTicketId,
+                'type' => $d->type,
+                'country' => $d->country,
+                'province' => $d->province,
+                'provinceName' => $d->provinceName,
+                'citymun' => $d->citymun,
+                'citymunName' => $d->citymunName,
+                'isMetroManila' => $d->isMetroManila,
+                'district' => $d->district,
+                'districtName' => $d->districtName,
+                'location' => $d->location,
+                'departure_time' => null,
+                'arrival_time' => null,
+            ])
+            ->all();
+
+        if (! empty($rows)) {
+            $conn2->table('trip_ticket_destinations')->insert($rows);
         }
     }
 }

@@ -56,7 +56,9 @@ import {
   PlaneTakeoff,
   Backpack,
   Bus,
-  Tags
+  Tags,
+  Logs,
+  Mails
 } from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
@@ -109,6 +111,19 @@ const AppSidebar = () => {
         { title: 'Applications', url: '/leaves', roles: ['HRIS_Staff', 'HRIS_HR'], icon: CalendarRange },
       ],
     }, */
+    {
+      title: "Tasks",
+      url: "#",
+      icon: ClipboardList,
+      roles: ['HRIS_Staff'],
+      submenu: [
+        { title: 'Emails', url: '/emails', roles: ['HRIS_Staff'], icon: Mails },
+        /* { title: 'OPCR', url: '/my-cga', roles: ['HRIS_Staff'], icon: Building },
+        { title: 'DPCR', url: '/staff-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UsersRound },
+        { title: 'IPCR', url: '/review-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UserRound },
+        { title: 'Libraries', url: '/competencies', roles: ['HRIS_HR'], icon: Settings2 }, */
+      ],
+    },
     {
       title: "Recruitment",
       url: "#",
@@ -192,18 +207,6 @@ const AppSidebar = () => {
         { title: 'Libraries', url: '/cga/libraries', roles: ['HRIS_HR'], icon: Settings2 },
       ],
     },
-    /* {
-      title: "Performance",
-      url: "#",
-      icon: ChartNoAxesCombined,
-      roles: ['HRIS_Staff'],
-      submenu: [
-        { title: 'OPCR', url: '/my-cga', roles: ['HRIS_Staff'], icon: Building },
-        { title: 'DPCR', url: '/staff-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UsersRound },
-        { title: 'IPCR', url: '/review-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UserRound },
-        { title: 'Libraries', url: '/competencies', roles: ['HRIS_HR'], icon: Settings2 },
-      ],
-    }, */
     {
       title: "Settings",
       url: '/settings',

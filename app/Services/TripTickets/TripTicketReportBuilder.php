@@ -23,7 +23,11 @@ class TripTicketReportBuilder
 
         $latestHistory = $this->fetchLatestToHistory($conn2, $ticket->travel_order_id);
         $staffRows = $this->fetchStaffRows($conn2, $ticket->travel_order_id);
-        $rawDestinations = $this->fetchDestinations($conn2, $ticket->travel_order_id);
+        $rawDestinations = $this->fetchDestinations(
+            conn2: $conn2,
+            tripTicketId: (int) $ticket->id,
+            travelOrderId: (int) $ticket->travel_order_id
+        );
 
         $destinations = $rawDestinations->map(function ($d) {
             return [
@@ -153,10 +157,20 @@ class TripTicketReportBuilder
             ->get();
     }
 
-    private function fetchDestinations($conn2, int $id): Collection
+    private function fetchDestinations($conn2, int $tripTicketId, int $travelOrderId): Collection
     {
+        $rows = $conn2->table('trip_ticket_destinations')
+            ->where('trip_ticket_id', $tripTicketId)
+            ->orderBy('id')
+            ->get();
+
+        if ($rows->isNotEmpty()) {
+            return $rows;
+        }
+
         return $conn2->table('travel_order_destinations')
-            ->where('travel_order_id', $id)
+            ->where('travel_order_id', $travelOrderId)
+            ->orderBy('id')
             ->get();
     }
 }

@@ -102,6 +102,12 @@ class UpdateTripTicket
                     'updated_by' => $actorIpmsId,
                     'updated_at' => now(),
                 ]);
+
+            $this->ensureTripTicketDestinations(
+                conn2: $conn2,
+                travelOrderId: (int) $data['travel_order_id'],
+                tripTicketId: $tripTicketId
+            );
         });
     }
 
@@ -128,4 +134,59 @@ class UpdateTripTicket
             return back()->withErrors(['trip_ticket' => 'Failed to update trip ticket.'])->withInput();
         }
     }
+
+    private function ensureTripTicketDestinations($conn2, int $travelOrderId, int $tripTicketId): void
+    {
+        $exists = $conn2->table('trip_ticket_destinations')
+            ->where('trip_ticket_id', $tripTicketId)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        $this->copyTravelOrderDestinationsToTripTicket($conn2, $travelOrderId, $tripTicketId);
+    }
+
+    private function copyTravelOrderDestinationsToTripTicket($conn2, int $travelOrderId, int $tripTicketId): void
+    {
+        $rows = $conn2->table('travel_order_destinations')
+            ->select([
+                'type',
+                'country',
+                'province',
+                'provinceName',
+                'citymun',
+                'citymunName',
+                'isMetroManila',
+                'district',
+                'districtName',
+                'location',
+            ])
+            ->where('travel_order_id', $travelOrderId)
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($d) => [
+                'travel_order_id' => $travelOrderId,
+                'trip_ticket_id' => $tripTicketId,
+                'type' => $d->type,
+                'country' => $d->country,
+                'province' => $d->province,
+                'provinceName' => $d->provinceName,
+                'citymun' => $d->citymun,
+                'citymunName' => $d->citymunName,
+                'isMetroManila' => $d->isMetroManila,
+                'district' => $d->district,
+                'districtName' => $d->districtName,
+                'location' => $d->location,
+                'departure_time' => null,
+                'arrival_time' => null,
+            ])
+            ->all();
+
+        if (! empty($rows)) {
+            $conn2->table('trip_ticket_destinations')->insert($rows);
+        }
+    }
+
 }
