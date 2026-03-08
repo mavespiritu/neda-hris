@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Models\TravelRequest;
+use App\States\TravelRequest\Draft;
+use App\States\TravelRequest\Submitted;
 use RuntimeException;
 
 class StoreTripTicket
@@ -97,6 +100,13 @@ class StoreTripTicket
                 tripTicketId: $tripTicketId
             );
 
+            $this->createDriverTravelRequestFromOriginal(
+                conn2: $conn2,
+                originalTravelOrderId: (int) $data['travel_order_id'],
+                driverId: (string) $data['driver_id'],
+                actorIpmsId: $actorIpmsId
+            );
+
             return $tripTicketId;
         });
     }
@@ -163,4 +173,128 @@ class StoreTripTicket
             $conn2->table('trip_ticket_destinations')->insert($rows);
         }
     }
+
+    private function createDriverTravelRequestFromOriginal($conn2, int $originalTravelOrderId, string $driverId, string $actorIpmsId): int
+    {
+        $original = $conn2->table('travel_order')
+            ->where('id', $originalTravelOrderId)
+            ->first();
+
+        if (! $original) {
+            throw new RuntimeException('Original travel request not found for driver copy.');
+        }
+
+        $driverDivision = DB::connection('mysql3')->table('tblemployee')->where('emp_id', $driverId)->value('division_id');
+
+        $newCategory = $conn2->table('travel_order_categories')->where('title', 'Driving Services')->value('id');
+
+        $newRecommending = $conn2->table('travel_order_signatories')
+            ->where('type', 'Recommending_Staff_TO')
+            ->where('division', $driverDivision)
+            ->value('signatory');
+
+        $newApproving = $conn2->table('travel_order_signatories')
+            ->where('type', 'Approver_TO')
+            ->value('signatory');
+
+        // simple unique reference (adjust if you have your own generator)
+        $newReferenceNo = $this->nextReferenceNo($conn2);
+
+        $newTravelOrderId = (int) $conn2->table('travel_order')->insertGetId([
+            'reference_no' => $newReferenceNo,
+            'request_type' => $original->request_type,
+            'travel_type' => $original->travel_type,
+            'travel_category_id' => $newCategory ?? $original->travel_category_id,
+            'start_date' => $original->start_date,
+            'end_date' => $original->end_date,
+            'purpose' => 'To provide driving services to Travel Request No. '.$original->reference_no,
+            'fund_source_id' => $original->fund_source_id,
+            'other_passengers' => $original->other_passengers,
+            'other_vehicles' => $original->other_vehicles,
+            'other_drivers' => $original->other_drivers,
+            'isRequestingVehicle' => 0,
+            'est_distance' => $original->est_distance,
+            'est_departure_time' => $original->est_departure_time,
+            'est_arrival_time' => $original->est_arrival_time,
+            'division' => $driverDivision,
+            'created_by' => $actorIpmsId,
+            'date_created' => now(),
+        ]);
+
+        // only selected driver as personnel
+        $conn2->table('travel_order_staffs')->insert([
+            'travel_order_id' => $newTravelOrderId,
+            'emp_id' => $driverId,
+            'recommender_id' => $newRecommending ?? null,
+            'approver_id' => $newApproving ?? null,
+        ]);
+
+        $destinationRows = $conn2->table('travel_order_destinations')
+            ->where('travel_order_id', $originalTravelOrderId)
+            ->get()
+            ->map(fn ($d) => [
+                'travel_order_id' => $newTravelOrderId,
+                'type' => $d->type,
+                'country' => $d->country,
+                'province' => $d->province,
+                'provinceName' => $d->provinceName,
+                'citymun' => $d->citymun,
+                'citymunName' => $d->citymunName,
+                'isMetroManila' => $d->isMetroManila,
+                'district' => $d->district,
+                'districtName' => $d->districtName,
+                'location' => $d->location,
+            ])
+            ->all();
+
+        if (! empty($destinationRows)) {
+            $conn2->table('travel_order_destinations')->insert($destinationRows);
+        }
+
+        $newTravelRequest = TravelRequest::query()
+            ->whereKey($newTravelOrderId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $newTravelRequest) {
+            throw new RuntimeException('Generated travel request not found for state transition.');
+        }
+
+        if (blank($newTravelRequest->getRawOriginal('tr_state'))) {
+            $newTravelRequest->tr_state = Draft::class;
+            $newTravelRequest->save();
+            $newTravelRequest->refresh();
+        }
+
+        if ($newTravelRequest->state instanceof Draft) {
+            $newTravelRequest->state->transitionTo(
+                Submitted::class,
+                $actorIpmsId,
+                'Auto-generated from trip ticket for selected driver.',
+                true
+            );
+            $newTravelRequest->refresh();
+        }
+
+        return $newTravelOrderId;
+    }
+
+    private function nextReferenceNo($conn2): string
+    {
+        $year = now()->format('Y');
+
+        $latestRef = $conn2->table('travel_order')
+        ->where('request_type', 'TO')
+        ->whereRaw('LEFT(reference_no, 4) = ?', [$year])
+        ->whereRaw('CHAR_LENGTH(reference_no) = 8')
+        ->whereRaw('reference_no REGEXP "^[0-9]{8}$"')
+        ->orderByDesc('reference_no')
+        ->value('reference_no');
+
+        if (!$latestRef) return $year . '0001';
+
+        $counter = (int) substr((string) $latestRef, 4);
+        return $year . str_pad((string) ($counter + 1), 4, '0', STR_PAD_LEFT);
+    }
+
 }
