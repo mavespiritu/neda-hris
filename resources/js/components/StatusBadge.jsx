@@ -24,6 +24,11 @@ const statusMap = {
     className: "bg-red-100 text-red-700 hover:bg-red-100 hover:text-red-700",
     icon: Edit3,
   },
+  Returned: {
+    label: "Returned",
+    className: "bg-red-300 text-red-800 hover:bg-red-300 hover:text-red-800",
+    icon: Ban,
+  },
   Disapproved: {
     label: "Disapproved",
     className: "bg-red-300 text-red-800 hover:bg-red-300 hover:text-red-800",

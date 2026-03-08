@@ -19,6 +19,9 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\VehicleRequestStateChanged::class => [
             \App\Actions\VehicleRequests\DispatchVehicleRequestNotification::class,
         ],
+        \App\Events\TravelRequestStateChanged::class => [
+            \App\Actions\TravelRequests\DispatchTravelRequestNotification::class,
+        ],
     ];
 
     /**

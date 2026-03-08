@@ -29,7 +29,9 @@ class TravelRequestsServiceProvider extends ServiceProvider
             'edit',
             'delete',
             'submit',
-            'filterAny'
+            'filterAny',
+            'return',
+            'resubmit',
         ];
 
         foreach ($abilities as $ability) {

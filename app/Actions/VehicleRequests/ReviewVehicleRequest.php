@@ -3,7 +3,7 @@
 namespace App\Actions\VehicleRequests;
 
 use App\Models\VehicleRequest;
-use App\States\VehicleRequest\Approved as VrApproved;
+use App\States\VehicleRequest\Endorsed as VrEndorsed;
 use App\States\VehicleRequest\Reviewed as VrReviewed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -73,8 +73,8 @@ class ReviewVehicleRequest
                 throw new RuntimeException('Vehicle request model not found.');
             }
 
-            if (! ($vehicleRequest->state instanceof VrApproved)) {
-                throw new RuntimeException('Only approved requests can be reviewed.');
+            if (! ($vehicleRequest->state instanceof VrEndorsed)) {
+                throw new RuntimeException('Only endorsed requests can be reviewed.');
             }
 
             $reason = null;

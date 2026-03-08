@@ -21,7 +21,7 @@ import RichTextEditor from "@/components/RichTextEditor"
 import { formatDateRange } from "@/lib/utils.jsx"
 import { format } from "date-fns"
 import Filter from "./Filter"
-
+import { travelRequestActionMap as actionMap } from "./actions"
 
 const breadcrumbItems = [
     { label: 'Home', href: '/' },
@@ -40,56 +40,56 @@ const TravelOrders = () => {
     travel_category_id: "",
     })
 
-    const canSelectStaff = useHasRole(["HRIS_PRU", "HRIS_DC", "HRIS_ADC"])
-
     const [confirmAction, setConfirmAction] = useState(null)
+    const confirmForm = useForm({ remarks: "" })
     const [selectedRow, setSelectedRow] = useState(null)
-    
-    const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
-        remarks: "",
-    })
+
+    const openConfirm = (action) => {
+        setConfirmAction(action)
+        confirmForm.setData("remarks", "")
+        confirmForm.clearErrors()
+    }
+
+    const closeConfirm = () => {
+        setConfirmAction(null)
+        confirmForm.reset()
+        confirmForm.clearErrors()
+    }
 
     const handleAction = (action, row) => {
         setConfirmAction(action)
         setSelectedRow(row)
+        confirmForm.setData("remarks", "")
+        confirmForm.clearErrors()
     }
 
-    const performAction = (e) => {
+    const currentActionConfig = actionMap[confirmAction] ?? {}
+    const dialogTitle = currentActionConfig.title ?? `Confirm ${confirmAction ?? "Action"}`
+    const dialogDescription =
+        currentActionConfig.description ??
+        `Are you sure you want to ${confirmAction ?? "perform this action"} this travel request?`
+    const actionNote = currentActionConfig.note ?? null
+    const needsRemarks = Boolean(currentActionConfig.needsRemarks)
+
+    const performConfirmAction = (e) => {
 
         e.preventDefault()
 
         if (!confirmAction || !selectedRow) return
 
         const id = selectedRow.original.id
+        const cfg = actionMap[confirmAction]
+        if (!cfg) return
 
-        const actionMap = {
-            Submit: {
-                route: "travel-requests.submit",
-                notification: "notification.submit-travel-request",
-            },
-        }
-
-        const { route: actionRoute, notification } = actionMap[confirmAction] || {}
-
-        if (!actionRoute) return
-
-        post(route(actionRoute, id), {
+        confirmForm.post(route(cfg.route, id), {
             preserveScroll: true,
             onSuccess: () => {
-                toast({
-                    title: "Success!",
-                    description: `${confirmAction} successful!`,
-                })
-
-                if (["Endorse", "Approve", "Needs Revision", "Disapprove"].includes(confirmAction)) {
-                    router.post(route(notification, { id, userId: user.ipms_id }))
-                } else {
-                    router.post(route(notification, id))
-                }
-
-                reset()
-                setConfirmAction(null)
-                setSelectedRow(null)
+            toast({
+                title: "Success!",
+                description: `${confirmAction} successful!`,
+            })
+            setSelectedRow(null)
+            closeConfirm()
             },
         })
     }
@@ -127,6 +127,21 @@ const TravelOrders = () => {
             meta: { enableSorting: true },
         },
         {
+        header: "Request Created",
+        accessorKey: "creator",
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span>{row.original.creator || "-"}</span>
+            <span className="text-xs text-muted-foreground">
+              {row.original.date_created
+                ? format(new Date(row.original.date_created), "MMMM d, yyyy")
+                : "-"}
+            </span>
+          </div>
+        ),
+        meta: { enableSorting: true },
+        },
+        {
             header: "Status",
             accessorKey: "status",
             meta: { enableSorting: true, className: "w-[15%]" },
@@ -139,7 +154,7 @@ const TravelOrders = () => {
                 return (
                     <div className="flex flex-col gap-1">
                         <StatusBadge status={status} />
-                        {/* {actedBy && (
+                        {actedBy && (
                             <span className="text-xs text-gray-400 mt-1">
                                 By: {actedBy === user.ipms_id ? "You" : actedByName}
                             </span>
@@ -156,7 +171,7 @@ const TravelOrders = () => {
                                     dangerouslySetInnerHTML={{ __html: remarks }}
                                 />
                             </span>
-                        )} */}
+                        )}
                     </div>
                 )
             }
@@ -168,7 +183,10 @@ const TravelOrders = () => {
                 const can = row.original?.can || {}
                 const actions = []
 
-                if (can.submit)  actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
+                if (can.submit) actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
+                if (can.return) actions.push({ label: "Return", icon: <Undo2 className="h-2 w-2" /> })
+                if (can.resubmit) actions.push({ label: "Resubmit", icon: <FileCheck className="h-2 w-2" /> })
+
 
                 if (actions.length === 0) return null
 
@@ -218,7 +236,6 @@ const TravelOrders = () => {
             enableFiltering: true,
             enableRowSelection: (row) => !!row.original?.can?.delete,
             enableGenerateReport: (row) => !!row.original?.can?.view,
-            canModify: canSelectStaff
         },
         endpoints: {
             addEndpoint: route('travel-requests.create'),
@@ -256,48 +273,43 @@ const TravelOrders = () => {
             />
             )}
 
-            <Dialog 
-                open={!!confirmAction}
-                onOpenChange={(open) => {
-                if (!open) {
-                    setConfirmAction(null)
-                    reset() 
-                    clearErrors()
-                }
-            }}    
-            >
+            <Dialog open={!!confirmAction} onOpenChange={(open) => (!open ? closeConfirm() : null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirm {confirmAction}</DialogTitle>
-                        <DialogDescription>
-                        Are you sure you want to <b>{confirmAction}</b> this travel order?
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={performAction}>
-                        {["Return", "Disapprove"].includes(confirmAction) && (
-                            <div className="flex flex-col gap-2">
-                                <Label htmlFor="description">Remarks</Label>
-                                <RichTextEditor 
-                                    name="remarks" 
-                                    onChange={(value => setData('remarks', value))}
-                                    isInvalid={errors.remarks}
-                                    id="remarks"
-                                    value={data.remarks}
-                                />
-                                {errors?.remarks && <span className="text-red-500 text-xs">{errors.remarks}</span>}
+                        <DialogTitle>{dialogTitle}</DialogTitle>
+                        <DialogDescription>{dialogDescription}</DialogDescription>
+
+                        {actionNote && (
+                            <div className="rounded-md bg-muted p-3 text-xs flex flex-col gap-1 border-l-4 border-muted-foreground/30 mt-2">
+                                Note: {actionNote}
                             </div>
+                        )}
+                    </DialogHeader>
+                    <form onSubmit={performConfirmAction}>
+                        {needsRemarks && (
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="remarks">Remarks</Label>
+                            <RichTextEditor
+                            name="remarks"
+                            id="remarks"
+                            value={confirmForm.data.remarks}
+                            isInvalid={confirmForm.errors.remarks}
+                            onChange={(value) => confirmForm.setData("remarks", value)}
+                            />
+                            {confirmForm.errors?.remarks && (
+                            <span className="text-red-500 text-xs">{confirmForm.errors.remarks}</span>
+                            )}
+                        </div>
                         )}
 
                         <div className="flex justify-end gap-2 mt-4">
-                            <Button variant="ghost" onClick={() => setConfirmAction(null)}>Cancel</Button>
-                            <Button type="submit" disabled={processing}>
-                                {processing ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        <span>Please wait</span>
-                                    </>
-                                ) : 'Submit'}
-                            </Button>
+                        <Button variant="ghost" type="button" onClick={closeConfirm}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={confirmForm.processing} className="flex items-center gap-2">
+                            {confirmForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Submit
+                        </Button>
                         </div>
                     </form>
                 </DialogContent>

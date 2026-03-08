@@ -8,6 +8,9 @@ use App\States\VehicleRequest\Draft as VrDraft;
 use App\States\VehicleRequest\Endorsed as VrEndorsed;
 use App\States\VehicleRequest\Submitted as VrSubmitted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
@@ -15,15 +18,27 @@ class SubmitVehicleRequest
 {
     use AsAction;
 
-    public function handle(object $travelOrder, string $actorIpmsId): void
+    public function authorize(ActionRequest $request): bool
+    {
+        $id = (int) $request->route('id');
+        return Gate::forUser($request->user())->allows('vr.submit', $id);
+    }
+
+    public function handle(int|string $travelOrderId, string $actorIpmsId): void
     {
         $conn2 = DB::connection('mysql2');
-        $conn3 = DB::connection('mysql3');
 
-        $travelOrderId = (int) $travelOrder->id;
+        $travelOrder = $conn2->table('travel_order')
+            ->select(['id', 'division', 'created_by'])
+            ->where('id', (int) $travelOrderId)
+            ->first();
+
+        if (! $travelOrder) {
+            throw new RuntimeException('Travel order not found.');
+        }
 
         $vehicleRequest = VehicleRequest::query()
-            ->whereKey($travelOrderId)
+            ->whereKey((int) $travelOrder->id)
             ->lockForUpdate()
             ->first();
 
@@ -56,19 +71,37 @@ class SubmitVehicleRequest
             VrDraft::class,
             VrSubmitted::class,
             $actorIpmsId,
-            !($isCreatorApprover || $isCreatorRecommender)
+            true//! ($isCreatorApprover || $isCreatorRecommender)
         );
 
-        if ($isCreatorApprover) {
+        /* if ($isCreatorApprover) {
             $this->transitionIf($vehicleRequest, VrSubmitted::class, VrEndorsed::class, $actorIpmsId, false);
             $this->transitionIf($vehicleRequest, VrEndorsed::class, VrApproved::class, $actorIpmsId, true);
             return;
         }
 
         if ($isCreatorRecommender) {
-            if ($vehicleRequest->state instanceof VrSubmitted) {
-                $this->transitionIf($vehicleRequest, VrSubmitted::class, VrEndorsed::class, $actorIpmsId, false);
-            }
+            $this->transitionIf($vehicleRequest, VrSubmitted::class, VrEndorsed::class, $actorIpmsId, false);
+        } */
+    }
+
+    public function asController(ActionRequest $request)
+    {
+        $id = (int) $request->route('id');
+
+        try {
+            $this->handle($id, (string) $request->user()->ipms_id);
+
+            return back()->with([
+                'status' => 'success',
+                'title' => 'Submitted',
+                'message' => 'Vehicle request submitted successfully.',
+            ]);
+        } catch (RuntimeException $e) {
+            return back()->withErrors(['vehicle_request' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            Log::error("SubmitVehicleRequest failed [VR:{$id}] {$e->getMessage()}");
+            return back()->withErrors(['vehicle_request' => 'Failed to submit vehicle request.']);
         }
     }
 

@@ -29,7 +29,7 @@ class VehicleRequestsServiceProvider extends ServiceProvider
             'review',
             'disapprove',
             'return',
-            'authorize',
+            //'authorize',
             'resubmit'
         ];
 

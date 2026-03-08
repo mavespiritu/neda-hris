@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Models\TravelRequest;
+use App\States\TravelRequest\Draft;
 
 class StoreTravelRequest
 {
@@ -239,13 +241,26 @@ class StoreTravelRequest
                 $conn2->table('travel_order_expenses')->insert($expenseRows);
             }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'TO',
-                'model_id' => $travelOrderId,
-                'status' => 'Draft',
-                'acted_by' => $actorIpmsId,
-                'date_acted' => Carbon::now(),
-            ]);
+            $travelRequest = TravelRequest::query()
+            ->whereKey($travelOrderId)
+            ->lockForUpdate()
+            ->first();
+
+            if (! $travelRequest) {
+                throw new \RuntimeException('Travel request not found after creation.');
+            }
+
+            if (blank($travelRequest->getRawOriginal('tr_state'))) {
+                $travelRequest->tr_state = Draft::class;
+                $travelRequest->save();
+
+                $travelRequest->state->transitionTo(
+                    Draft::class,
+                    (string) $actorIpmsId,
+                    null,
+                    false
+                );
+            }
 
             return (int) $travelOrderId;
         });
@@ -271,7 +286,7 @@ class StoreTravelRequest
             return redirect()->back()->withInput()->with([
                 'status' => 'error',
                 'title' => 'Save travel request failed',
-                'message' => 'An error occurred while saving the travel request.',
+                'message' => $e->getMessage(),
             ]);
         }
     }

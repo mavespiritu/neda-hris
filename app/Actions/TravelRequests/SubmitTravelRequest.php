@@ -2,7 +2,10 @@
 
 namespace App\Actions\TravelRequests;
 
+use App\Models\TravelRequest;
 use App\Actions\VehicleRequests\SubmitVehicleRequest;
+use App\States\TravelRequest\Draft;
+use App\States\TravelRequest\Submitted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -25,26 +28,26 @@ class SubmitTravelRequest
         $conn2 = DB::connection('mysql2');
 
         $conn2->transaction(function () use ($conn2, $id, $actorIpmsId) {
-            $travelOrder = $conn2->table('travel_order')
-                ->where('id', $id)
+            $travelRequest = TravelRequest::query()
+                ->whereKey($id)
                 ->lockForUpdate()
                 ->first();
 
-            if (! $travelOrder) {
-                throw new RuntimeException('Travel order record not found.');
+            if (! $travelRequest) {
+                throw new RuntimeException('Travel request not found.');
             }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'TO',
-                'model_id' => $id,
-                'status' => 'Submitted',
-                'acted_by' => $actorIpmsId,
-                'date_acted' => now(),
-            ]);
+            $this->transitionIf(
+                $travelRequest,
+                Draft::class,
+                Submitted::class,
+                $actorIpmsId,
+                false
+            );
 
-            if ($this->needsVehicle($travelOrder->isRequestingVehicle ?? null)) {
+            if ($this->needsVehicle($travelRequest->isRequestingVehicle ?? null)) {
                 SubmitVehicleRequest::run(
-                    travelOrder: $travelOrder,
+                    travelOrderId: $travelRequest->id,
                     actorIpmsId: $actorIpmsId
                 );
             }
@@ -80,13 +83,28 @@ class SubmitTravelRequest
                 'message' => $e->getMessage(),
             ]);
         } catch (\Throwable $e) {
-            Log::error("Error submitting TO #{$id}: {$e->getMessage()}");
+            Log::error("Error submitting TR #{$id}: {$e->getMessage()}");
 
             return redirect()->back()->with([
                 'status' => 'error',
                 'title' => 'Uh oh!',
-                'message' => 'An error occurred while submitting TO. Please try again.',
+                'message' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function transitionIf(
+        TravelRequest $travelRequest,
+        string $fromState,
+        string $toState,
+        string $actorIpmsId,
+        bool $notify = true
+    ): void {
+        if (! ($travelRequest->state instanceof $fromState)) {
+            return;
+        }
+
+        $travelRequest->state->transitionTo($toState, $actorIpmsId, null, $notify);
+        $travelRequest->refresh();
     }
 }

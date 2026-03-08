@@ -61,7 +61,7 @@ const CompleteTripForm = ({ open, ticket, onClose, onSuccess }) => {
               id: d?.id ?? null,
               destination_label:
                 d?.destination_label ||
-                [d?.location, d?.citymunName, d?.provinceName, d?.country].filter(Boolean).join(", "),
+                [d?.location, d?.citymunName, d?.provinceName].filter(Boolean).join(", "),
               departure_time: d?.departure_time ?? "",
               arrival_time: d?.arrival_time ?? "",
             }))

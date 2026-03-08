@@ -39,7 +39,6 @@ class CompleteTripFormBuilder
                     $d->location ?? null,
                     $d->citymunName ?? null,
                     $d->provinceName ?? null,
-                    $d->country ?? null,
                 ], fn ($v) => filled($v));
 
                 return [

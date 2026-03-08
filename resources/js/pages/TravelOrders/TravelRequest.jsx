@@ -1,56 +1,81 @@
 import { useMemo, useState } from "react"
 import { useForm, usePage } from "@inertiajs/react"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import StatusInfoBox from "@/components/StatusInfoBox"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { formatDateRange, formatDate } from "@/lib/utils.jsx"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Printer, Loader2 } from "lucide-react"
+import RichTextEditor from "@/components/RichTextEditor"
+import { travelRequestActionMap as actionMap } from "./actions"
 
 const TravelRequest = ({ travelOrder, can, user }) => {
   const { toast } = useToast()
-  const { props } = usePage()
   const [confirmAction, setConfirmAction] = useState(null)
-
-  const { post, processing, reset, clearErrors, setData } = useForm({
-    remarks: "",
-  })
-
-  const actionMap = {
-    Submit: {
-      route: "travel-requests.submit",
-      needsRemarks: false,
-      notifyWithUser: false,
-    },
-  }
+  const confirmForm = useForm({ remarks: "" })
 
   const openConfirm = (action) => {
     setConfirmAction(action)
-    setData("remarks", "")
-    clearErrors()
+    confirmForm.setData("remarks", "")
+    confirmForm.clearErrors()
   }
 
-  const performAction = (e) => {
+  const closeConfirm = () => {
+    setConfirmAction(null)
+    confirmForm.reset()
+    confirmForm.clearErrors()
+  }
+
+  const performConfirmAction = (e) => {
     e.preventDefault()
     if (!confirmAction) return
 
     const cfg = actionMap[confirmAction]
     if (!cfg) return
 
-    post(route(cfg.route, travelOrder.id), {
+    confirmForm.post(route(cfg.route, travelOrder.id), {
       preserveScroll: true,
       onSuccess: (page) => {
-        const title = page.props?.title ?? props?.title ?? "Success"
-        const description = page.props?.message ?? props?.message ?? `${confirmAction} successful!`
+        const flash = page?.props?.flash ?? {}
 
-        toast({ title, description })
+        const isError =
+          flash.status === "error" ||
+          flash.type === "error" ||
+          !!flash.error
 
-        reset()
-        setConfirmAction(null)
+        toast({
+          title: flash.title || (isError ? "Action failed" : "Success"),
+          description:
+            flash.message ||
+            (isError
+              ? "Unable to process request."
+              : `${confirmAction} successful!`),
+          variant: isError ? "destructive" : "default",
+        })
+
+        if (!isError) {
+          closeConfirm()
+        }
+      },
+      onError: () => {
+        toast({
+          title: "Please check the form",
+          description: "Fix the errors and try again.",
+          variant: "destructive",
+        })
       },
     })
   }
+
+  const currentActionConfig = actionMap[confirmAction] || {}
+  const dialogTitle = currentActionConfig.title || `Confirm ${confirmAction}`
+  const dialogDescription =
+    currentActionConfig.description ||
+    `Are you sure you want to ${confirmAction} this travel request?`
+  const actionNote = currentActionConfig.note
+  const needsRemarks = !!currentActionConfig.needsRemarks
 
   const destinations = useMemo(
     () => (Array.isArray(travelOrder?.destinations) ? travelOrder.destinations : []),
@@ -122,6 +147,13 @@ const TravelRequest = ({ travelOrder, can, user }) => {
     ))
   }, [travelOrder?.staffs])
 
+  const status = String(travelOrder.status || "").trim()
+  const statusColor =
+    status === "Submitted" ? "green" :
+    status === "Resubmitted" ? "green" :
+    status === "Returned" ? "red" :
+    undefined
+
   return (
     // h-full + flex-col: enables footer to sit at bottom
     <div className="min-w-0 h-full flex flex-col">
@@ -133,6 +165,7 @@ const TravelRequest = ({ travelOrder, can, user }) => {
 
         <div className="mb-4">
           <StatusInfoBox
+            color={statusColor}
             status={travelOrder.status}
             message={
               <>
@@ -141,6 +174,14 @@ const TravelRequest = ({ travelOrder, can, user }) => {
                   <>
                     by {travelOrder.acted_by_name} on {formatDate(travelOrder.date_acted)}
                   </>
+                )}
+                {travelOrder.remarks && (
+                  <div className="text-xs flex gap-1 flex-col mt-2">
+                    <span>Remarks:</span>
+                    <span
+                      dangerouslySetInnerHTML={{ __html: travelOrder.remarks }}
+                    />
+                  </div>
                 )}
               </>
             }
@@ -198,7 +239,7 @@ const TravelRequest = ({ travelOrder, can, user }) => {
       </div>
 
       {/* Footer (sticks to bottom naturally via flex) */}
-      {(can?.submit || can?.view) && (
+      {(can?.submit || can?.trReturn || can?.trResubmit || can?.view) && (
         <div className="mt-auto pt-6 flex justify-end gap-2">
           {can?.view && (
             <Button
@@ -222,34 +263,63 @@ const TravelRequest = ({ travelOrder, can, user }) => {
               Submit Travel Request
             </Button>
           )}
+          {can?.trReturn && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => openConfirm("Return")}
+            >
+              Return Request
+            </Button>
+          )}
+          {can?.trResubmit && (
+            <Button
+              type="button"
+              onClick={() => openConfirm("Resubmit")}
+            >
+              Resubmit Request
+            </Button>
+          )}
         </div>
       )}
 
-      <Dialog
-        open={!!confirmAction}
-        onOpenChange={(open) => {
-          if (!open) {
-            setConfirmAction(null)
-            reset()
-          }
-        }}
-      >
+      <Dialog open={!!confirmAction} onOpenChange={(open) => (!open ? closeConfirm() : null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm {confirmAction}</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to <b>{confirmAction}</b> this travel request?
-            </DialogDescription>
+            <DialogTitle>{dialogTitle}</DialogTitle>
+            <DialogDescription>{dialogDescription}</DialogDescription>
+
+            {actionNote && (
+              <div className="rounded-md bg-muted p-3 text-xs flex flex-col gap-1 border-l-4 border-muted-foreground/30 mt-2">
+                Note: {actionNote}
+              </div>
+            )}
           </DialogHeader>
 
-          <form onSubmit={performAction}>
+          <form onSubmit={performConfirmAction}>
+            {needsRemarks && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="remarks">Remarks</Label>
+                <RichTextEditor
+                  name="remarks"
+                  id="remarks"
+                  value={confirmForm.data.remarks}
+                  isInvalid={confirmForm.errors.remarks}
+                  onChange={(value) => confirmForm.setData("remarks", value)}
+                />
+                {confirmForm.errors?.remarks && (
+                  <span className="text-red-500 text-xs">{confirmForm.errors.remarks}</span>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 mt-4">
-              <Button variant="ghost" type="button" onClick={() => setConfirmAction(null)}>
+              <Button variant="ghost" type="button" onClick={closeConfirm}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={processing} className="flex items-center gap-2">
-                  {processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Submit
+              <Button type="submit" disabled={confirmForm.processing} className="flex items-center gap-2">
+                {confirmForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
+                Submit
               </Button>
             </div>
           </form>

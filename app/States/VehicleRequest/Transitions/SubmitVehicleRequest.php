@@ -21,8 +21,8 @@ class SubmitVehicleRequest extends Transition
     {
         $from = $this->vehicleRequest->state->label();
 
-        $this->vehicleRequest->status_remarks = $this->remarks;
-        $this->vehicleRequest->state = new Submitted($this->vehicleRequest);
+        $this->vehicleRequest->vr_status_remarks = $this->remarks;
+        $this->vehicleRequest->vr_state = new Submitted($this->vehicleRequest);
         $this->vehicleRequest->save();
 
         $this->logAndDispatch(

@@ -22,7 +22,7 @@ class StoreVehicleExpense
     public function rules(): array
     {
         return [
-            'driver' => ['required'],
+            //'driver' => ['required'],
             'vehicle_id' => ['required', 'integer'],
             'total_km' => ['required', 'numeric', 'min:0'],
             'gas_price' => ['required', 'numeric', 'min:0'],
@@ -34,7 +34,7 @@ class StoreVehicleExpense
     public function getValidationMessages(): array
     {
         return [
-            'driver.required' => 'Please select a driver.',
+            //'driver.required' => 'Please select a driver.',
             'vehicle_id.required' => 'Please select a vehicle.',
             'vehicle_id.integer' => 'Selected vehicle is invalid.',
             'total_km.required' => 'Total kilometers is required.',
@@ -69,7 +69,7 @@ class StoreVehicleExpense
 
             $payload = [
                 'travel_order_id' => $travelOrderId,
-                'driver' => (string) $data['driver'],
+                //'driver' => (string) $data['driver'],
                 'vehicle_id' => (int) $data['vehicle_id'],
                 'total_km' => (float) $data['total_km'],
                 'total_gas' => (float) $totalGas,

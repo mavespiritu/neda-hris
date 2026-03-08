@@ -10,24 +10,22 @@
 
     $title = match($required) {
         'endorse'         => 'Vehicle Request Endorsement Required',
-        'approve'         => 'Vehicle Request Approval Required',
         'review'          => 'Vehicle Request Review Required',
-        'authorize'       => 'Vehicle Request Authorization Required',
+        'approve'         => 'Vehicle Request Approval Required',
         'create_trip_ticket' => 'Trip Ticket Generation Required',
         'resubmit'        => 'Vehicle Request Returned',
-        'fyi_done'        => 'Vehicle Request Authorized',
+        'fyi_done'        => 'Vehicle Request Approved',
         'fyi_disapproved' => 'Vehicle Request Disapproved',
         default           => 'Vehicle Request Update',
     };
 
     $primaryText = match($required) {
         'endorse'         => 'This vehicle request requires your endorsement.',
-        'approve'         => 'This vehicle request requires your approval.',
         'review'          => 'This vehicle request requires your review and assessment.',
-        'authorize'       => 'This vehicle request requires your authorization for vehicle use.',
-        'create_trip_ticket' => 'This vehicle request has been authorized and now requires trip ticket generation.',
+        'approve'         => 'This vehicle request requires your approval.',
+        'create_trip_ticket' => 'This vehicle request has been approved and now requires trip ticket generation.',
         'resubmit'        => 'This request was returned and needs your corrections/resubmission.',
-        'fyi_done'        => 'This vehicle request has been authorized.',
+        'fyi_done'        => 'This vehicle request has been approved.',
         'fyi_disapproved' => 'This vehicle request has been disapproved.',
         default           => 'A vehicle request has been updated.',
     };
@@ -35,7 +33,6 @@
     $primaryButtonLabel = match($required) {
         'endorse'   => 'Endorse',
         'approve'   => 'Approve',
-        'authorize' => 'Authorize',
         default     => null,
     };
 @endphp
@@ -46,11 +43,25 @@
             <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">{{ $title }}</h1>
             <p style="margin:0 0 16px;line-height:1.6;">{{ $primaryText }}</p>
 
-            @if($required === 'authorize' && !empty($review))
+            @if(!empty($remarks))
+                <div style="margin:0 0 16px;padding:12px;border:1px solid #e5e7eb;border-left:4px solid #f59e0b;background:#fffbeb;">
+                    <p style="margin:0 0 6px;font-weight:700;">Remarks</p>
+                    <div style="line-height:1.6;">
+                        {!! $remarks !!}
+                    </div>
+                </div>
+            @endif
+
+            @if($required === 'approve' && !empty($review))
+            @php
+                use Illuminate\Support\Str;
+                $rec = $review->recommendation ?? null;
+                $label = $rec ? Str::replaceEnd('ed', 'e', $rec) . ' for Vehicle Provision' : '-';
+            @endphp
                 <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:16px;">
                     <tr>
                         <td style="border:1px solid #e5e7eb;"><strong>PRU Recommendation</strong></td>
-                        <td style="border:1px solid #e5e7eb;">{{ $review->recommendation.' for Vehicle Provision' ?? '-' }}</td>
+                        <td style="border:1px solid #e5e7eb;">{{ $label }}</td>
                     </tr>
 
                     @if(!empty($review->reason))

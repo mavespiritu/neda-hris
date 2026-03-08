@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\User;
+use App\Models\TravelRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Access\Response;
 
@@ -51,6 +52,70 @@ class TravelRequestPolicy
             ->exists();
     }
 
+    private function latestStatus(int|string $travelRequestId): string
+    {
+        $tr = TravelRequest::query()->find($travelRequestId);
+
+        if ($tr?->state) {
+            return (string) $tr->state->label();
+        }
+
+        return (string) (
+            DB::connection('mysql2')->table('submission_history')
+                ->where('model', 'TO')
+                ->where('model_id', $travelRequestId)
+                ->orderByDesc('id')
+                ->value('status') ?? 'Draft'
+        );
+    }
+
+    private function requestRow(int|string $travelRequestId): ?object
+    {
+        return DB::connection('mysql2')->table('travel_order')
+            ->select(['id', 'division', 'created_by', 'tr_state', 'tr_return_to_user'])
+            ->where('id', $travelRequestId)
+            ->first();
+    }
+
+    private function signatoryIds(string $type, ?string $division = null)
+    {
+        $q = DB::connection('mysql2')
+            ->table('travel_order_signatories')
+            ->where('type', $type);
+
+        $globalTypes = ['Approver_TT', 'Reviewer_VR'];
+
+        if (!in_array($type, $globalTypes, true) && $division) {
+            $q->where('division', $division);
+        }
+
+        return $q->pluck('signatory')
+            ->filter()
+            ->map(fn ($v) => (string) $v)
+            ->unique()
+            ->values();
+    }
+
+    public function submit(User $user, $travelRequestId): Response
+    {
+        $tr = $this->requestRow($travelRequestId);
+        if (! $tr) {
+            return Response::deny('Travel request not found.');
+        }
+
+        if ((string) $tr->created_by !== (string) $user->ipms_id) {
+            return Response::deny('Only the creator can submit this request.');
+        }
+
+        $status = $this->latestStatus($travelRequestId);
+
+        if ($status !== 'Draft') {
+            return Response::deny('Only draft requests can be submitted.');
+        }
+
+        return Response::allow();
+    }
+
     public function create(User $user): Response
     {
         return $user->hasRole('HRIS_Staff')
@@ -69,28 +134,20 @@ class TravelRequestPolicy
     {
         $conn2 = DB::connection('mysql2');
 
-        $travelRequest = $conn2->table('travel_order')
-            ->where('id', $travelRequestId)
-            ->first();
+        $travelRequest = $this->requestRow($travelRequestId);
 
         if (!$travelRequest) {
             return Response::deny('Travel request not found.');
         }
 
-        $latestStatus = $conn2->table('submission_history')
-            ->where('model', 'TO')
-            ->where('model_id', $travelRequestId)
-            ->orderByDesc('date_acted')
-            ->value('status');
-
         if ($user->hasRole('HRIS_PRU')) {
             return Response::allow();
         }
 
-        $status = trim((string) ($latestStatus ?? 'Draft'));
+        $status = $this->latestStatus($travelRequestId);
 
-        if (!in_array($status, ['Draft', 'Returned'], true)) {
-            return Response::deny('Only draft requests can be edited.');
+        if (! in_array($status, ['Draft', 'Returned'], true)) {
+            return Response::deny('Only draft or returned requests can be edited.');
         }
 
         if ((string) $travelRequest->created_by !== (string) $user->ipms_id) {
@@ -102,30 +159,20 @@ class TravelRequestPolicy
 
     public function delete(User $user, $travelRequestId): Response
     {
-        $conn2 = DB::connection('mysql2');
+        $travelRequest = $this->requestRow($travelRequestId);
 
-        $travelRequest = $conn2->table('travel_order')
-            ->where('id', $travelRequestId)
-            ->first();
-
-        if (!$travelRequest) {
+        if (! $travelRequest) {
             return Response::deny('Travel request not found.');
         }
-
-        $latestStatus = $conn2->table('submission_history')
-            ->where('model', 'TO')
-            ->where('model_id', $travelRequestId)
-            ->orderByDesc('date_acted')
-            ->value('status');
 
         if ($user->hasRole('HRIS_PRU')) {
             return Response::allow();
         }
 
-        $status = trim((string) ($latestStatus ?? 'Draft'));
+        $status = $this->latestStatus($travelRequestId);
 
-        if (!in_array($status, ['Draft', 'Returned'], true)) {
-            return Response::deny('Only draft requests can be deleted.');
+        if (! in_array($status, ['Draft', 'Returned'], true)) {
+            return Response::deny('Only draft or returned requests can be deleted.');
         }
 
         if ((string) $travelRequest->created_by !== (string) $user->ipms_id) {
@@ -189,45 +236,61 @@ class TravelRequestPolicy
         return Response::deny('You are not authorized to view this travel request.');
     }
 
-    public function submit(User $user, $travelRequestId): Response
+    public function filterAny(User $user): Response
     {
-        $conn2 = DB::connection('mysql2');
-
-        $travelRequest = $conn2->table('travel_order')
-            ->where('id', $travelRequestId)
-            ->first();
-
-        if (!$travelRequest) {
-            return Response::deny('Travel request not found.');
-        }
-
-        $latestStatus = $conn2->table('submission_history')
-            ->where('model', 'TO')
-            ->where('model_id', $travelRequestId)
-            ->orderByDesc('date_acted')
-            ->value('status'); 
-
-        $status = trim((string) ($latestStatus ?? 'Draft'));
-
-        if (!in_array($status, ['Draft', 'Returned'], true)) {
-            return Response::deny('Only draft or returned requests can be submitted.');
-        }
-
-        if (empty($travelRequest->division)) {
-            return Response::deny('Division not set for this request.');
-        }
-
-        if ((string) $travelRequest->created_by !== (string) $user->ipms_id) {
-            return Response::deny('Only the request creator can submit.');
+        if (! $this->isReviewer($user)) {
+            return Response::deny('Not allowed to filter any travel requests.');
         }
 
         return Response::allow();
     }
 
-    public function filterAny(User $user): Response
+    public function return(User $user, $travelRequestId): Response
     {
-        if (! $this->isReviewer($user)) {
-            return Response::deny('Not allowed to filter any travel requests.');
+        $tr = $this->requestRow($travelRequestId);
+        if (!$tr) return Response::deny('Travel request not found.');
+
+        $status = $this->latestStatus($travelRequestId);
+
+        if (in_array($status, ['Draft', 'Returned'], true)) {
+            return Response::deny("{$status} requests cannot be returned.");
+        }
+
+        $reviewerIds = $this->signatoryIds('Reviewer_VR');
+        if ($reviewerIds->contains((string) $user->ipms_id)) {
+            return Response::allow();
+        }
+
+        $status = $this->latestStatus($travelRequestId);
+
+        $typeByStatus = [
+            'Submitted' => 'Reviewer_VR',
+        ];
+
+        $requiredType = $typeByStatus[$status] ?? null;
+        if (!$requiredType) return Response::deny('This request cannot be returned at its current status.');
+
+        if (!in_array($requiredType, ['Reviewer_VR'], true) && empty($tr->division)) {
+            return Response::deny('Division not set for this request.');
+        }
+
+        $ids = $this->signatoryIds($requiredType, (string) $tr->division);
+        if ($ids->isEmpty()) return Response::deny("No signatory found for {$requiredType}.");
+        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to return.');
+
+        return Response::allow();
+    }
+
+    public function resubmit(User $user, $travelRequestId): Response
+    {
+        $tr = $this->requestRow($travelRequestId);
+        if (!$tr) return Response::deny('Travel request not found.');
+
+        $status = $this->latestStatus($travelRequestId);
+        if ($status !== 'Returned') return Response::deny('Only returned requests can be resubmitted.');
+
+        if ((string) $tr->created_by !== (string) $user->ipms_id) {
+            return Response::deny('Only the creator can resubmit.');
         }
 
         return Response::allow();

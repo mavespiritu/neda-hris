@@ -2,7 +2,6 @@
 
 namespace App\Actions\TravelRequests;
 
-use App\Models\VehicleRequest;
 use App\Traits\BuildsEmployeeNameMap;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -50,10 +49,6 @@ class ShowTravelRequest
         $latestHistory = $latestHistories->get('TO');
         $latestVehicleRequestHistory = $latestHistories->get('Vehicle Request');
 
-        $vehicleRequest = VehicleRequest::query()->find($id);
-        $vehicleRequestStatus = $vehicleRequest?->state?->label()
-            ?? $latestVehicleRequestHistory?->status;
-
         $staffRows = $this->fetchStaffRows($conn2, $id);
         $destinations = $this->fetchDestinations($conn2, $id);
         $commutationExpenses = $this->fetchCommutationExpenses($conn2, $id);
@@ -100,13 +95,13 @@ class ShowTravelRequest
                 'destinations' => $destinations,
                 'commutation_expenses' => $commutationExpenses,
 
-                'status' => $latestHistory?->status,
+                'status' => $this->travelRequestStatusFromState($order->tr_state) ?? $latestHistory?->status ?? 'Draft',
                 'acted_by' => $latestHistory?->acted_by,
                 'acted_by_name' => $this->employeeName($employeesById, $latestHistory?->acted_by),
                 'remarks' => $latestHistory?->remarks,
                 'date_acted' => $latestHistory?->date_acted,
 
-                'vehicle_request_status' => $vehicleRequestStatus,
+                'vehicle_request_status' => $this->vehicleRequestStatusFromState($order->vr_state) ?? $latestVehicleRequestHistory?->status,
                 'vehicle_request_acted_by' => $latestVehicleRequestHistory?->acted_by,
                 'vehicle_request_acted_by_name' => $this->employeeName($employeesById, $latestVehicleRequestHistory?->acted_by),
                 'vehicle_request_remarks' => $latestVehicleRequestHistory?->remarks,
@@ -141,6 +136,8 @@ class ShowTravelRequest
                 'isRequestingVehicle',
                 'created_by',
                 'date_created',
+                'tr_state',
+                'vr_state',
                 'travel_order_categories.title as category_title',
                 'travel_order_fund_sources.title as fund_source_title',
                 'approver_id',
@@ -282,13 +279,53 @@ class ShowTravelRequest
             'delete' => $gate->inspect('tr.delete', $id)->allowed(),
             'view' => $gate->inspect('tr.view', $id)->allowed(),
             'submit' => $gate->inspect('tr.submit', $id)->allowed(),
+            'vrSubmit' => $gate->inspect('vr.submit', $id)->allowed(),
             'endorse' => $gate->inspect('vr.endorse', $id)->allowed(),
             'approve' => $gate->inspect('vr.approve', $id)->allowed(),
             'review' => $gate->inspect('vr.review', $id)->allowed(),
-            'authorize' => $gate->inspect('vr.authorize', $id)->allowed(),
+            //'authorize' => $gate->inspect('vr.authorize', $id)->allowed(),
             'disapprove' => $gate->inspect('vr.disapprove', $id)->allowed(),
             'return' => $gate->inspect('vr.return', $id)->allowed(),
+            'trReturn' => $gate->inspect('tr.return', $id)->allowed(),
+            'trResubmit' => $gate->inspect('tr.resubmit', $id)->allowed(),
             'resubmit' => $gate->inspect('vr.resubmit', $id)->allowed(),
         ];
+    }
+
+    private function travelRequestStatusFromState($state): ?string
+    {
+        if (blank($state)) return null;
+
+        $map = [
+            \App\States\TravelRequest\Draft::class => 'Draft',
+            \App\States\TravelRequest\Submitted::class => 'Submitted',
+            \App\States\TravelRequest\Returned::class => 'Returned',
+            \App\States\TravelRequest\Resubmitted::class => 'Resubmitted',
+        ];
+
+        $stateClass = is_object($state) ? get_class($state) : (string) $state;
+
+        return $map[$stateClass] ?? class_basename($stateClass);
+    }
+
+    private function vehicleRequestStatusFromState($state): ?string
+    {
+        if (blank($state)) return null;
+
+        $map = [
+            \App\States\VehicleRequest\Draft::class => 'Draft',
+            \App\States\VehicleRequest\Submitted::class => 'Submitted',
+            \App\States\VehicleRequest\Endorsed::class => 'Endorsed',
+            \App\States\VehicleRequest\Reviewed::class => 'Reviewed',
+            \App\States\VehicleRequest\Approved::class => 'Approved',
+            \App\States\VehicleRequest\Returned::class => 'Returned',
+            \App\States\VehicleRequest\Resubmitted::class => 'Resubmitted',
+            \App\States\VehicleRequest\Disapproved::class => 'Disapproved',
+            //\App\States\VehicleRequest\VehicleAuthorized::class => 'Vehicle Authorized',
+        ];
+
+        $stateClass = is_object($state) ? get_class($state) : (string) $state;
+
+        return $map[$stateClass] ?? class_basename($stateClass);
     }
 }

@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import SingleComboBox from "@/components/SingleComboBox"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import StatusInfoBox from "@/components/StatusInfoBox"
 
 const Form = ({ mode, data, onClose, open }) => {
   const isEdit = mode === "edit"
@@ -24,6 +25,8 @@ const Form = ({ mode, data, onClose, open }) => {
   const [bootLoading, setBootLoading] = useState(false)
   const [bootData, setBootData] = useState(null)
   const loadedKeyRef = useRef(null)
+  const [driverCheckLoading, setDriverCheckLoading] = useState(false)
+  const [driverScheduleCheck, setDriverScheduleCheck] = useState(null)
 
   const {
     data: formData,
@@ -108,9 +111,46 @@ const Form = ({ mode, data, onClose, open }) => {
     active = false
     controller.abort()
   }
-}, [open, isEdit, data?.id])
+  }, [open, isEdit, data?.id])
 
+  useEffect(() => {
+    if (!open) return
+    if (!formData.driver_id || !formData.travel_order_id) {
+      setDriverScheduleCheck(null)
+      return
+    }
 
+    const controller = new AbortController()
+
+    const run = async () => {
+      setDriverCheckLoading(true)
+      try {
+        const params = new URLSearchParams({
+          driver_id: String(formData.driver_id),
+          travel_order_id: String(formData.travel_order_id),
+        })
+        if (isEdit && editId) {
+          params.append("trip_ticket_id", String(editId))
+        }
+
+        const res = await fetch(
+          `${route("trip-ticket.check-driver-schedule")}?${params.toString()}`,
+          { headers: { Accept: "application/json" }, signal: controller.signal }
+        )
+
+        if (!res.ok) throw new Error("Failed to check driver schedule")
+        const json = await res.json()
+        setDriverScheduleCheck(json)
+      } catch (err) {
+        if (err?.name !== "AbortError") setDriverScheduleCheck(null)
+      } finally {
+        setDriverCheckLoading(false)
+      }
+    }
+
+    run()
+    return () => controller.abort()
+  }, [open, formData.driver_id, formData.travel_order_id, isEdit, editId])
 
   const vehicles = bootData?.vehicles || []
   const requests = bootData?.requests || []
@@ -219,6 +259,43 @@ const Form = ({ mode, data, onClose, open }) => {
                   {errors.driver_id && <p className="text-xs text-red-500">{errors.driver_id}</p>}
                 </div>
               </div>
+
+              {formData.driver_id && formData.travel_order_id && (
+                <div className="mt-2">
+                  <StatusInfoBox
+                    color={driverScheduleCheck?.has_conflict ? "red" : "green"}
+                    status={
+                      driverCheckLoading
+                        ? "Checking driver schedule..."
+                        : driverScheduleCheck?.has_conflict
+                          ? "Conflict Found"
+                          : "No Conflict"
+                    }
+                    message={
+                      <div className="space-y-1">
+                        <div>
+                          {driverCheckLoading
+                            ? "Please wait..."
+                            : driverScheduleCheck?.has_conflict
+                              ? `${driverScheduleCheck.message} (${driverScheduleCheck.conflicts?.length || 0} conflict${(driverScheduleCheck.conflicts?.length || 0) > 1 ? "s" : ""})`
+                              : (driverScheduleCheck?.message || "No conflict found.")}
+                        </div>
+
+                        {!driverCheckLoading &&
+                          driverScheduleCheck?.has_conflict &&
+                          Array.isArray(driverScheduleCheck.conflict_lines) &&
+                          driverScheduleCheck.conflict_lines.length > 0 && (
+                            <div className="text-xs space-y-1">
+                              {driverScheduleCheck.conflict_lines.map((line, idx) => (
+                                <div key={idx}>{line}</div>
+                              ))}
+                            </div>
+                          )}
+                      </div>
+                    }
+                  />
+                </div>
+              )}
 
               <div className="space-y-1">
                 <Label>Dispatcher</Label>

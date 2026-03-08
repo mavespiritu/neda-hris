@@ -272,32 +272,43 @@ const Form = ({
   }
 
   const handleSubmit = (e) => {
-    e.preventDefault()
+      e.preventDefault()
 
-    const successMsg = isEdit
-      ? "Travel order updated successfully."
-      : "Travel order created successfully."
+      const request = isEdit
+        ? () => put(route("travel-requests.update", data.id), opts)
+        : () => post(route("travel-requests.store"), opts)
 
-    const opts = {
-      onSuccess: () => {
-        toast({
-          title: "Success",
-          description: successMsg,
-        })
-      },
-      onError: () => {
-        toast({
-          title: "Please check the form",
-          description: "Fix the errors and try again.",
-          variant: "destructive",
-        })
-      },
+      const opts = {
+        preserveScroll: true,
+        onSuccess: (page) => {
+          const flash = page?.props?.flash ?? {}
+          const status = flash.status ?? "success"
+          const title =
+            flash.title ?? (isEdit ? "Updated" : "Created")
+          const message =
+            flash.message ??
+            (isEdit
+              ? "Travel order updated successfully."
+              : "Travel order created successfully.")
+
+          toast({
+            title,
+            description: message,
+            variant: status === "error" ? "destructive" : "default",
+          })
+        },
+        onError: () => {
+          toast({
+            title: "Please check the form",
+            description: "Fix the errors and try again.",
+            variant: "destructive",
+          })
+        },
+      }
+
+      if (!formData.date_created) setData("date_created", toYMD(new Date()))
+      request()
     }
-
-    if (!formData.date_created) setData("date_created", toYMD(new Date()))
-    if (isEdit) put(route("travel-requests.update", data.id), opts)
-    else post(route("travel-requests.store"), opts)
-  }
 
   const handleStartDateChange = (val) => {
     setData("start_date", val || "")

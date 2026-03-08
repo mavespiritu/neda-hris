@@ -4,8 +4,8 @@ namespace App\Actions\VehicleRequests;
 
 use App\Models\User;
 use App\Models\VehicleRequest;
+use App\States\VehicleRequest\Reviewed as VrReviewed;
 use App\States\VehicleRequest\Approved as VrApproved;
-use App\States\VehicleRequest\Endorsed as VrEndorsed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -40,7 +40,7 @@ class ApproveVehicleRequestViaEmail
 
             $vr = VehicleRequest::on('mysql2')->whereKey((int) $link->model_id)->lockForUpdate()->first();
             if (! $vr) throw new RuntimeException('Vehicle request not found.');
-            if (! ($vr->state instanceof VrEndorsed)) return 'Vehicle request is not in endorsed status.';
+            if (! ($vr->state instanceof VrReviewed)) return 'Vehicle request is not in reviewed status.';
 
             $vr->state->transitionTo(VrApproved::class, (string) $user->ipms_id, null, true);
 

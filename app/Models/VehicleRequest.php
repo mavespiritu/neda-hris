@@ -15,6 +15,16 @@ class VehicleRequest extends Model
     public $timestamps = false;
 
     protected $casts = [
-        'state' => VehicleRequestState::class,
+        'vr_state' => VehicleRequestState::class,
     ];
+
+    public function getStateAttribute()
+    {
+        return $this->vr_state;
+    }
+
+    public function setStateAttribute($value): void
+    {
+        $this->setAttribute('vr_state', $value);
+    }
 }

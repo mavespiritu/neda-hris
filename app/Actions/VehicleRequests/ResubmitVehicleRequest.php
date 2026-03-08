@@ -48,8 +48,8 @@ class ResubmitVehicleRequest
                 throw new RuntimeException('Only Returned vehicle requests can be resubmitted.');
             }
 
-            $targetLabel = trim((string) $vehicleRequest->return_to_state);
-            $returnToUser = trim((string) $vehicleRequest->return_to_user);
+            $targetLabel = trim((string) $vehicleRequest->vr_return_to_state);
+            $returnToUser = trim((string) $vehicleRequest->vr_return_to_user);
 
             if ($targetLabel === '' || $returnToUser === '') {
                 throw new RuntimeException('Return target is missing. Cannot resubmit.');
@@ -66,8 +66,8 @@ class ResubmitVehicleRequest
             $vehicleRequest->refresh();
 
             // optional cleanup
-            $vehicleRequest->status_remarks = null;
-            $vehicleRequest->return_to_user = null;
+            $vehicleRequest->vr_status_remarks = null;
+            $vehicleRequest->vr_return_to_user = null;
             $vehicleRequest->save();
         });
     }

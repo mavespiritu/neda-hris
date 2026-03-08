@@ -12,6 +12,8 @@ use App\Actions\TravelRequests\GenerateTravelRequestReport;
 use App\Actions\TravelRequests\SubmitTravelRequest;
 use App\Actions\TravelRequests\DeleteTravelRequest;
 use App\Actions\TravelRequests\BulkDeleteTravelRequests;
+use App\Actions\TravelRequests\ReturnTravelRequest;
+use App\Actions\TravelRequests\ResubmitTravelRequest;
 use App\Actions\VehicleRequests\StoreVehicleExpense;
 use App\Actions\VehicleRequests\UpdateVehicleExpense;
 use App\Actions\VehicleRequests\DeleteVehicleExpense;
@@ -21,6 +23,7 @@ use App\Actions\VehicleRequests\ReviewVehicleRequest;
 use App\Actions\VehicleRequests\EndorseVehicleRequestViaEmail;
 use App\Actions\VehicleRequests\ApproveVehicleRequestViaEmail;
 use App\Actions\VehicleRequests\AuthorizeVehicleRequestViaEmail;
+use App\Actions\VehicleRequests\SubmitVehicleRequest;
 use App\Actions\VehicleRequests\EndorseVehicleRequest;
 use App\Actions\VehicleRequests\ApproveVehicleRequest;
 use App\Actions\VehicleRequests\AuthorizeVehicleRequest;
@@ -36,6 +39,7 @@ use App\Actions\TravelRequests\GenerateTripTicketReport;
 use App\Actions\TripTickets\ListTripTickets;
 use App\Actions\TripTickets\CompleteTrip;
 use App\Actions\TripTickets\StoreCompleteTrip;
+use App\Actions\TripTickets\CheckDriverSchedule;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
@@ -50,10 +54,14 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::post('/travel-requests/bulk-destroy', BulkDeleteTravelRequests::class)->name('travel-requests.bulk-destroy');
     Route::get('/travel-requests/{id}/report', GenerateTravelRequestReport::class)->name('travel-requests.generate');
     Route::post('/travel-requests/{id}/submit', SubmitTravelRequest::class)->name('travel-requests.submit');
+    Route::post('/travel-requests/{id}/return', ReturnTravelRequest::class)->name('travel-requests.return');
+    Route::post('/travel-requests/{id}/resubmit', ResubmitTravelRequest::class)->name('travel-requests.resubmit');
+    
     Route::post('/travel-requests/{id}/service-expense', StoreVehicleExpense::class)->name('travel-requests.service-expense.store');
     Route::put('/travel-requests/{id}/service-expense/{expenseId}', UpdateVehicleExpense::class)->name('travel-requests.service-expense.update');
     Route::delete('/travel-requests/{id}/service-expense/{expenseId}', DeleteVehicleExpense::class)->name('travel-requests.service-expense.destroy');
 
+    Route::post('/vehicle-requests/{id}/submit', SubmitVehicleRequest::class)->name('vehicle-requests.submit');
     Route::post('/vehicle-requests/{id}/endorse', EndorseVehicleRequest::class)->name('vehicle-requests.endorse');
     Route::post('/vehicle-requests/{id}/approve', ApproveVehicleRequest::class)->name('vehicle-requests.approve');
     Route::post('/vehicle-requests/{id}/return', ReturnVehicleRequest::class)->name('vehicle-requests.return');
@@ -92,6 +100,9 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::get('/trip-tickets/{id}/complete', CompleteTrip::class)->name('trip-tickets.complete.form');
     Route::post('/trip-tickets/{id}/complete', StoreCompleteTrip::class)->name('trip-tickets.complete');
+
+    Route::get('/trip-tickets/check-driver-schedule', CheckDriverSchedule::class)
+        ->name('trip-ticket.check-driver-schedule');
 });
 
 Route::middleware(['web', 'signed'])->group(function () {

@@ -114,14 +114,23 @@ class ListTravelRequests
 
     private function decorateItems($items, ActionRequest $request, $conn2, $conn3)
     {
-        $ids = $items->pluck('id')->all();
+        $ids = $items->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        if (empty($ids)) {
+            return $items;
+        }
+
+        $latestIds = $conn2->table('submission_history')
+        ->where('model', 'TO') 
+        ->whereIn('model_id', $ids)
+        ->selectRaw('MAX(id) as id')
+        ->groupBy('model_id')
+        ->pluck('id');
 
         $histories = $conn2->table('submission_history')
-            ->where('model', 'TO')
-            ->whereIn('model_id', $ids)
-            ->orderByDesc('date_acted')
-            ->get()
-            ->groupBy('model_id');
+        ->whereIn('id', $latestIds)
+        ->get()
+        ->keyBy('model_id');
 
         $actedByIds = $histories->flatten()->pluck('acted_by');
         $creatorIds = $items->pluck('created_by');
@@ -131,10 +140,11 @@ class ListTravelRequests
         $gate = Gate::forUser($request->user());
 
         return $items->transform(function ($item) use ($employees, $histories, $gate) {
-            $latest = $histories[$item->id][0] ?? null;
+            $latest = $histories->get((int) $item->id);
 
             $item->creator = $this->employeeName($employees, $item->created_by);
-            $item->status = $latest->status ?? null;
+            $item->status = $this->travelRequestStatusFromState($item->tr_state ?? null);
+
             $item->acted_by = $latest->acted_by ?? null;
             $item->acted_by_name = $this->employeeName($employees, $latest->acted_by ?? null);
             $item->remarks = $latest->remarks ?? null;
@@ -145,6 +155,9 @@ class ListTravelRequests
                 'delete' => $gate->inspect('tr.delete', $item->id)->allowed(),
                 'view' => $gate->inspect('tr.view', $item->id)->allowed(),
                 'submit' => $gate->inspect('tr.submit', $item->id)->allowed(),
+                'return' => $gate->inspect('tr.return', $item->id)->allowed(),
+                'resubmit' => $gate->inspect('tr.resubmit', $item->id)->allowed(),
+                'vrSubmit' => $gate->inspect('vr.submit', $item->id)->allowed(),
             ];
 
             return $item;
@@ -202,5 +215,21 @@ class ListTravelRequests
             'travel_types' => $travelTypes,
             'travel_categories' => $categories,
         ];
+    }
+
+    private function travelRequestStatusFromState($state): string
+    {
+        if (blank($state)) return 'Draft';
+
+        $stateClass = is_object($state) ? get_class($state) : (string) $state;
+
+        $map = [
+            \App\States\TravelRequest\Draft::class => 'Draft',
+            \App\States\TravelRequest\Submitted::class => 'Submitted',
+            \App\States\TravelRequest\Returned::class => 'Returned',
+            \App\States\TravelRequest\Resubmitted::class => 'Resubmitted',
+        ];
+
+        return $map[$stateClass] ?? class_basename($stateClass);
     }
 }

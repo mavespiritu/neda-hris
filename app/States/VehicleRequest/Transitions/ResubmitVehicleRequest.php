@@ -21,8 +21,8 @@ class ResubmitVehicleRequest extends Transition
     {
         $from = $this->vehicleRequest->state->label();
 
-        $this->vehicleRequest->status_remarks = $this->remarks;
-        $this->vehicleRequest->state = new Resubmitted($this->vehicleRequest);
+        $this->vehicleRequest->vr_status_remarks = $this->remarks;
+        $this->vehicleRequest->vr_state = new Resubmitted($this->vehicleRequest);
         $this->vehicleRequest->save();
 
         $this->logAndDispatch(
@@ -32,8 +32,8 @@ class ResubmitVehicleRequest extends Transition
             toState: 'Resubmitted',
             actedBy: $this->actedBy,
             remarks: $this->remarks,
-            returnToState: $this->vehicleRequest->return_to_state,
-            returnToUser: $this->vehicleRequest->return_to_user,
+            returnToState: $this->vehicleRequest->vr_return_to_state,
+            returnToUser: $this->vehicleRequest->vr_return_to_user,
             notify: $this->notify
         );
 

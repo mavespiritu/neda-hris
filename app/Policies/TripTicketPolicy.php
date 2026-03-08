@@ -37,7 +37,7 @@ class TripTicketPolicy
 
     private function isAuthorized(string $status): bool
     {
-        return in_array($status, ['Vehicle Authorized'], true);
+        return in_array($status, ['Approved'], true);
     }
 
     private function vehicleRequestRow(int|string $vehicleRequestId): ?object

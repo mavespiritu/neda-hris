@@ -18,7 +18,7 @@ class ResumeToReturnTarget extends Transition
 
   public function handle(): VehicleRequest
   {
-    $target = trim((string) $this->vehicleRequest->return_to_state);
+    $target = trim((string) $this->vehicleRequest->vr_return_to_state);
 
     $map = [
       'Submitted' => Submitted::class,
@@ -32,10 +32,10 @@ class ResumeToReturnTarget extends Transition
       throw new InvalidArgumentException("Invalid return target state: {$target}");
     }
 
-    $this->vehicleRequest->state = new ($map[$target])($this->vehicleRequest);
+    $this->vehicleRequest->vr_state = new ($map[$target])($this->vehicleRequest);
 
     // clear return memory after jumping back
-    $this->vehicleRequest->return_to_state = null;
+    $this->vehicleRequest->vr_return_to_state = null;
 
     $this->vehicleRequest->save();
 

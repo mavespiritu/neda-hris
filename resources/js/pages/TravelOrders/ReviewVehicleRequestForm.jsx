@@ -72,7 +72,7 @@ const ReviewVehicleRequestForm = ({
         reset()
         setOpen(false)
       },
-      onError: () => {
+      onError: (e) => {
         toast({
           title: "Submission failed",
           description: "Please check the form and try again.",

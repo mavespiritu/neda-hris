@@ -59,8 +59,8 @@ const View = () => {
   ]
 
   const isRequestingVehicle = !!travelOrder?.isRequestingVehicle
-  const isVehicleAuthorized =
-    String(travelOrder?.vehicle_request_status || "").trim() === "Vehicle Authorized"
+  const isApproved =
+    String(travelOrder?.vehicle_request_status || "").trim() === "Approved"
 
   const tabs = [
     { key: "trip", label: "Trip Information", hash: "trip-information" },
@@ -74,7 +74,7 @@ const View = () => {
       key: "ticket",
       label: "Trip Ticket",
       hash: "trip-ticket",
-      hidden: !(isRequestingVehicle && isVehicleAuthorized),
+      hidden: !(isRequestingVehicle && isApproved),
     },
   ]
 
@@ -88,7 +88,28 @@ const View = () => {
     if (!visible.includes(currentTab)) {
       setCurrentTab("trip")
     }
-  }, [isRequestingVehicle, isVehicleAuthorized])
+  }, [isRequestingVehicle, isApproved])
+
+  const handleDelete = () => {
+    form.delete(route("travel-requests.destroy", travelOrder.id), {
+      preserveScroll: true,
+      onSuccess: (page) => {
+        const f = page?.props?.flash ?? flash ?? {}
+        toast({
+          title: f.title || "Success",
+          description: f.message || "Travel request deleted successfully.",
+          variant: f.status === "error" ? "destructive" : "default",
+        })
+      },
+      onError: (errors) => {
+        toast({
+          title: "Delete failed",
+          description: errors?.travel_order || "Unable to delete travel request.",
+          variant: "destructive",
+        })
+      },
+    })
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -166,7 +187,8 @@ const View = () => {
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         className="bg-destructive text-white hover:bg-destructive/90"
-                        onClick={() => console.log({ id: travelOrder.id, form, toast })}
+                        onClick={handleDelete}
+                        disabled={form.processing}
                       >
                         Yes, delete it
                       </AlertDialogAction>
@@ -219,7 +241,7 @@ const View = () => {
                   />
                 )}
 
-                {currentTab === "ticket" && isRequestingVehicle && isVehicleAuthorized && (
+                {currentTab === "ticket" && isRequestingVehicle && isApproved && (
                   <TripTicket
                     travelOrderId={travelOrder.id}
                   />

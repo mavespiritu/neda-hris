@@ -63,7 +63,7 @@ class VehicleRequestPolicy
     private function requestRow(int|string $vehicleRequestId): ?object
     {
         return DB::connection('mysql2')->table('travel_order')
-            ->select(['id', 'division', 'created_by', 'state', 'return_to_user'])
+            ->select(['id', 'division', 'created_by', 'vr_state', 'vr_return_to_user'])
             ->where('id', $vehicleRequestId)
             ->first();
     }
@@ -87,6 +87,26 @@ class VehicleRequestPolicy
             ->values();
     }
 
+    public function submit(User $user, $vehicleRequestId): Response
+    {
+        $vr = $this->requestRow($vehicleRequestId);
+        if (! $vr) {
+            return Response::deny('Vehicle request not found.');
+        }
+
+        if ((string) $vr->created_by !== (string) $user->ipms_id) {
+            return Response::deny('Only the creator can submit this request.');
+        }
+
+        $status = $this->latestStatus($vehicleRequestId);
+
+        if ($status !== 'Draft') {
+            return Response::deny('Only draft requests can be submitted.');
+        }
+
+        return Response::allow();
+    }
+
     public function endorse(User $user, $vehicleRequestId): Response
     {
         $vr = $this->requestRow($vehicleRequestId);
@@ -100,24 +120,11 @@ class VehicleRequestPolicy
         return Response::allow();
     }
 
-    public function approve(User $user, $vehicleRequestId): Response
-    {
-        $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
-        if ($this->latestStatus($vehicleRequestId) !== 'Endorsed') return Response::deny('Only endorsed requests can be approved.');
-
-        $ids = $this->signatoryIds('Approver_VR', (string) $vr->division);
-        if ($ids->isEmpty()) return Response::deny('Approver not found.');
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to approve.');
-
-        return Response::allow();
-    }
-
     public function review(User $user, $vehicleRequestId): Response
     {
         $vr = $this->requestRow($vehicleRequestId);
         if (!$vr) return Response::deny('Vehicle request not found.');
-        if ($this->latestStatus($vehicleRequestId) !== 'Approved') return Response::deny('Only approved requests can be reviewed.');
+        if ($this->latestStatus($vehicleRequestId) !== 'Endorsed') return Response::deny('Only endorsed requests can be reviewed.');
 
         $ids = $this->signatoryIds('Reviewer_VR', (string) $vr->division);
         if ($ids->isEmpty()) return Response::deny('Reviewer not found.');
@@ -126,7 +133,20 @@ class VehicleRequestPolicy
         return Response::allow();
     }
 
-    public function authorize(User $user, $vehicleRequestId): Response
+    public function approve(User $user, $vehicleRequestId): Response
+    {
+        $vr = $this->requestRow($vehicleRequestId);
+        if (!$vr) return Response::deny('Vehicle request not found.');
+        if ($this->latestStatus($vehicleRequestId) !== 'Reviewed') return Response::deny('Only reviewed requests can be approved.');
+
+        $ids = $this->signatoryIds('Approver_VR', (string) $vr->division);
+        if ($ids->isEmpty()) return Response::deny('Approver not found.');
+        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to approve.');
+
+        return Response::allow();
+    }
+
+    /* public function authorize(User $user, $vehicleRequestId): Response
     {
         $vr = $this->requestRow($vehicleRequestId);
         if (!$vr) return Response::deny('Vehicle request not found.');
@@ -137,7 +157,7 @@ class VehicleRequestPolicy
         if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to authorize.');
 
         return Response::allow();
-    }
+    } */
 
     public function disapprove(User $user, $vehicleRequestId): Response
     {
@@ -148,9 +168,9 @@ class VehicleRequestPolicy
 
         $typeByStatus = [
             'Submitted' => 'Recommending_VR',
-            'Endorsed'  => 'Approver_VR',
-            'Approved'  => 'Reviewer_VR',
-            'Reviewed'  => 'Approver_TT',
+            'Endorsed'  => 'Reviewer_VR',
+            'Reviewed'  => 'Approver_VR',
+            'Approved'  => null,
         ];
 
         $requiredType = $typeByStatus[$status] ?? null;
@@ -183,10 +203,9 @@ class VehicleRequestPolicy
 
         $typeByStatus = [
             'Submitted' => 'Recommending_VR',
-            'Endorsed'  => 'Approver_VR',
-            'Approved'  => 'Reviewer_VR',
-            'Reviewed'  => 'Approver_TT',
-            'Vehicle Authorized' => 'Approver_TT',
+            'Endorsed'  => 'Reviewer_VR',
+            'Reviewed'  => 'Approver_VR',
+            'Approved'  => null,
         ];
 
         $requiredType = $typeByStatus[$status] ?? null;

@@ -21,8 +21,8 @@ class DisapproveVehicleRequest extends Transition
   {
     $from = $this->vehicleRequest->state->label();
     
-    $this->vehicleRequest->status_remarks = $this->remarks;
-    $this->vehicleRequest->state = new Disapproved($this->vehicleRequest);
+    $this->vehicleRequest->vr_status_remarks = $this->remarks;
+    $this->vehicleRequest->vr_state = new Disapproved($this->vehicleRequest);
     $this->vehicleRequest->save();
 
     $this->logAndDispatch(

@@ -20,6 +20,7 @@ import RichTextEditor from "@/components/RichTextEditor"
 
 import ServiceVehicleExpenseForm from "./ServiceVehicleExpenseForm"
 import ReviewVehicleRequestForm from "./ReviewVehicleRequestForm"
+import { vehicleRequestActionMap as actionMap } from "./actions"
 
 import {
   Table,
@@ -44,73 +45,6 @@ const VehicleRequest = ({
 
   const confirmForm = useForm({ remarks: "" })
   const [serviceVehicleTotal, setServiceVehicleTotal] = useState(0)
-
-  const actionMap = useMemo(
-    () => ({
-      Endorse: {
-        route: "vehicle-requests.endorse",
-        needsRemarks: false,
-        title: "Confirm Endorsement",
-        description:
-          "This will endorse the vehicle request to the next approving authority.",
-        note:
-          "The next approving authority will be notified through email regarding the endorsement of vehicle request.",
-      },
-      Approve: {
-        route: "vehicle-requests.approve",
-        needsRemarks: false,
-        title: "Confirm Approval",
-        description:
-          "This will be forwarded to PRU for review and assessment of the vehicle request.",
-        note:
-          "The PRU staff will be notified through email for review and assessment of the vehicle request.",
-      },
-      Return: {
-        route: "vehicle-requests.return",
-        needsRemarks: true,
-        title: "Confirm Return",
-        description:
-          "This will be forwarded to the request creator for editing of the vehicle request.",
-        note:
-          "The requesting personnel will be notified through email regarding the return of the vehicle request.",
-      },
-      Disapprove: {
-        route: "vehicle-requests.disapprove",
-        needsRemarks: true,
-        title: "Confirm Disapproval",
-        description: "This will disapprove the vehicle request.",
-        note:
-          "The requesting personnel will be notified through email regarding the disapproval of the vehicle request.",
-      },
-      Review: {
-        route: "vehicle-requests.review",
-        needsRemarks: false,
-        title: "Confirm Submission",
-        description:
-          "This will be forwarded to authorize the use of official vehicle for this vehicle request.",
-        note:
-          "The next approving authority will be notified through email regarding the submission of the vehicle request.",
-      },
-      Resubmit: {
-        route: "vehicle-requests.resubmit",
-        needsRemarks: false,
-        title: "Confirm Resubmission",
-        description:
-          "This will be forwarded to the returner of this vehicle request.",
-        note:
-          "The next approving authority will be notified through email regarding the submission of the vehicle request.",
-      },
-      "Vehicle Authorized": {
-        route: "vehicle-requests.authorize",
-        needsRemarks: false,
-        title: "Confirm Authorization",
-        description: "Are you sure you want to authorize the use of official vehicle?",
-        note:
-          "The requesting personnel will be notified through email regarding the authorization of vehicle use.",
-      },
-    }),
-    []
-  )
 
   const openConfirm = (action) => {
     setConfirmAction(action)
@@ -200,7 +134,7 @@ const VehicleRequest = ({
     return commutationTotalCost > serviceEstimateThreshold
   }, [commutationTotalCost, serviceEstimateThreshold, totalServiceVehicleEstimate])
 
-  const showAuthorizeButtons = useMemo(
+  const showApproveButton = useMemo(
     () => totalServiceVehicleEstimate > 0,
     [totalServiceVehicleEstimate]
   )
@@ -305,17 +239,16 @@ const VehicleRequest = ({
           </div>
         )}
 
-        {(can?.endorse || can?.approve || can?.return || can?.resubmit) && (
+        {(can?.vrSubmit || can?.endorse || can?.approve || can?.return || can?.resubmit) && (
           <div className="pt-3 flex flex-col sm:flex-row gap-2 justify-end">
-            {can?.endorse && (
-              <Button type="button" variant="outline" onClick={() => openConfirm("Endorse")}>
-                Endorse for Approval
+            {can?.vrSubmit && (
+              <Button type="button" onClick={() => openConfirm("Submit")}>
+                Submit Vehicle Request
               </Button>
             )}
-
-            {can?.approve && (
-              <Button type="button" onClick={() => openConfirm("Approve")}>
-                Approve Request
+            {can?.endorse && (
+              <Button type="button" onClick={() => openConfirm("Endorse")}>
+                Endorse for Approval
               </Button>
             )}
 
@@ -373,7 +306,7 @@ const VehicleRequest = ({
         )}
       </div>
 
-      {travelOrder?.review && (can?.authorize || can?.review) && (() => {
+      {travelOrder?.review && (can?.approve || can?.review) && (() => {
         const rec = travelOrder.review.recommendation
         const isApprove = rec === "Approved"
         const isDisapprove = rec === "Disapproved"
@@ -397,7 +330,7 @@ const VehicleRequest = ({
 
                 {travelOrder.review.dispatcher_name && (
                   <div className="text-xs text-muted-foreground">
-                    Recommendation by {travelOrder.review.dispatcher_name}
+                    Reviewed and assessed by {travelOrder.review.dispatcher_name}
                   </div>
                 )}
               </div>
@@ -455,14 +388,14 @@ const VehicleRequest = ({
         )
       })()}
 
-      {showAuthorizeButtons && can?.authorize && (
+      {showApproveButton && can?.approve && (
         <div className="mt-4 flex flex-col sm:flex-row gap-2 justify-end">
           <Button type="button" variant="destructive" onClick={() => openConfirm("Disapprove")}>
-            Decline
+            Disapprove
           </Button>
 
-          <Button type="button" onClick={() => openConfirm("Vehicle Authorized")}>
-            Authorize Use of Vehicle
+          <Button type="button" onClick={() => openConfirm("Approve")}>
+            Approve
           </Button>
         </div>
       )}

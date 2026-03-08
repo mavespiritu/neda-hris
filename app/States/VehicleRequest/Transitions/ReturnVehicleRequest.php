@@ -31,9 +31,9 @@ class ReturnVehicleRequest extends Transition
             throw new InvalidArgumentException('returnToState and returnToUser are required.');
         }
 
-        $this->vehicleRequest->return_to_state = $returnToState;
-        $this->vehicleRequest->return_to_user = $returnToUser;
-        $this->vehicleRequest->status_remarks = $this->remarks;
+        $this->vehicleRequest->vr_return_to_state = $returnToState;
+        $this->vehicleRequest->vr_return_to_user = $returnToUser;
+        $this->vehicleRequest->vr_status_remarks = $this->remarks;
 
         $this->vehicleRequest->state = new Returned($this->vehicleRequest);
         $this->vehicleRequest->save();

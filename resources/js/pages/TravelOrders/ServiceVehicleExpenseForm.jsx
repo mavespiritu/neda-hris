@@ -113,7 +113,7 @@ const ServiceVehicleExpenseForm = ({
   const [deleteTarget, setDeleteTarget] = useState(null)
 
   const saveForm = useForm({
-    driver: "",
+    //driver: "",
     vehicle_id: "",
     total_km: "",
     gas_price: 0,
@@ -200,7 +200,7 @@ const ServiceVehicleExpenseForm = ({
     setEditingId(null)
     saveForm.clearErrors()
     saveForm.setData({
-      driver: "",
+      //driver: "",
       vehicle_id: "",
       total_km: "",
       gas_price: 0,
@@ -215,7 +215,7 @@ const ServiceVehicleExpenseForm = ({
     setEditingId(row.id)
     saveForm.clearErrors()
     saveForm.setData({
-      driver: row?.driver ? String(row.driver) : "",
+      //driver: row?.driver ? String(row.driver) : "",
       vehicle_id: row?.vehicle_id ? String(row.vehicle_id) : "",
       total_km: row?.total_km ?? "",
       gas_price: formatToNumber(row?.gas_price),
@@ -314,7 +314,7 @@ const ServiceVehicleExpenseForm = ({
         <Table>
           <TableHeader>
             <TableRow className="h-9">
-              <TableHead className="py-1 px-2 text-xs font-semibold">Driver</TableHead>
+              {/* <TableHead className="py-1 px-2 text-xs font-semibold">Driver</TableHead> */}
               <TableHead className="py-1 px-2 text-xs font-semibold">Vehicle</TableHead>
               <TableHead className="py-1 px-2 text-xs font-semibold text-right">Round Trip Cost</TableHead>
               {showActions && (
@@ -333,8 +333,7 @@ const ServiceVehicleExpenseForm = ({
             ) : (
               displayRows.map((row) => (
                 <TableRow key={row.id} className="h-9">
-                  <TableCell className="py-1 px-2 text-xs whitespace-nowrap">{row.driver_name}</TableCell>
-
+                  {/* <TableCell className="py-1 px-2 text-xs whitespace-nowrap">{row.driver_name}</TableCell> */}
                   <TableCell className="py-1 px-2 text-xs">
                     <div className="font-medium">{row.vehicle_label}</div>
                     <div className="text-[11px] text-muted-foreground">
@@ -405,7 +404,7 @@ const ServiceVehicleExpenseForm = ({
           </DialogHeader>
 
           <form onSubmit={onSubmitSave} className="space-y-3">
-            <div className="space-y-1">
+            {/* <div className="space-y-1">
               <label className="text-xs font-semibold" htmlFor="svc_driver">
                 Driver <span className="text-destructive">*</span>
               </label>
@@ -423,7 +422,7 @@ const ServiceVehicleExpenseForm = ({
               {saveForm.errors?.driver && (
                 <span className="text-red-500 text-[11px]">{saveForm.errors.driver}</span>
               )}
-            </div>
+            </div> */}
 
             <div className="space-y-1">
               <label className="text-xs font-semibold" htmlFor="svc_vehicle_id">

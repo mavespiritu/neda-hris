@@ -164,12 +164,12 @@ class VehicleRequestMailPayloadBuilder
     {
         $subject = match ($requiredAction) {
             'endorse'         => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs your endorsement for approval",
-            'approve'         => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs your approval",
             'review'          => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs your review and assessment",
-            'authorize'       => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs your authorization",
-            'create_trip_ticket' => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} is authorized and needs trip ticket generation",
+            'approve'         => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs your approval",
+            //'authorize'       => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs your authorization",
+            'create_trip_ticket' => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} is approved and needs trip ticket generation",
             'resubmit'        => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} needs further revision",
-            'fyi_done'        => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} has been authorized to use official vehicle",
+            'fyi_done'        => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} has been approved",
             'fyi_disapproved' => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} has been disapproved",
             default           => "(DEPDev RO1 HRIS) Vehicle Request No. {$referenceNo} has been updated",
         };
@@ -182,7 +182,7 @@ class VehicleRequestMailPayloadBuilder
         $routeByRequiredAction = [
             'endorse' => 'vehicle-requests.endorse.email',
             'approve' => 'vehicle-requests.approve.email',
-            'authorize' => 'vehicle-requests.authorize.email',
+            //'authorize' => 'vehicle-requests.authorize.email',
         ];
 
         $routeName = $routeByRequiredAction[$requiredAction] ?? null;

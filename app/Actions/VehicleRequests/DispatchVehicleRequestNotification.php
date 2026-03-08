@@ -128,12 +128,16 @@ class DispatchVehicleRequestNotification implements ShouldQueue
         $creator = $this->creatorEmpIdFromVehicleRequest($conn2, $vehicleRequestId);
 
         return match ($action) {
-            'submitted' => $this->signatoryTargets($conn2, 'Recommending_VR', $divisionId, 'endorse'),
+            /* 'submitted' => $this->signatoryTargets($conn2, 'Recommending_VR', $divisionId, 'endorse'),
             'endorsed'  => $this->signatoryTargets($conn2, 'Approver_VR', $divisionId, 'approve'),
             'approved'  => $this->signatoryTargets($conn2, 'Reviewer_VR', null, 'review'),
-            'reviewed'  => $this->signatoryTargets($conn2, 'Approver_TT', null, 'authorize'),
+            'reviewed'  => $this->signatoryTargets($conn2, 'Approver_TT', null, 'authorize'), */
 
-            'authorized' => array_merge(
+            'submitted' => $this->signatoryTargets($conn2, 'Recommending_VR', $divisionId, 'endorse'),
+            'endorsed'  => $this->signatoryTargets($conn2, 'Reviewer_VR', null, 'review'),
+            'reviewed'  => $this->signatoryTargets($conn2, 'Approver_VR', $divisionId, 'approve'),
+
+            'approved' => array_merge(
                 $creator ? [[
                     'emp_id' => $creator,
                     'required_action' => 'fyi_done',
