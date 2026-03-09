@@ -145,7 +145,7 @@ const View = () => {
                 </DropdownMenuItem>
               )}
 
-              {can?.view && (
+              {can?.generate && (
                 <DropdownMenuItem
                   onSelect={() => {
                     window.open(

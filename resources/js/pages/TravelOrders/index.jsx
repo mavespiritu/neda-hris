@@ -235,7 +235,7 @@ const TravelOrders = () => {
             enableSearching: true,
             enableFiltering: true,
             enableRowSelection: (row) => !!row.original?.can?.delete,
-            enableGenerateReport: (row) => !!row.original?.can?.view,
+            enableGenerateReport: (row) => !!row.original?.can?.generate,
         },
         endpoints: {
             addEndpoint: route('travel-requests.create'),

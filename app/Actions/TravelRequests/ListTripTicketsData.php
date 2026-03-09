@@ -14,11 +14,17 @@ class ListTripTicketsData
 {
     use AsAction, BuildsEmployeeNameMap;
 
+    private function resolveTravelOrderId(ActionRequest $request): ?int
+    {
+        $id = $request->route('id') ?? $request->query('id');
+        return blank($id) ? null : (int) $id;
+    }
+
     public function authorize(ActionRequest $request): bool
     {
-        $id = $request->route('id');
+        $id = $this->resolveTravelOrderId($request);
 
-        if (blank($id)) {
+        if (is_null($id)) {
             return Gate::forUser($request->user())->allows('tt.viewAny');
         }
 
@@ -27,8 +33,7 @@ class ListTripTicketsData
 
     public function asController(ActionRequest $request): JsonResponse
     {
-        $id = $request->route('id');
-        $travelOrderId = blank($id) ? null : (int) $id;
+        $travelOrderId  = $this->resolveTravelOrderId($request);
 
         return response()->json($this->handle($request, $travelOrderId));
     }

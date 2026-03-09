@@ -283,12 +283,12 @@ class ShowTravelRequest
             'endorse' => $gate->inspect('vr.endorse', $id)->allowed(),
             'approve' => $gate->inspect('vr.approve', $id)->allowed(),
             'review' => $gate->inspect('vr.review', $id)->allowed(),
-            //'authorize' => $gate->inspect('vr.authorize', $id)->allowed(),
             'disapprove' => $gate->inspect('vr.disapprove', $id)->allowed(),
             'return' => $gate->inspect('vr.return', $id)->allowed(),
             'trReturn' => $gate->inspect('tr.return', $id)->allowed(),
             'trResubmit' => $gate->inspect('tr.resubmit', $id)->allowed(),
             'resubmit' => $gate->inspect('vr.resubmit', $id)->allowed(),
+            'generate' => $gate->inspect('tr.generate', $id)->allowed(),
         ];
     }
 

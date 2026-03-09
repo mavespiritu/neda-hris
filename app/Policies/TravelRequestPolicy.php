@@ -295,4 +295,65 @@ class TravelRequestPolicy
 
         return Response::allow();
     }
+
+    public function generate(User $user, $travelRequestId): Response
+    {
+        $conn2 = DB::connection('mysql2');
+
+        if ($user->hasRole('HRIS_PRU')) {
+            return Response::allow();
+        }
+
+        $travelRequest = $conn2->table('travel_order')
+            ->select(['id', 'division', 'created_by'])
+            ->where('id', $travelRequestId)
+            ->first();
+
+        if (! $travelRequest) {
+            return Response::deny('Travel request not found.');
+        }
+
+        // Require state-based latest status to be Submitted
+        $status = $this->latestStatus($travelRequestId); // uses state transition label first
+        if ($status !== 'Submitted') {
+            return Response::deny('Only submitted travel requests can be generated.');
+        }
+
+        $userRoles = $user->roles->pluck('name')->toArray();
+
+        $globalRoles = ['HRIS_RD', 'HRIS_ARD', 'HRIS_PRU', 'HRIS_Administrator'];
+        if (count(array_intersect($userRoles, $globalRoles)) > 0) {
+            return Response::allow();
+        }
+
+        $divisionRoles = ['HRIS_DC', 'HRIS_Staff'];
+        if (
+            count(array_intersect($userRoles, $divisionRoles)) > 0 &&
+            ! empty($travelRequest->division) &&
+            (string) $user->division === (string) $travelRequest->division
+        ) {
+            return Response::allow();
+        }
+
+        $empId = (string) $user->ipms_id;
+
+        if ((string) $travelRequest->created_by === $empId) {
+            return Response::allow();
+        }
+
+        $isAuthorizedStaff = $conn2->table('travel_order_staffs')
+            ->where('travel_order_id', $travelRequestId)
+            ->where(function ($q) use ($empId) {
+                $q->where('emp_id', $empId)
+                ->orWhere('recommender_id', $empId)
+                ->orWhere('approver_id', $empId);
+            })
+            ->exists();
+
+        if ($isAuthorizedStaff) {
+            return Response::allow();
+        }
+
+        return Response::deny('You are not authorized to view this travel request.');
+    }
 }

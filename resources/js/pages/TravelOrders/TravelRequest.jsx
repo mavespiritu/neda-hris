@@ -239,9 +239,9 @@ const TravelRequest = ({ travelOrder, can, user }) => {
       </div>
 
       {/* Footer (sticks to bottom naturally via flex) */}
-      {(can?.submit || can?.trReturn || can?.trResubmit || can?.view) && (
+      {(can?.submit || can?.trReturn || can?.trResubmit || can?.generate) && (
         <div className="mt-auto pt-6 flex justify-end gap-2">
-          {can?.view && (
+          {can?.generate && (
             <Button
                 variant="outline"
                 type="button"

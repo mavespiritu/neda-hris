@@ -158,6 +158,7 @@ class ListTravelRequests
                 'return' => $gate->inspect('tr.return', $item->id)->allowed(),
                 'resubmit' => $gate->inspect('tr.resubmit', $item->id)->allowed(),
                 'vrSubmit' => $gate->inspect('vr.submit', $item->id)->allowed(),
+                'generate' => $gate->inspect('tr.generate', $item->id)->allowed(),
             ];
 
             return $item;

@@ -12,12 +12,13 @@ const TripTicket = ({ travelOrderId }) => {
     fetchTripTickets 
   } = store()
 
-  const [filters, setFilters] = useState({})
+  const [filters, setFilters] = useState({ id: travelOrderId })
 
   useEffect(() => {
-    if (!travelOrderId) return
-    fetchTripTickets({ travelOrderId, filters })
-  }, [travelOrderId])
+  if (!travelOrderId) return
+  setFilters((prev) => ({ ...prev, id: travelOrderId }))
+  fetchTripTickets({ travelOrderId, filters: { ...filters, id: travelOrderId } })
+}, [travelOrderId])
 
   const columns = useMemo(
     () => [
@@ -113,7 +114,7 @@ const TripTicket = ({ travelOrderId }) => {
           travelOrderId={travelOrderId}
           onClose={() => {
             handleCloseForm()
-            reloadTable()
+            reloadTable({ id: travelOrderId })
           }}
         />
       )}
@@ -126,6 +127,7 @@ const TripTicket = ({ travelOrderId }) => {
             setFilters((prev) => ({
               ...prev,
               ...appliedFilters,
+              id: travelOrderId,
             }))
           }
           initialValues={filters}

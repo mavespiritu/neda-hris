@@ -15,7 +15,7 @@ class GenerateTravelRequestReport
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('tr.view', $id);
+        return Gate::forUser($request->user())->allows('tr.generate', $id);
     }
 
     public function asController(ActionRequest $request, TravelRequestReportBuilder $builder)

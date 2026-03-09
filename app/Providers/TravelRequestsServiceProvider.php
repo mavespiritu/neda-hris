@@ -32,6 +32,7 @@ class TravelRequestsServiceProvider extends ServiceProvider
             'filterAny',
             'return',
             'resubmit',
+            'generate'
         ];
 
         foreach ($abilities as $ability) {
