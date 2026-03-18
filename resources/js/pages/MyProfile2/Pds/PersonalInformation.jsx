@@ -310,7 +310,7 @@ const PersonalInformation = ({
                 <Label htmlFor="height">Height (in m.)</Label>
                 <AmountInput
                   name="height"
-                  onChange={(e) => setData("height", e.target.value)}
+                  onChange={(value) => setData("height", value ?? "")}
                   isInvalid={errors["height"]}
                   id="height"
                   value={data.height || ""}
@@ -325,7 +325,7 @@ const PersonalInformation = ({
                 <Label htmlFor="weight">Weight (in kg.)</Label>
                 <AmountInput
                   name="weight"
-                  onChange={(e) => setData("weight", e.target.value)}
+                  onChange={(value) => setData("weight", value ?? "")}
                   isInvalid={errors["weight"]}
                   id="weight"
                   value={data.weight || ""}
@@ -921,3 +921,4 @@ const PersonalInformation = ({
 }
 
 export default PersonalInformation
+
