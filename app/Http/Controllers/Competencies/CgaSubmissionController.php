@@ -17,9 +17,17 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use App\Notifications\CompetenciesForReviewSubmitted;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 
 class CgaSubmissionController extends Controller
 {
+    public function callAction($method, $parameters)
+    {
+        Gate::authorize('submissions', 'gap-analysis');
+
+        return $this->{$method}(...array_values($parameters));
+    }
+
     public function index(Request $request)
     {
         $conn2 = DB::connection('mysql2');

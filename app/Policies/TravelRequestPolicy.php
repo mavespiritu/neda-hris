@@ -2,10 +2,10 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\TravelRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Access\Response;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\DB;
 
 class TravelRequestPolicy
 {
@@ -17,9 +17,22 @@ class TravelRequestPolicy
         //
     }
 
-    public function visibleEmployeeIds(User $user)
+    protected function isStaffUser(Authenticatable $user): bool
+    {
+        return method_exists($user, 'hasRole')
+            && ! blank($user->ipms_id ?? null);
+    }
+
+    public function visibleEmployeeIds(Authenticatable $user)
     {
         $conn3 = DB::connection('mysql3');
+        $q = $conn3->table('tblemployee')
+            ->select('emp_id')
+            ->where('work_status', 'active');
+
+        if (! $this->isStaffUser($user)) {
+            return $q->whereRaw('1=0');
+        }
 
         $rolePriorities = config('roles.priorities', []);
 
@@ -31,10 +44,6 @@ class TravelRequestPolicy
             ->keys()
             ->first();
 
-        $q = $conn3->table('tblemployee')
-            ->select('emp_id')
-            ->where('work_status', 'active');
-
         return match ($highestRole) {
             'HRIS_RD', 'HRIS_ARD', 'HRIS_PRU' => $q,
             'HRIS_ADC', 'HRIS_DC'            => $q->where('division_id', $user->division),
@@ -43,8 +52,12 @@ class TravelRequestPolicy
         };
     }
 
-    private function isReviewer(User $user): bool
+    private function isReviewer(Authenticatable $user): bool
     {
+        if (! $this->isStaffUser($user)) {
+            return false;
+        }
+
         return DB::connection('mysql2')
             ->table('travel_order_signatories')
             ->where('type', 'Reviewer_VR')
@@ -96,8 +109,12 @@ class TravelRequestPolicy
             ->values();
     }
 
-    public function submit(User $user, $travelRequestId): Response
+    public function submit(Authenticatable $user, $travelRequestId): Response
     {
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can submit travel requests.');
+        }
+
         $tr = $this->requestRow($travelRequestId);
         if (! $tr) {
             return Response::deny('Travel request not found.');
@@ -116,23 +133,25 @@ class TravelRequestPolicy
         return Response::allow();
     }
 
-    public function create(User $user): Response
+    public function create(Authenticatable $user): Response
     {
-        return $user->hasRole('HRIS_Staff')
+        return $this->isStaffUser($user) && $user->hasRole('HRIS_Staff')
             ? Response::allow()
             : Response::deny('Only DRO1 staff can create travel requests.');
     }
 
-    public function viewAny(User $user): Response
+    public function viewAny(Authenticatable $user): Response
     {
-        return $user->hasRole('HRIS_Staff')
+        return $this->isStaffUser($user) && $user->hasRole('HRIS_Staff')
             ? Response::allow()
             : Response::deny('Only DRO1 staff can view travel requests.');
     }
 
-    public function edit(User $user, $travelRequestId): Response
+    public function edit(Authenticatable $user, $travelRequestId): Response
     {
-        $conn2 = DB::connection('mysql2');
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can edit travel requests.');
+        }
 
         $travelRequest = $this->requestRow($travelRequestId);
 
@@ -157,8 +176,12 @@ class TravelRequestPolicy
         return Response::allow();
     }
 
-    public function delete(User $user, $travelRequestId): Response
+    public function delete(Authenticatable $user, $travelRequestId): Response
     {
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can delete travel requests.');
+        }
+
         $travelRequest = $this->requestRow($travelRequestId);
 
         if (! $travelRequest) {
@@ -182,8 +205,12 @@ class TravelRequestPolicy
         return Response::allow();
     }
 
-    public function view(User $user, $travelRequestId): Response
+    public function view(Authenticatable $user, $travelRequestId): Response
     {
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('You are not authorized to view this travel request.');
+        }
+
         $conn2 = DB::connection('mysql2');
 
         $travelRequest = $conn2->table('travel_order')
@@ -236,7 +263,7 @@ class TravelRequestPolicy
         return Response::deny('You are not authorized to view this travel request.');
     }
 
-    public function filterAny(User $user): Response
+    public function filterAny(Authenticatable $user): Response
     {
         if (! $this->isReviewer($user)) {
             return Response::deny('Not allowed to filter any travel requests.');
@@ -245,8 +272,12 @@ class TravelRequestPolicy
         return Response::allow();
     }
 
-    public function return(User $user, $travelRequestId): Response
+    public function return(Authenticatable $user, $travelRequestId): Response
     {
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can return travel requests.');
+        }
+
         $tr = $this->requestRow($travelRequestId);
         if (!$tr) return Response::deny('Travel request not found.');
 
@@ -281,8 +312,12 @@ class TravelRequestPolicy
         return Response::allow();
     }
 
-    public function resubmit(User $user, $travelRequestId): Response
+    public function resubmit(Authenticatable $user, $travelRequestId): Response
     {
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can resubmit travel requests.');
+        }
+
         $tr = $this->requestRow($travelRequestId);
         if (!$tr) return Response::deny('Travel request not found.');
 
@@ -296,8 +331,12 @@ class TravelRequestPolicy
         return Response::allow();
     }
 
-    public function generate(User $user, $travelRequestId): Response
+    public function generate(Authenticatable $user, $travelRequestId): Response
     {
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('You are not authorized to view this travel request.');
+        }
+
         $conn2 = DB::connection('mysql2');
 
         if ($user->hasRole('HRIS_PRU')) {

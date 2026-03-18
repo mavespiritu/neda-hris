@@ -15,6 +15,7 @@ use App\Http\Controllers\CompareCgaController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SettingsController;
+use App\Actions\Settings\ShowSettings;
 use App\Http\Controllers\Auth\GoogleController;
 use Illuminate\Http\Request;
 
@@ -49,7 +50,7 @@ Route::get('/dashboard', function () {
 
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/roles', [UserController::class, 'roles'])->name('user.roles');
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::get('/settings', ShowSettings::class)->name('settings.index');
 });
 
 /*

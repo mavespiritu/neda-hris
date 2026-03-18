@@ -18,9 +18,17 @@ use Illuminate\Support\Facades\Validator;
 use App\Notifications\CompetenciesForReviewSubmitted;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
 
 class IndicatorController extends Controller
 {
+    public function callAction($method, $parameters)
+    {
+        Gate::authorize('libraries', 'gap-analysis');
+
+        return $this->{$method}(...array_values($parameters));
+    }
+
     /**
      * Display a listing of the resource.
      */

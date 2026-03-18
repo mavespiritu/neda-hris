@@ -1,22 +1,25 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
+use App\Actions\Publications\BulkDeletePublication;
+use App\Actions\Publications\DeletePublication;
+use App\Actions\Publications\ListPublication;
+use App\Actions\Publications\ShowPublication;
+use App\Actions\Publications\StorePublication;
+use App\Actions\Publications\UpdatePublication;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 use App\Http\Controllers\Publications\PublicationController;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
-    Route::get('/publications', [PublicationController::class, 'index'])->name('publications.index');
+    Route::get('/publications', ListPublication::class)->name('publications.index');
 
-    Route::post('/publications', [PublicationController::class, 'store'])->name('publications.store');
+    Route::post('/publications', StorePublication::class)->name('publications.store');
 
-    Route::post('/publications/{id}', [PublicationController::class, 'update'])->name('publications.update');
+    Route::post('/publications/{id}', UpdatePublication::class)->name('publications.update');
 
-    Route::delete('/publications/{id}', [PublicationController::class, 'destroy'])->name('publications.destroy');
+    Route::delete('/publications/{id}', DeletePublication::class)->name('publications.destroy');
 
-    Route::get('/publications/{id}', [PublicationController::class, 'show'])->name('publications.show');
+    Route::get('/publications/{id}', ShowPublication::class)->name('publications.show');
 
     Route::get('/publications/{id}/vacancies', [PublicationController::class, 'getVacancies'])->name('publications.vacancies');
 
@@ -26,7 +29,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::post('/publications/{id}/vacancies', [PublicationController::class, 'bulkDestroyVacancies'])->name('publications.vacancies.bulk-destroy');
 
-    Route::post('/publications/bulk-destroy', [PublicationController::class, 'bulkDestroy'])->name('publications.bulk-destroy');
+    Route::post('/publications/bulk-destroy', BulkDeletePublication::class)->name('publications.bulk-destroy');
 
     Route::patch('/publications/{id}/toggle-visibility', [PublicationController::class, 'toggleVisibility'])->name('publications.toggle-visibility');
 });

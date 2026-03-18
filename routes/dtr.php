@@ -1,25 +1,31 @@
 <?php
 
+use App\Actions\Flexiplace\BulkStoreSchedule;
+use App\Actions\Flexiplace\ExportExcelTimeRecords;
+use App\Actions\Flexiplace\ExportWordTimeRecords;
+use App\Actions\Flexiplace\ListSchedule;
+use App\Actions\Flexiplace\ListTimeRecords;
+use App\Actions\Flexiplace\ShowDtr;
+use App\Actions\Flexiplace\ShowReports;
+use App\Actions\Flexiplace\StoreDtr;
+use App\Actions\Flexiplace\StoreSchedule;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Application;
-use App\Http\Controllers\Dtr\FwaController;
 use App\Http\Controllers\Dtr\RtoController;
 use App\Http\Controllers\Dtr\RaaController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Dtr\ScheduleController;
-use App\Http\Controllers\Dtr\ReportController as FwaReportController;
 use App\Http\Middleware\AccessControl;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
-    Route::get('/fwa', [FwaController::class, 'index'])->name('fwa.index');
-    Route::post('/fwa', [FwaController::class, 'store'])->name('fwa.store');
+    Route::get('/fwa', ShowDtr::class)->name('fwa.index');
+    Route::post('/fwa', StoreDtr::class)->name('fwa.store');
 
-    Route::get('/fwa/schedule', [ScheduleController::class, 'index'])
+    Route::get('/fwa/schedule', ListSchedule::class)
         ->name('fwa.schedule.index');
-    Route::post('/fwa/schedule', [ScheduleController::class, 'store'])->name('fwa.schedule.store');
-    Route::post('/fwa/schedule/bulk', [ScheduleController::class, 'bulkStore'])->name('fwa.schedule.bulk-store');
+    Route::post('/fwa/schedule', StoreSchedule::class)->name('fwa.schedule.store');
+    Route::post('/fwa/schedule/bulk', BulkStoreSchedule::class)->name('fwa.schedule.bulk-store');
 
     Route::get('/rto', [RtoController::class, 'index'])->name('rto.index');
     Route::post('/rto', [RtoController::class, 'store'])->name('rto.store');
@@ -51,12 +57,12 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/raa/{id}/report', [RaaController::class, 'generate'])
      ->name('raa.generate');
 
-    Route::get('/fwa/reports', [FwaReportController::class, 'index'])
+    Route::get('/fwa/reports', ShowReports::class)
         ->name('fwa.reports.index');
-    Route::get('/fwa/reports/time-records', [FwaReportController::class, 'timeRecords'])
+    Route::get('/fwa/reports/time-records', ListTimeRecords::class)
         ->name('fwa.reports.time-records');
-    Route::get('/fwa/reports/time-records/export/excel', [FwaReportController::class, 'exportExcelTimeRecords'])->name('fwa.reports.time-records.export-excel');
-    Route::get('/fwa/reports/time-records/export/word', [FwaReportController::class, 'exportWordTimeRecords'])->name('fwa.reports.time-records.export-word');
+    Route::get('/fwa/reports/time-records/export/excel', ExportExcelTimeRecords::class)->name('fwa.reports.time-records.export-excel');
+    Route::get('/fwa/reports/time-records/export/word', ExportWordTimeRecords::class)->name('fwa.reports.time-records.export-word');
      
 });
 
@@ -78,7 +84,7 @@ Route::middleware(['web'])->group(function () {
     ->name('raa.approve.email')
     ->middleware('signed');
 
-    Route::get('/fwa/schedule/{key}', [ScheduleController::class, 'indexPublic'])
+    Route::get('/fwa/schedule/{key}', ListSchedule::class)
     ->where('key', config('fwa.public_key'));
 
 });

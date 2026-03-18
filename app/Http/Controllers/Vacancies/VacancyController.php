@@ -883,6 +883,7 @@ class VacancyController extends Controller
 
     public function getPositions()
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
@@ -944,6 +945,7 @@ class VacancyController extends Controller
 
     public function getCompetencies(Request $request)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
@@ -968,6 +970,7 @@ class VacancyController extends Controller
 
     public function getCompetenciesPerPosition($id)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
@@ -991,6 +994,7 @@ class VacancyController extends Controller
 
     public function getQuestions(Request $request)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
 
         $search = $request->input('search', '');
@@ -1077,6 +1081,7 @@ class VacancyController extends Controller
 
     public function storeQuestion($id, Request $request)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
 
         $validator = Validator::make($request->all(), [
@@ -1154,6 +1159,7 @@ class VacancyController extends Controller
 
     public function updateQuestion($vacancyId, $questionId, Request $request)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
 
         $validator = Validator::make($request->all(), [
@@ -1240,6 +1246,7 @@ class VacancyController extends Controller
 
     public function deleteQuestion($vacancyId, $questionId)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
 
         try {
@@ -1274,6 +1281,7 @@ class VacancyController extends Controller
 
     public function getVacancies()
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
 
         $vacancies = $conn2->table('vacancy')
@@ -1299,6 +1307,7 @@ class VacancyController extends Controller
 
     public function getVacancyDetails($id)
     {
+        Gate::authorize('edit', 'vacancies');
         $conn2 = DB::connection('mysql2');
 
         $vacancy = $conn2->table('vacancy')
@@ -1323,3 +1332,8 @@ class VacancyController extends Controller
         return response()->json($vacancy);
     }
 }
+
+
+
+
+

@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Competencies\ShowGapAnalysis;
+use App\Actions\Competencies\ShowLibraries;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -15,7 +17,7 @@ use App\Http\Controllers\NotificationController;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
-    Route::get('/cga', [CgaController::class, 'index'])->name('cga.index');
+    Route::get('/cga', ShowGapAnalysis::class)->name('cga.index');
 
     Route::get('/cga/{id}/competencies', [CgaController::class, 'getCompetencies'])->name('cga.competencies');
 
@@ -81,5 +83,5 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::post('/cga/gap-analysis', [CgaController::class, 'storeGapAnalysis'])->name('cga.gap-analysis.store');
 
-    Route::get('/cga/libraries', [CgaController::class, 'getLibraries'])->name('cga.libraries');
+    Route::get('/cga/libraries', ShowLibraries::class)->name('cga.libraries');
 });

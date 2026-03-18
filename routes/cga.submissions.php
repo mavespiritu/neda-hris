@@ -1,12 +1,13 @@
 <?php
 
+use App\Actions\Competencies\ListSubmissions;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Competencies\CgaSubmissionController;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
-    Route::get('/cga/review', [CgaSubmissionController::class, 'index'])->name('cga.review');
+    Route::get('/cga/review', ListSubmissions::class)->name('cga.review');
 
     Route::post('/cga/review/{id}/update-indicator', [CgaSubmissionController::class, 'updateIndicator'])->name('cga.review.update-indicator');
 

@@ -1,6 +1,12 @@
 <?php
 
+use App\Actions\Applicants\BulkDeleteApplicants;
+use App\Actions\Applicants\CreateApplicant;
+
 use App\Actions\Applicants\CreateCivilServiceEligibility;
+use App\Actions\Applicants\DeleteApplicant;
+use App\Actions\Applicants\EditApplicant;
+use App\Actions\Applicants\ListApplicants;
 use App\Actions\Applicants\CreateLearningAndDevelopment;
 use App\Actions\Applicants\CreateVoluntaryWork;
 use App\Actions\Applicants\CreateWorkExperience;
@@ -24,13 +30,13 @@ use App\Http\Controllers\Applicants\ApplicantsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
-    Route::get('/applicants', [ApplicantsController::class, 'index'])->name('applicants.index');
-    Route::get('/applicants/create', [ApplicantsController::class, 'create'])->name('applicants.create');
+    Route::get('/applicants', ListApplicants::class)->name('applicants.index');
+    Route::get('/applicants/create', CreateApplicant::class)->name('applicants.create');
     Route::post('/applicants', [ApplicantsController::class, 'store'])->name('applicants.store');
-    Route::get('/applicants/{id}/edit', [ApplicantsController::class, 'edit'])->name('applicants.edit');
+    Route::get('/applicants/{id}/edit', EditApplicant::class)->name('applicants.edit');
     Route::put('/applicants/{id}', [ApplicantsController::class, 'update'])->name('applicants.update');
-    Route::delete('/applicants/{id}', [ApplicantsController::class, 'destroy'])->name('applicants.destroy');
-    Route::post('/applicants/bulk-destroy', [ApplicantsController::class, 'bulkDestroy'])->name('applicants.bulk-destroy');
+    Route::delete('/applicants/{id}', DeleteApplicant::class)->name('applicants.destroy');
+    Route::post('/applicants/bulk-destroy', BulkDeleteApplicants::class)->name('applicants.bulk-destroy');
 
     Route::get('/applicants-pds', [ApplicantsController::class, 'getPds'])->name('applicants.pds');
     Route::get('/applicants-pds/{section}', [ApplicantsController::class, 'getPdsSection'])->name('applicants.pds.section');
@@ -59,3 +65,5 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::put('/applicants/{applicantId}/learning-and-development/{id}', UpdateLearningAndDevelopment::class)->name('applicants.update-learning-and-development');
     Route::delete('/applicants/{applicantId}/learning-and-development/{id}', DeleteLearningAndDevelopment::class)->name('applicants.delete-learning-and-development');
 });
+
+

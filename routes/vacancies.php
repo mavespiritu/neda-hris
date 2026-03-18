@@ -1,5 +1,13 @@
 <?php
 
+use App\Actions\Vacancies\BulkDeleteVacancy;
+use App\Actions\Vacancies\CreateVacancy;
+use App\Actions\Vacancies\DeleteVacancy;
+use App\Actions\Vacancies\EditVacancy;
+use App\Actions\Vacancies\ListVacancy;
+use App\Actions\Vacancies\ShowVacancy;
+use App\Actions\Vacancies\StoreVacancy;
+use App\Actions\Vacancies\UpdateVacancy;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -16,14 +24,14 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::get('/vacancies/questions', [VacancyController::class, 'getQuestions'])->name('vacancies.get-questions');
 
-    Route::get('/vacancies', [VacancyController::class, 'index'])->name('vacancies.index');
-    Route::get('/vacancies/create', [VacancyController::class, 'create'])->name('vacancies.create');
-    Route::post('/vacancies', [VacancyController::class, 'store'])->name('vacancies.store');
-    Route::get('/vacancies/{id}/edit', [VacancyController::class, 'edit'])->name('vacancies.edit');
-    Route::put('/vacancies/{id}', [VacancyController::class, 'update'])->name('vacancies.update');
-    Route::delete('/vacancies/{id}', [VacancyController::class, 'destroy'])->name('vacancies.destroy');
-    Route::post('/vacancies/bulk-destroy', [VacancyController::class, 'bulkDestroy'])->name('vacancies.bulk-destroy');
-    Route::get('/vacancies/{id}', [VacancyController::class, 'show'])->name('vacancies.show');
+    Route::get('/vacancies', ListVacancy::class)->name('vacancies.index');
+    Route::get('/vacancies/create', CreateVacancy::class)->name('vacancies.create');
+    Route::post('/vacancies', StoreVacancy::class)->name('vacancies.store');
+    Route::get('/vacancies/{id}/edit', EditVacancy::class)->name('vacancies.edit');
+    Route::put('/vacancies/{id}', UpdateVacancy::class)->name('vacancies.update');
+    Route::delete('/vacancies/{id}', DeleteVacancy::class)->name('vacancies.destroy');
+    Route::post('/vacancies/bulk-destroy', BulkDeleteVacancy::class)->name('vacancies.bulk-destroy');
+    Route::get('/vacancies/{id}', ShowVacancy::class)->name('vacancies.show');
 
     Route::post('/vacancies/{id}/submit', [VacancyController::class, 'submit'])->name('vacancies.submit');
     Route::post('/vacancies/{id}/approve', [VacancyController::class, 'approve'])->name('vacancies.approve');
@@ -63,3 +71,4 @@ Route::middleware(['web'])->group(function () {
     ->middleware('signed');
 
 });
+

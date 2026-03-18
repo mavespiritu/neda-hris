@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -783,6 +784,8 @@ class PublicationController extends Controller
 
     public function getVacancies($id, Request $request)
     {
+        Gate::authorize('edit', 'publications');
+
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
@@ -816,6 +819,8 @@ class PublicationController extends Controller
 
     public function storeVacancies($id, Request $request)
     {
+        Gate::authorize('edit', 'publications');
+
         $conn2 = DB::connection('mysql2');
 
         $validator = Validator::make($request->all(), [
@@ -866,6 +871,8 @@ class PublicationController extends Controller
 
     public function destroyVacancy($id, Request $request)
     {
+        Gate::authorize('edit', 'publications');
+
         $conn2 = DB::connection('mysql2');
 
         try {
@@ -897,6 +904,8 @@ class PublicationController extends Controller
 
     public function bulkDestroyVacancies($id, Request $request)
     {
+        Gate::authorize('edit', 'publications');
+
         $conn2 = DB::connection('mysql2');
 
         $ids = $request->input('ids');
@@ -931,6 +940,8 @@ class PublicationController extends Controller
 
     public function toggleVisibility($id)
     {
+        Gate::authorize('edit', 'publications');
+
         $conn2 = DB::connection('mysql2');
 
         $publication = $conn2->table('publication')->where('id', $id)->first();

@@ -26,6 +26,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Arr;
 
 class ApplicantsController extends Controller
@@ -131,6 +132,7 @@ class ApplicantsController extends Controller
 
     public function store(Request $request)
     {
+        Gate::forUser($request->user())->authorize('create', 'applicants');
         $action = app(StoreApplicantPersonalInformation::class);
         $validator = Validator::make(
             $request->all(),
@@ -169,6 +171,7 @@ class ApplicantsController extends Controller
 
     public function update($id, Request $request)
     {
+        Gate::forUser($request->user())->authorize('edit', 'applicants');
         $conn = DB::connection('mysql');
 
         $step = $request->input('step');
@@ -1970,6 +1973,7 @@ class ApplicantsController extends Controller
 
     public function getPds(Request $request, $id = null)
     {
+        Gate::forUser($request->user())->authorize('edit', 'applicants');
         $id = $id ?? ($request->filled('applicantId') ? (int) $request->input('applicantId') : null);
 
         if (! $id) {
@@ -2018,6 +2022,7 @@ class ApplicantsController extends Controller
 
     public function getPdsSection(string $section, Request $request)
     {
+        Gate::forUser($request->user())->authorize('edit', 'applicants');
         $applicantId = $request->filled('applicantId')
             ? (int) $request->input('applicantId')
             : null;
@@ -2563,6 +2568,10 @@ class ApplicantsController extends Controller
         return response()->json($otherInformation);
     }
 }
+
+
+
+
 
 
 

@@ -169,6 +169,7 @@ class ApplicationsController extends Controller
 
     public function show(Request $request, $id)
     {
+        Gate::forUser($request->user())->authorize('list', 'applications');
         $conn  = DB::connection('mysql');
         
         $application = $conn->table('application')
@@ -388,6 +389,7 @@ class ApplicationsController extends Controller
 
     public function searchApplicant(Request $request)
     {
+        Gate::forUser($request->user())->authorize('create', 'applications');
         $conn = DB::connection('mysql');
         $term = trim($request->input('search', ''));
 
@@ -440,6 +442,7 @@ class ApplicationsController extends Controller
 
     public function searchVacancy(Request $request)
     {
+        Gate::forUser($request->user())->authorize('create', 'applications');
         $conn = DB::connection('mysql2');
         $term = trim($request->input('search', ''));
 
@@ -485,6 +488,7 @@ class ApplicationsController extends Controller
 
     public function getRequirements($applicantId, $vacancyId)
     {
+        Gate::authorize('edit', 'applications');
         $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
@@ -569,3 +573,4 @@ class ApplicationsController extends Controller
         return response()->json($requirements);
     }
 }
+

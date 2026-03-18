@@ -2,15 +2,25 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\VehicleRequest;
 use Illuminate\Auth\Access\Response;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 
 class TripTicketPolicy
 {
-    private function isReviewer(User $user): bool
+    private function isStaffUser(Authenticatable $user): bool
     {
+        return method_exists($user, 'hasRole')
+            && ! blank($user->ipms_id ?? null);
+    }
+
+    private function isReviewer(Authenticatable $user): bool
+    {
+        if (! $this->isStaffUser($user)) {
+            return false;
+        }
+
         return DB::connection('mysql2')
             ->table('travel_order_signatories')
             ->where('type', 'Reviewer_VR')
@@ -48,42 +58,42 @@ class TripTicketPolicy
             ->first();
     }
 
-    public function viewAny(User $user): Response
+    public function viewAny(Authenticatable $user): Response
     {
         return $this->isReviewer($user)
             ? Response::allow()
             : Response::deny('Not allowed to view trip tickets.');
     }
 
-    public function view(User $user): Response
+    public function view(Authenticatable $user): Response
     {
         return $this->isReviewer($user)
             ? Response::allow()
             : Response::deny('Not allowed to view this trip ticket.');
     }
 
-    public function create(User $user): Response
+    public function create(Authenticatable $user): Response
     {
         return $this->isReviewer($user)
             ? Response::allow()
             : Response::deny('Not allowed to create trip tickets.');
     }
 
-    public function edit(User $user): Response
+    public function edit(Authenticatable $user): Response
     {
         return $this->isReviewer($user)
             ? Response::allow()
             : Response::deny('Not allowed to edit trip tickets.');
     }
 
-    public function delete(User $user): Response
+    public function delete(Authenticatable $user): Response
     {
         return $this->isReviewer($user)
             ? Response::allow()
             : Response::deny('Not allowed to delete trip tickets.');
     }
 
-    public function viewByVehicleRequest(User $user, int|string $vehicleRequestId): Response
+    public function viewByVehicleRequest(Authenticatable $user, int|string $vehicleRequestId): Response
     {
         $vr = $this->vehicleRequestRow($vehicleRequestId);
         if (! $vr) return Response::deny('Vehicle request not found.');
@@ -104,7 +114,7 @@ class TripTicketPolicy
         return Response::deny('Not allowed to view trip ticket for this vehicle request.');
     }
 
-    public function createByVehicleRequest(User $user, int|string $vehicleRequestId): Response
+    public function createByVehicleRequest(Authenticatable $user, int|string $vehicleRequestId): Response
     {
         if (! $this->isReviewer($user)) {
             return Response::deny('Only reviewer can create trip ticket for vehicle request.');
@@ -118,7 +128,7 @@ class TripTicketPolicy
         return Response::allow();
     }
 
-    public function editByVehicleRequest(User $user, int|string $vehicleRequestId): Response
+    public function editByVehicleRequest(Authenticatable $user, int|string $vehicleRequestId): Response
     {
         if (! $this->isReviewer($user)) {
             return Response::deny('Only reviewer can edit trip ticket for vehicle request.');
@@ -132,7 +142,7 @@ class TripTicketPolicy
         return Response::allow();
     }
 
-    public function deleteByVehicleRequest(User $user, int|string $vehicleRequestId): Response
+    public function deleteByVehicleRequest(Authenticatable $user, int|string $vehicleRequestId): Response
     {
         if (! $this->isReviewer($user)) {
             return Response::deny('Only reviewer can delete trip ticket for vehicle request.');
@@ -146,7 +156,7 @@ class TripTicketPolicy
         return Response::allow();
     }
 
-    public function generate(User $user): Response
+    public function generate(Authenticatable $user): Response
     {
         if (! $this->isReviewer($user)) {
             return Response::deny('Not allowed to generate trip tickets.');
@@ -155,7 +165,7 @@ class TripTicketPolicy
         return Response::allow();
     }
 
-    public function completeTrip(User $user): Response
+    public function completeTrip(Authenticatable $user): Response
     {
         return $this->isReviewer($user)
             ? Response::allow()
