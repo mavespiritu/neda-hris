@@ -223,7 +223,7 @@ const Applications = () => {
             Before submitting an application, make sure your{" "}
             <span className="font-bold">Profile</span> is updated. Click{" "}
             <span className="text-blue-500 font-semibold">
-              <Link href={route("applicant.index")}>here</Link>
+              <Link href={route("profile.index")}>here</Link>
             </span>{" "}
             to update.
           </p>

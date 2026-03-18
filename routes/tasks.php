@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Socialite\Facades\Socialite;
+use SocialiteProviders\Manager\Config;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/emails', ListEmails::class)->name('emails.index');
@@ -12,25 +13,40 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
 
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/auth/microsoft/connect', function () {
+        $config = new Config(
+            config('services.microsoft.client_id'),
+            config('services.microsoft.client_secret'),
+            config('services.microsoft.redirect'),
+            [
+                'tenant' => config('services.microsoft.tenant')
+            ]
+        );
+
         return Socialite::driver('microsoft')
-            ->scopes([
-                'openid', 
-                'profile', 
-                'email', 
-                'offline_access', 
-                'User.Read', 
-                'Mail.Read',
-                'Mail.Read.Shared',
-                'Mail.ReadBasic',
-            ])
-            ->with(['login_hint' => auth()->user()->email]) // optional
+            ->setConfig($config)
             ->redirect();
     })->name('auth.microsoft');
 
     Route::get('/auth/microsoft/callback', function () {
-        $microsoftUser = Socialite::driver('microsoft')->user();
+        if (request()->filled('error')) {
+            return redirect()->route('emails.index')->with('error', request('error_description', 'Microsoft sign-in failed.'));
+        }
+
+        $config = new Config(
+            config('services.microsoft.client_id'),
+            config('services.microsoft.client_secret'),
+            config('services.microsoft.redirect'),
+            [
+                'tenant' => config('services.microsoft.tenant'),
+            ]
+        );
+
+        $microsoftUser = Socialite::driver('microsoft')
+            ->setConfig($config)
+            ->user();
+
         $user = auth()->user();
 
         $tokenPayload = $microsoftUser->accessTokenResponseBody ?? [];

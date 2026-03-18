@@ -126,3 +126,5 @@ require __DIR__ . '/issue.php';
 require __DIR__ . '/leaves.php';
 require __DIR__ . '/travel-requests.php';
 require __DIR__ . '/tasks.php';
+require __DIR__ . '/messenger.php';
+require __DIR__ . '/psgc.php';

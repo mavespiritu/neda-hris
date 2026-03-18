@@ -8,7 +8,7 @@ const SubHeader = () => {
 
   const menuItems = [
     { name: "My Applications", href: route("my-applications.index"), icon: Home },
-    { name: "My Profile", href: route("applicant.index"), icon: User },
+    { name: "My Profile", href: route("profile.index"), icon: User },
     { name: "Search Jobs", href: route("jobs.index"), icon: Search },
   ]
 

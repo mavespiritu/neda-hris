@@ -220,7 +220,7 @@ const Applicants = () => {
                   `}
                   onClick={() => setActiveTab("profile")}
                 >
-                  Profile
+                  Applicant's Profile
                 </button>
 
                 <button
@@ -231,7 +231,7 @@ const Applicants = () => {
                   `}
                   onClick={() => setActiveTab("documents")}
                 >
-                  Documents
+                  Submitted Documents
                 </button>
               </div>
 

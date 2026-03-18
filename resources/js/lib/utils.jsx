@@ -116,8 +116,18 @@ export function formatDateRange(fromDate, toDate) {
   return `${format(from, "MMMM d, yyyy")} - ${format(to, "MMMM d, yyyy")}`
 }
 
-export function formatNumberWithCommas(number){
-    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+export function formatNumberWithCommas(number) {
+  if (number === null || number === undefined || number === "") {
+    return ""
+  }
+
+  const value = typeof number === "number" ? number : Number(number)
+
+  if (Number.isNaN(value)) {
+    return ""
+  }
+
+  return value.toLocaleString("en-US")
 }
 
 export const middleInitial = (middle_name) => {

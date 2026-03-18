@@ -17,18 +17,19 @@ import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 
 const SingleComboBox = ({
-  items,
+  items = [],
   name,
   onChange,
   value,
   invalidMessage,
-  placeholder,
+  placeholder = "Select option",
   ref,
   width,
   labelWidth,
   className,
   disabled,
   loading = false,
+  renderLabel, // optional custom renderer for item label
 }) => {
   const [open, setOpen] = useState(false)
   const [selectedValue, setSelectedValue] = useState(value)
@@ -37,18 +38,25 @@ const SingleComboBox = ({
     setSelectedValue(value)
   }, [value])
 
+  const selectedItem = items.find((item) => item.value === selectedValue)
+
   const toggleSelection = (currentValue) => {
     if (disabled || loading) return
     const newValue = selectedValue === currentValue ? null : currentValue
     setSelectedValue(newValue)
-    onChange(newValue)
+    onChange?.(newValue)
     setOpen(false)
   }
 
   const clearSelection = () => {
     if (disabled || loading) return
     setSelectedValue(null)
-    onChange(null)
+    onChange?.(null)
+  }
+
+  const renderItemLabel = (item) => {
+    if (!item) return placeholder
+    return renderLabel ? renderLabel(item) : item.label
   }
 
   return (
@@ -59,15 +67,13 @@ const SingleComboBox = ({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={`justify-between w-full relative ${
-              invalidMessage ? "border-red-500" : ""
-            }`}
+            className={`justify-between w-full relative ${invalidMessage ? "border-red-500" : ""}`}
             onClick={() => !disabled && !loading && setOpen((prev) => !prev)}
             disabled={disabled || loading}
           >
             <span
               className={`text-left pr-2 flex items-center gap-2 ${
-                labelWidth || `w-[380px]`
+                labelWidth || "w-[380px]"
               } truncate overflow-hidden whitespace-nowrap ${
                 !selectedValue ? "text-gray-400" : ""
               }`}
@@ -78,8 +84,7 @@ const SingleComboBox = ({
                   Fetching options...
                 </>
               ) : selectedValue ? (
-                items.find((item) => item.value === selectedValue)?.label ??
-                placeholder
+                renderItemLabel(selectedItem)
               ) : (
                 placeholder
               )}
@@ -95,38 +100,38 @@ const SingleComboBox = ({
                 placeholder="Type to search..."
                 className="ring-0 border-0 outline-none focus:ring-0 focus:border-0 focus:outline-none"
               />
+
               {selectedValue && (
                 <div
                   className="text-sm font-medium cursor-pointer hover:underline p-2"
                   onClick={clearSelection}
                 >
-                  Deselect All
+                  Deselect
                 </div>
               )}
+
               <CommandList>
                 {items?.length ? (
                   <CommandGroup>
                     {items.map((item) => (
                       <CommandItem
-                        key={item.label}
-                        value={item.label}
+                        key={`${item.value}`}
+                        value={String(item.label ?? item.value)}
                         onSelect={() => toggleSelection(item.value)}
                         className="text-sm"
                       >
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            selectedValue === item.value
-                              ? "opacity-100"
-                              : "opacity-0"
+                            selectedValue === item.value ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        {item.label}
+                        {renderItemLabel(item)}
                       </CommandItem>
                     ))}
                   </CommandGroup>
                 ) : (
-                  <CommandEmpty>{`No ${name} found`}</CommandEmpty>
+                  <CommandEmpty>{`No ${name || "item"} found`}</CommandEmpty>
                 )}
               </CommandList>
             </Command>

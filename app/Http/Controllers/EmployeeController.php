@@ -214,15 +214,29 @@ class EmployeeController extends Controller
         $conn3 = DB::connection('mysql3');
 
         $employee = $conn3->table('tblemployee')
-            ->select([
-                'picture'
-            ])
+            ->select(['picture'])
             ->where('emp_id', $id)
             ->first();
 
-        return response($employee->picture, 200)
+        if (! $employee || empty($employee->picture)) {
+            abort(404, 'Image not found.');
+        }
+
+        $binary = $employee->picture;
+
+        // Build ETag from content so browser can reuse cached image
+        $etag = '"' . md5($binary) . '"';
+
+        $ifNoneMatch = request()->header('If-None-Match');
+        if ($ifNoneMatch === $etag) {
+            return response('', 304)->header('ETag', $etag);
+        }
+
+        return response($binary, 200)
             ->header('Content-Type', 'image/jpeg')
-            ->header('Content-Disposition', 'inline; filename="'.$id.'.jpg"');
+            ->header('Content-Disposition', 'inline; filename="' . $id . '.jpg"')
+            ->header('Cache-Control', 'public, max-age=86400') // 1 day
+            ->header('ETag', $etag);
     }
 
     public function showCurrentPosition($id)

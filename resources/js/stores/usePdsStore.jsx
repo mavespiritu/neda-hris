@@ -6,6 +6,7 @@ import {
   getPdsSection,
   getCountries,
   getProvinces,
+  getDistricts,
   getMunicipalities,
   getBarangays
 } from '@/pages/MyProfile/api'
@@ -43,15 +44,27 @@ const usePdsStore = create((set, get) => ({
             permanent_street: "",
             permanent_subdivision: "",
             permanent_barangay: "",
+            permanent_barangay_name: "",
             permanent_city: "",
+            permanent_city_name: "",
             permanent_province: "",
+            permanent_province_name: "",
+            permanent_district: "",
+            permanent_district_name: "",
+            permanent_is_metro_manila: false,
             permanent_zip: "",
             residential_house_no: "",
             residential_street: "",
             residential_subdivision: "",
             residential_barangay: "",
+            residential_barangay_name: "",
             residential_city: "",
+            residential_city_name: "",
             residential_province: "",
+            residential_province_name: "",
+            residential_district: "",
+            residential_district_name: "",
+            residential_is_metro_manila: false,
             residential_zip: "",
             telephone_no: "",
             mobile_no: "",
@@ -353,6 +366,9 @@ const usePdsStore = create((set, get) => ({
       provinces: [],
       provincesLoading: false,
       provincesError: null,
+      districts: [],
+      districtsLoading: false,
+      districtsError: null,
       citymuns: [],
       citymunsLoading: false,
       citymunsError: null,
@@ -391,6 +407,42 @@ const usePdsStore = create((set, get) => ({
               ...state.permanentAddressState,
               provincesError: error.message || 'Failed to fetch provinces.',
               provincesLoading: false,
+            },
+          }))
+        }
+      },
+      fetchDistricts: async () => {
+        set((state) => ({
+          permanentAddressState: { 
+            ...state.permanentAddressState, 
+            districtsLoading: true, 
+            districtsError: null 
+          },
+        }))
+
+        try {
+          const response = await getDistricts()
+
+          const districtData = response.data
+          ?.map((province) => ({
+            label: district.name,
+            value: district.code,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+    
+          set((state) => ({
+            permanentAddressState: {
+              ...state.permanentAddressState,
+              districts: provinceData,
+              districtsLoading: false,
+            },
+          }))
+        } catch (error) {
+          set((state) => ({
+            permanentAddressState: {
+              ...state.permanentAddressState,
+              districtsError: error.message || 'Failed to fetch districts.',
+              districtsLoading: false,
             },
           }))
         }

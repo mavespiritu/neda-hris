@@ -87,42 +87,6 @@ const Applicants = () => {
             accessorKey: "mobile_no",
             meta: { enableSorting: true },
         },
-        {
-            header: "Sections",
-            id: "sections",
-            cell: ({ row }) => {
-            const applicant = row.original
-
-            return (
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                        <Pencil className="h-4 w-4" />
-                        Edit
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2">
-                        <h4 className="font-medium text-sm mb-2">Edit Section</h4>
-                        <div className="flex flex-col gap-1">
-                        {pdsSections.map((section, index) => (
-                            <Button
-                            key={index}
-                            variant="ghost"
-                            size="sm"
-                            className="justify-start"
-                            onClick={() => {
-                                router.visit(`/applicants/${applicant.id}/edit?step=${section.step}`)
-                            }}
-                            >
-                            {section.label}
-                            </Button>
-                        ))}
-                        </div>
-                    </PopoverContent>
-                </Popover>
-            )
-            },
-        },
     ], [])
 
     const [filters, setFilters] = useState({})
@@ -143,7 +107,7 @@ const Applicants = () => {
         filters,
         options: {
             enableAdd: true,
-            enableEdit: false,
+            enableEdit: true,
             enableView: false,
             enableViewAsLink: true,
             enableDelete: true, 

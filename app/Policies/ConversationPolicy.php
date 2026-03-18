@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Policies;
+
+use App\Models\Conversation;
+use App\Models\User;
+use Illuminate\Auth\Access\Response;
+
+class ConversationPolicy
+{
+    public function view(User $user, Conversation $conversation): Response
+    {
+        $allowed = $conversation->participants()
+            ->where('users.id', $user->id)
+            ->exists();
+
+        return $allowed
+            ? Response::allow()
+            : Response::deny('Not allowed.');
+    }
+
+    public function send(User $user, Conversation $conversation): Response
+    {
+        $allowed = $conversation->participants()
+            ->where('users.id', $user->id)
+            ->exists();
+
+        return $allowed
+            ? Response::allow()
+            : Response::deny('Not allowed.');
+    }
+}

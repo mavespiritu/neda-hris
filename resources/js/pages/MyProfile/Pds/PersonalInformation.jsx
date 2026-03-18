@@ -8,40 +8,7 @@ import SingleComboBox from "@/components/SingleComboBox"
 import { Switch } from "@/components/ui/switch"
 import { useEffect } from 'react'
 import TextInput from "@/components/TextInput"
-
-const genders = [
-  { label: 'Male', value: 'Male'},
-  { label: 'Female', value: 'Female'},
-]
-
-const civilStatuses = [
-  { label: 'Single', value: 'Single'},
-  { label: 'Married', value: 'Married'},
-  { label: 'Common Law', value: 'Common Law'},
-  { label: 'Separated', value: 'Separated'},
-  { label: 'Widowed', value: 'Widowed'},
-]
-
-const bloodTypes = [
-  { label: 'A+', value: 'A+'},
-  { label: 'A-', value: 'A-'},
-  { label: 'B+', value: 'B+'},
-  { label: 'B-', value: 'B-'},
-  { label: 'AB+', value: 'AB+'},
-  { label: 'AB-', value: 'AB-'},
-  { label: 'O+', value: 'O+'},
-  { label: 'O-', value: 'O-'},
-]
-
-const citizenships = [
-  { label: 'Filipino', value: 'Filipino'},
-  { label: 'Dual Citizenship', value: 'Dual Citizenship'},
-]
-
-const citizenshipsBy = [
-  { label: 'By birth', value: 'By birth'},
-  { label: 'By naturalization', value: 'By naturalization'},
-]
+import { genders, civilStatuses, bloodTypes, citizenships, citizenshipsBy } from "../selections.jsx"
 
 const PersonalInformation = ({ data, setData, errors = {} }) => {
 
@@ -54,6 +21,9 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
       provinces: permanentProvinces,
       citymuns: permanentCitymuns,
       barangays: permanentBarangays,
+      provincesLoading: permanentProvincesLoading,
+      citymunsLoading: permanentCitymunsLoading,
+      barangaysLoading: permanentBarangaysLoading,
     },
     residentialAddressState: {
       fetchProvinces: fetchResidentialProvinces,
@@ -62,6 +32,9 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
       provinces: residentialProvinces,
       citymuns: residentialCitymuns,
       barangays: residentialBarangays,
+      provincesLoading: residentialProvincesLoading,
+      citymunsLoading: residentialCitymunsLoading,
+      barangaysLoading: residentialBarangaysLoading,
     },
     loading,
   } = usePdsStore()
@@ -429,6 +402,14 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
           </div>
         </Fieldset>
         <Fieldset legend="Residential Address" className="bg-muted">
+          <Switch 
+            checked={data.residential_is_metro_manila}
+            onCheckedChange={(isChecked) => {
+              setData("residential_is_metro_manila", isChecked)
+            }}
+            value={data.residential_is_metro_manila}
+          />
+          <span className="text-sm font-medium ml-2">Is this address in Metro Manila?</span>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Province */}
             <div>
@@ -547,6 +528,14 @@ const PersonalInformation = ({ data, setData, errors = {} }) => {
         </div>
         {!data.isResidenceSameWithPermanentAddress && (
         <Fieldset legend="Permanent Address" className="bg-muted">
+          <Switch 
+            checked={data.permanent_is_metro_manila}
+            onCheckedChange={(isChecked) => {
+              setData("permanent_is_metro_manila", isChecked)
+            }}
+            value={data.permanent_is_metro_manila}
+          />
+          <span className="text-sm font-medium ml-2">Is this address in Metro Manila?</span>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Province */}
             <div>

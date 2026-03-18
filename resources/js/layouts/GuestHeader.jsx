@@ -33,7 +33,7 @@ const GuestHeader = () => {
                 ) : (
                 <>
                     <Link href={route('home')} className="hover:text-gray-800">Search Jobs</Link>
-                    <Link href={route('applicant.index')} className="hover:text-gray-800">My Profile</Link>
+                    <Link href={route('profile.index')} className="hover:text-gray-800">My Profile</Link>
                     <Link href={route('logout')} method="post" as="button">
                     <Button variant="outline">Logout</Button>
                     </Link>

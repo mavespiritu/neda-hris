@@ -45,4 +45,17 @@ trait BuildsEmployeeNameMap
         $name = $employeesById[$key]->name ?? null;
         return $name ? trim($name) : null;
     }
+
+    protected function employeeGenderById($empIds, string $connection = 'mysql3'): array
+    {
+        $ids = collect($empIds)->filter()->unique()->values();
+        if ($ids->isEmpty()) return [];
+
+        return \DB::connection($connection)
+            ->table('tblemployee')
+            ->whereIn('emp_id', $ids)
+            ->pluck('gender', 'emp_id')
+            ->map(fn ($v) => $v ? trim((string) $v) : null)
+            ->all();
+    }
 }

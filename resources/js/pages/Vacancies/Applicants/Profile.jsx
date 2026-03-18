@@ -11,9 +11,8 @@ import SingleComboBox from "@/components/SingleComboBox"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useState, useEffect } from 'react'
-import { useForm, Link } from '@inertiajs/react'
 import { formatDate, formatNumberWithCommas } from "@/lib/utils.jsx"
-import { getProvinceName, getCitymunName, getBarangayName } from './api'
+import { getProvinceName, getCitymunName, getBarangayName, getDistrictName } from "./api"
 import {
   Table,
   TableBody,
@@ -55,41 +54,112 @@ const Profile = ({applicantId}) => {
 
   useEffect(() => {
     fetchPds(applicantId)
-    fetchAddressNames()
   }, [applicantId])
   
+  const [permanentDistrictName, setPermanentDistrictName] = useState("")
   const [permanentProvinceName, setPermanentProvinceName] = useState("")
   const [permanentCitymunName, setPermanentCitymunName] = useState("")
   const [permanentBarangayName, setPermanentBarangayName] = useState("")
 
+  const [residentialDistrictName, setResidentialDistrictName] = useState("")
   const [residentialProvinceName, setResidentialProvinceName] = useState("")
   const [residentialCitymunName, setResidentialCitymunName] = useState("")
   const [residentialBarangayName, setResidentialBarangayName] = useState("")
 
-  const fetchAddressNames = async () => {
-    try {
-      const permanentProvinceResponse = await getProvinceName(personalInformation.permanent_province)
-      setPermanentProvinceName(permanentProvinceResponse.data.name)
+  useEffect(() => {
+    const fetchAddressNames = async () => {
+      try {
+        if (personalInformation.permanent_district_name) {
+          setPermanentDistrictName(personalInformation.permanent_district_name)
+        } else if (personalInformation.permanent_district) {
+          const response = await getDistrictName(personalInformation.permanent_district)
+          setPermanentDistrictName(response.data.name)
+        } else {
+          setPermanentDistrictName("")
+        }
 
-      const permanentCitymunResponse = await getCitymunName(personalInformation.permanent_city)
-      setPermanentCitymunName(permanentCitymunResponse.data.name)
+        if (personalInformation.permanent_province_name) {
+          setPermanentProvinceName(personalInformation.permanent_province_name)
+        } else if (personalInformation.permanent_province) {
+          const response = await getProvinceName(personalInformation.permanent_province)
+          setPermanentProvinceName(response.data.name)
+        } else {
+          setPermanentProvinceName("")
+        }
 
-      const permanentBarangayResponse = await getBarangayName(personalInformation.permanent_barangay)
-      setPermanentBarangayName(permanentBarangayResponse.data.name)
+        if (personalInformation.permanent_city_name) {
+          setPermanentCitymunName(personalInformation.permanent_city_name)
+        } else if (personalInformation.permanent_city) {
+          const response = await getCitymunName(personalInformation.permanent_city)
+          setPermanentCitymunName(response.data.name)
+        } else {
+          setPermanentCitymunName("")
+        }
 
-      const residentialProvinceResponse = await getProvinceName(personalInformation.residential_province)
-      setResidentialProvinceName(residentialProvinceResponse.data.name)
+        if (personalInformation.permanent_barangay_name) {
+          setPermanentBarangayName(personalInformation.permanent_barangay_name)
+        } else if (personalInformation.permanent_barangay) {
+          const response = await getBarangayName(personalInformation.permanent_barangay)
+          setPermanentBarangayName(response.data.name)
+        } else {
+          setPermanentBarangayName("")
+        }
 
-      const residentialCitymunResponse = await getCitymunName(personalInformation.residential_city)
-      setResidentialCitymunName(residentialCitymunResponse.data.name)
+        if (personalInformation.residential_district_name) {
+          setResidentialDistrictName(personalInformation.residential_district_name)
+        } else if (personalInformation.residential_district) {
+          const response = await getDistrictName(personalInformation.residential_district)
+          setResidentialDistrictName(response.data.name)
+        } else {
+          setResidentialDistrictName("")
+        }
 
-      const residentialBarangayResponse = await getBarangayName(personalInformation.residential_barangay)
-      setResidentialBarangayName(residentialBarangayResponse.data.name)
+        if (personalInformation.residential_province_name) {
+          setResidentialProvinceName(personalInformation.residential_province_name)
+        } else if (personalInformation.residential_province) {
+          const response = await getProvinceName(personalInformation.residential_province)
+          setResidentialProvinceName(response.data.name)
+        } else {
+          setResidentialProvinceName("")
+        }
 
-    } catch (error) {
-      console.error('Error fetching address details:', error);
+        if (personalInformation.residential_city_name) {
+          setResidentialCitymunName(personalInformation.residential_city_name)
+        } else if (personalInformation.residential_city) {
+          const response = await getCitymunName(personalInformation.residential_city)
+          setResidentialCitymunName(response.data.name)
+        } else {
+          setResidentialCitymunName("")
+        }
+
+        if (personalInformation.residential_barangay_name) {
+          setResidentialBarangayName(personalInformation.residential_barangay_name)
+        } else if (personalInformation.residential_barangay) {
+          const response = await getBarangayName(personalInformation.residential_barangay)
+          setResidentialBarangayName(response.data.name)
+        } else {
+          setResidentialBarangayName("")
+        }
+      } catch (error) {
+        console.error("Error fetching address details:", error)
+      }
     }
-  }
+
+    fetchAddressNames()
+  }, [
+    personalInformation.permanent_province,
+    personalInformation.permanent_province_name,
+    personalInformation.permanent_city,
+    personalInformation.permanent_city_name,
+    personalInformation.permanent_barangay,
+    personalInformation.permanent_barangay_name,
+    personalInformation.residential_province,
+    personalInformation.residential_province_name,
+    personalInformation.residential_city,
+    personalInformation.residential_city_name,
+    personalInformation.residential_barangay,
+    personalInformation.residential_barangay_name,
+  ])
 
   return (
     <div className="flex flex-col gap-4 border rounded-lg p-4">
@@ -143,8 +213,8 @@ const Profile = ({applicantId}) => {
                       <div className="text-sm text-muted-foreground">Blood Type:</div>
                       <div className="text-sm font-medium">{personalInformation.blood_type}</div>
 
-                      <div className="text-sm text-muted-foreground">GSIS No.:</div>
-                      <div className="text-sm font-medium">{personalInformation.gsis_no}</div>
+                      <div className="text-sm text-muted-foreground">UMID No.:</div>
+                      <div className="text-sm font-medium">{personalInformation.umid_no}</div>
 
                       <div className="text-sm text-muted-foreground">PAG-IBIG No.:</div>
                       <div className="text-sm font-medium">{personalInformation.pag_ibig_no}</div>
@@ -152,8 +222,8 @@ const Profile = ({applicantId}) => {
                       <div className="text-sm text-muted-foreground">PhilHealth No.:</div>
                       <div className="text-sm font-medium">{personalInformation.philhealth_no}</div>
 
-                      <div className="text-sm text-muted-foreground">SSS No.:</div>
-                      <div className="text-sm font-medium">{personalInformation.sss_no}</div>
+                      <div className="text-sm text-muted-foreground">PhilSys No. (PSN):</div>
+                      <div className="text-sm font-medium">{personalInformation.philsys_no}</div>
 
                       <div className="text-sm text-muted-foreground">TIN:</div>
                       <div className="text-sm font-medium">{personalInformation.tin_no}</div>
@@ -202,8 +272,8 @@ const Profile = ({applicantId}) => {
                       <div className="text-sm text-muted-foreground">City/Municipality:</div>
                       <div className="text-sm font-medium">{residentialCitymunName}</div>
 
-                      <div className="text-sm text-muted-foreground">Province:</div>
-                      <div className="text-sm font-medium">{residentialProvinceName}</div>
+                      <div className="text-sm text-muted-foreground">Province/District:</div>
+                      <div className="text-sm font-medium">{residentialDistrictName|| residentialProvinceName}</div>
 
                       <div className="text-sm text-muted-foreground">Zip Code:</div>
                       <div className="text-sm font-medium">{personalInformation.residential_zip}</div>
@@ -229,8 +299,8 @@ const Profile = ({applicantId}) => {
                       <div className="text-sm text-muted-foreground">City/Municipality:</div>
                       <div className="text-sm font-medium">{permanentCitymunName}</div>
 
-                      <div className="text-sm text-muted-foreground">Province:</div>
-                      <div className="text-sm font-medium">{permanentProvinceName}</div>
+                      <div className="text-sm text-muted-foreground">Province/District:</div>
+                      <div className="text-sm font-medium">{permanentProvinceName || permanentDistrictName}</div>
 
                       <div className="text-sm text-muted-foreground">Zip Code:</div>
                       <div className="text-sm font-medium">{personalInformation.permanent_zip}</div>
@@ -537,13 +607,6 @@ const Profile = ({applicantId}) => {
                           <span>(Write in full/Do not abbreviate)</span>
                         </div>
                       </TableHead>
-                      <TableHead className="text-center" rowSpan={2}>Monthly Salary</TableHead>
-                      <TableHead className="text-center" rowSpan={2}>
-                        <div className="flex flex-col">
-                          <span>Salary/Job/Pay Grade (if applicable)</span>
-                          <span>& Step (Format "00-0")/Increment</span>
-                        </div>
-                      </TableHead>
                       <TableHead className="text-center" rowSpan={2}>Status of Appointment</TableHead>
                       <TableHead className="text-center" rowSpan={2}>
                         <div className="flex flex-col">
@@ -565,8 +628,6 @@ const Profile = ({applicantId}) => {
                       <TableCell className="text-center">{child.to_date ? formatDate(child.to_date) : "Present"}</TableCell>
                       <TableCell>{child.position}</TableCell>
                       <TableCell>{child.agency}</TableCell>
-                      <TableCell className="text-center">{formatNumberWithCommas(child.monthly_salary)}</TableCell>
-                      <TableCell className="text-center">{child.grade}-{child.step}</TableCell>
                       <TableCell className="text-center">{child.appointment}</TableCell>
                       <TableCell className="text-center">{child.isGovtService? "Y" : "N"}</TableCell>
                     </TableRow>

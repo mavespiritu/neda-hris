@@ -9,4 +9,5 @@ return [
     App\Providers\TravelRequestsServiceProvider::class,
     App\Providers\VehicleRequestsServiceProvider::class,
     App\Providers\TripTicketsServiceProvider::class,
+    App\Providers\ProfileServiceProvider::class,
 ];

@@ -14,7 +14,7 @@ import JobTypeBadge from "./JobTypeBadge"
 import JobDescription from "./JobDescription"
 import PaginationControls from '@/components/PaginationControls'
 import { Stepper } from '@/components/Stepper'
-import Review from '../MyProfile/Pds/Review'
+import Review from '../MyProfile2/Pds/Review'
 import {
   Sheet,
   SheetContent,
@@ -59,7 +59,7 @@ const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPer
         Make sure your information is <span className="font-semibold">up to date</span> before continuing to the next step.
         </p>
         <Link
-        href={route("applicant.index", {
+        href={route("profile.index", {
             redirect: route("jobs.apply", job.hashed_id),
         })}
         >
@@ -233,7 +233,7 @@ const apply = () => {
                     Please update your profile by clicking the button below before continuing.
                     </p>
                     <Link
-                    href={route("applicant.index", {
+                    href={route("profile.index", {
                         redirect: route("jobs.apply", job.hashed_id),
                     })}
                     >

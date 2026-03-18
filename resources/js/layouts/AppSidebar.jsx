@@ -83,7 +83,7 @@ const AppSidebar = () => {
     },
     {
       title: "My Profile",
-      url: "/profile",
+      url: "/my-profile",
       icon: UserRound,
     },
     {
@@ -112,16 +112,15 @@ const AppSidebar = () => {
       ],
     }, */
     {
-      title: "Tasks",
+      title: "Performance",
       url: "#",
-      icon: ClipboardList,
+      icon: ChartNoAxesCombined,
       roles: ['HRIS_Staff'],
       submenu: [
         { title: 'Emails', url: '/emails', roles: ['HRIS_Staff'], icon: Mails },
-        /* { title: 'OPCR', url: '/my-cga', roles: ['HRIS_Staff'], icon: Building },
-        { title: 'DPCR', url: '/staff-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UsersRound },
-        { title: 'IPCR', url: '/review-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: UserRound },
-        { title: 'Libraries', url: '/competencies', roles: ['HRIS_HR'], icon: Settings2 }, */
+        { title: 'OPCR', url: '/opcrs', roles: ['HRIS_RD', 'HRIS_ARD'], icon: Building },
+        { title: 'DPCR', url: '/dpcrs', roles: ['HRIS_DC', 'HRIS_ADC'], icon: UsersRound },
+        { title: 'IPCR', url: '/ipcrs', roles: ['HRIS_Staff'], icon: UserRound },
       ],
     },
     {

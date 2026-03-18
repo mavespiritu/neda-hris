@@ -55,6 +55,16 @@ class User extends Authenticatable
         ];
     }
 
+    public function getGender(): ?string
+    {
+        if (!$this->ipms_id) return null;
+
+        return DB::connection('conn3')
+            ->table('tblemployee')
+            ->where('emp_id', $this->ipms_id)
+            ->value('gender');
+    }
+
     public function sendCompetencyForReviewSubmissionNotification($staff)
     {
         $this->notify(new CompetenciesForReviewSubmitted($staff));

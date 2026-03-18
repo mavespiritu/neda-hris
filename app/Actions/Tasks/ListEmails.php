@@ -108,12 +108,15 @@ class ListEmails
             return null;
         }
 
-        $tokenResponse = Http::asForm()->post('https://login.microsoftonline.com/common/oauth2/v2.0/token', [
+        $tenant = config('services.microsoft.tenant_id');
+        $tokenUrl = "https://login.microsoftonline.com/{$tenant}/oauth2/v2.0/token";
+
+        $tokenResponse = Http::asForm()->post($tokenUrl, [
             'client_id' => config('services.microsoft.client_id'),
             'client_secret' => config('services.microsoft.client_secret'),
             'grant_type' => 'refresh_token',
             'refresh_token' => $user->microsoft_refresh_token,
-            'scope' => 'openid profile email offline_access User.Read Mail.Read',
+            'scope' => 'openid offline_access User.Read Mail.Read',
         ]);
 
         if (! $tokenResponse->successful()) {

@@ -2,20 +2,30 @@
 
 namespace App\Http\Controllers\Applicants;
 
+use App\Actions\Applicants\ShowCivilServiceEligibility as ShowApplicantCivilServiceEligibility;
+use App\Actions\Applicants\ShowEducationalBackground as ShowApplicantEducationalBackground;
+use App\Actions\Applicants\ShowFamilyBackground as ShowApplicantFamilyBackground;
+use App\Actions\Applicants\ShowLearningAndDevelopment as ShowApplicantLearningAndDevelopment;
+use App\Actions\Applicants\ShowOtherInformation as ShowApplicantOtherInformation;
+use App\Actions\Applicants\ShowPersonalInformation as ShowApplicantPersonalInformation;
+use App\Actions\Applicants\ShowVoluntaryWork as ShowApplicantVoluntaryWork;
+use App\Actions\Applicants\ShowWorkExperience as ShowApplicantWorkExperience;
+use App\Actions\Applicants\StoreCivilServiceEligibilitySection as StoreApplicantCivilServiceEligibility;
+use App\Actions\Applicants\StoreEducationalBackground as StoreApplicantEducationalBackground;
+use App\Actions\Applicants\StoreFamilyBackground as StoreApplicantFamilyBackground;
+use App\Actions\Applicants\StoreLearningAndDevelopmentSection as StoreApplicantLearningAndDevelopment;
+use App\Actions\Applicants\StoreOtherInformation as StoreApplicantOtherInformation;
+use App\Actions\Applicants\StorePersonalInformation as StoreApplicantPersonalInformation;
+use App\Actions\Applicants\StoreVoluntaryWorkSection as StoreApplicantVoluntaryWork;
+use App\Actions\Applicants\StoreWorkExperienceSection as StoreApplicantWorkExperience;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Exception;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Auth;
-use App\Models\User;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Arr;
 
 class ApplicantsController extends Controller
@@ -83,6 +93,7 @@ class ApplicantsController extends Controller
 
         $applicants = $applicantsQuery
                     ->whereNotNull('type')
+                    ->whereNotNull('last_name')
                     ->orderBy('a.id', 'desc')
                     ->paginate(20);
 
@@ -111,61 +122,24 @@ class ApplicantsController extends Controller
 
     public function create()
     {
-        $applicant = [
-            'id' => null,
-            'emp_id' => '',
-            'type' => 'Applicant',
-            'email_address' => '',
-            'last_name' => '',
-            'first_name' => '',
-            'middle_name' => '',
-            'ext_name' => '',
-            'birth_date' => "",
-            'birth_place' => "",
-            'gender' => "",
-            'civil_status' => "",
-            'height' => 0,
-            'weight' => 0,
-            'blood_type' => "",
-            'gsis_no' => "",
-            'pag_ibig_no' => "",
-            'philhealth_no' => "",
-            'sss_no' => "",
-            'tin_no' => "",
-            'agency_employee_no' => "",
-            'citizenship' => "",
-            'citizenship_by' => "",
-            'citizenship_country' => "",
-            'isResidenceSameWithPermanentAddress' => false,
-            'permanent_house_no' => "",
-            'permanent_street' => "",
-            'permanent_subdivision' => "",
-            'permanent_barangay' => "",
-            'permanent_city' => "",
-            'permanent_province' => "",
-            'permanent_zip' => "",
-            'residential_house_no' => "",
-            'residential_street' => "",
-            'residential_subdivision' => "",
-            'residential_barangay' => "",
-            'residential_city' => "",
-            'residential_province' => "",
-            'residential_zip' => "",
-            'telephone_no' => "",
-            'mobile_no' => "",
-        ];
-
-        return inertia('Applicants/Pds/PersonalInformation', [
-            'applicant' => $applicant,
-            'mode' => 'create'
+        return Inertia::render('Applicants/Wizard/index', [
+            'applicantId' => null,
+            'profileType' => 'Applicant',
+            'progress' => [],
         ]);
     }
 
     public function store(Request $request)
     {
-        $conn = DB::connection('mysql');
+        $action = app(StoreApplicantPersonalInformation::class);
+        $validator = Validator::make(
+            $request->all(),
+            $action->rules(),
+            $action->getValidationMessages()
+        );
+        $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
 
-        return $this->storePersonalInformation($request, $conn);
+        return $action->handle($validator->validate());
 
     }
 
@@ -173,36 +147,24 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $step = $request->input('step');
-        
-        switch($step){
-            case 'personalInformation':
-                return $this->editPersonalInformation($id);
-            break;
-            case 'familyBackground':
-                return $this->editFamilyBackground($id);
-            break;
-            case 'educationalBackground':
-                return $this->editEducationalBackground($id);
-            break;
-            case 'civilServiceEligibility':
-                return $this->editCivilServiceEligibility($id);
-            break;
-            case 'workExperience':
-                return $this->editWorkExperience($id);
-            break;
-            case 'voluntaryWork':
-                return $this->editVoluntaryWork($id);
-            break;
-            case 'learningAndDevelopment':
-                return $this->editLearningAndDevelopment($id);
-            break;
-            case 'otherInformation':
-                return $this->editOtherInformation($id);
-            break;
-             default:
-                return $this->editPersonalInformation($id);
+        $applicant = $conn->table('applicant')
+            ->where('id', $id)
+            ->first();
+
+        if (! $applicant) {
+            abort(404);
         }
+
+        $progress = $conn->table('applicant_pds')
+            ->where('applicant_id', $id)
+            ->pluck('status', 'step')
+            ->toArray();
+
+        return Inertia::render('Applicants/Wizard/index', [
+            'applicantId' => (int) $id,
+            'profileType' => $applicant->type ?? 'Applicant',
+            'progress' => $progress,
+        ]);
     }
 
     public function update($id, Request $request)
@@ -213,32 +175,141 @@ class ApplicantsController extends Controller
         
         switch($step){
             case 'personalInformation':
-                return $this->storePersonalInformation($request, $conn, $id);
+                $action = app(StoreApplicantPersonalInformation::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+                $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'familyBackground':
-                return $this->storeFamilyBackground($request, $conn, $id);
+                $action = app(StoreApplicantFamilyBackground::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'educationalBackground':
-                return $this->storeEducationalBackground($request, $conn, $id);
+                $action = app(StoreApplicantEducationalBackground::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+                $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'civilServiceEligibility':
-                return $this->storeCivilServiceEligibilty($request, $conn, $id);
+                $action = app(StoreApplicantCivilServiceEligibility::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'workExperience':
-                return $this->storeWorkExperience($request, $conn, $id);
+                $action = app(StoreApplicantWorkExperience::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+                $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'voluntaryWork':
-                return $this->storeVoluntaryWork($request, $conn, $id);
+                $action = app(StoreApplicantVoluntaryWork::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+                $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'learningAndDevelopment':
-                return $this->storeLearningAndDevelopment($request, $conn, $id);
+                $action = app(StoreApplicantLearningAndDevelopment::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+                $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
             case 'otherInformation':
-                return $this->storeOtherInformation($request, $conn, $id);
+                $action = app(StoreApplicantOtherInformation::class);
+                $validator = Validator::make(
+                    $request->all(),
+                    $action->rules(),
+                    $action->getValidationMessages()
+                );
+                $action->withValidator($validator, \Lorisleiva\Actions\ActionRequest::createFromBase($request));
+
+                return $action->handle($validator->validate(), (int) $id);
             break;
              default:
                 throw new \Exception("Invalid step: {$step}");
         }
+    }
+
+    private function stepSavedResponse(Request $request, int $applicantId, ?string $nextStep, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => $message,
+                'applicantId' => $applicantId,
+                'nextStep' => $nextStep,
+            ]);
+        }
+
+        if ($nextStep) {
+            return redirect()->route('applicants.edit', [
+                'id' => $applicantId,
+                'step' => $nextStep,
+            ])->with([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => $message,
+            ]);
+        }
+
+        return redirect()->route('applicants.index')->with([
+            'status' => 'success',
+            'title' => 'Success!',
+            'message' => $message,
+        ]);
+    }
+
+    private function stepErrorResponse(Request $request, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => $message,
+            ], 500);
+        }
+
+        return redirect()->back()->with([
+            'status' => 'error',
+            'title' => 'Uh oh! Something went wrong.',
+            'message' => $message,
+        ]);
     }
 
     private function storePersonalInformation($request, $conn)
@@ -254,10 +325,10 @@ class ApplicantsController extends Controller
             'height' => 'required|numeric',
             'weight' => 'required|numeric',
             'blood_type' => 'required',
-            'gsis_no' => 'required',
+            'umid_no' => 'required',
             'pag_ibig_no' => 'required',
             'philhealth_no' => 'required',
-            'sss_no' => 'required',
+            'philsys_no' => 'required',
             'tin_no' => 'required',
             'agency_employee_no' => 'required',
             'citizenship' => 'required',
@@ -294,10 +365,10 @@ class ApplicantsController extends Controller
             'weight.required' => 'The weight is required.',
             'weight.numeric' => 'The weight must be a number.',
             'blood_type.required' => 'The blood type is required.',
-            'gsis_no.required' => 'The GSIS number is required.',
+            'umid_no.required' => 'The UMID number is required.',
             'pag_ibig_no.required' => 'The PAG-IBIG number is required.',
             'philhealth_no.required' => 'The PhilHealth number is required.',
-            'sss_no.required' => 'The SSS number is required.',
+            'philsys_no.required' => 'The PhilSys ID number is required.',
             'tin_no.required' => 'The TIN number is required.',
             'agency_employee_no.required' => 'The agency employee number is required.',
             'citizenship.required' => 'The citizenship is required.',
@@ -414,15 +485,7 @@ class ApplicantsController extends Controller
 
     public function editPersonalInformation($id)
     {
-        $conn = DB::connection('mysql');
-
-        $applicant = $conn->table('applicant')
-            ->where('id', $id)
-            ->first();
-
-        if (!$applicant) {
-            abort(404);
-        }
+        $applicant = app(ShowApplicantPersonalInformation::class)->handle((int) $id);
 
         return inertia('Applicants/Pds/PersonalInformation', [
             'applicant' => $applicant,
@@ -612,25 +675,21 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.edit', [
-                'id' => $applicantId,
-                'step' => 'educationalBackground',
-            ])
-            ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Family background saved successfully! Proceed with this step.'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                'educationalBackground',
+                'Family background saved successfully! Proceed with this step.'
+            );
 
         }catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save family background of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving family background of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving family background of an applicant. Please try again.'
+            );
         }
     }
 
@@ -818,25 +877,21 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.edit', [
-                'id' => $applicantId,
-                'step' => 'civilServiceEligibility',
-            ])
-            ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Educational background saved successfully! Proceed with this step.'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                'civilServiceEligibility',
+                'Educational background saved successfully! Proceed with this step.'
+            );
 
         }catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save educational background of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving educational background of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving educational background of an applicant. Please try again.'
+            );
         }
     }
 
@@ -937,25 +992,21 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.edit', [
-                'id' => $applicantId,
-                'step' => 'workExperience',
-            ])
-               ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Civil service eligibilities saved successfully! Proceed with this step.'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                'workExperience',
+                'Civil service eligibilities saved successfully! Proceed with this step.'
+            );
 
         }catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save civil service eligibilities of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving civil service eligibilities of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving civil service eligibilities of an applicant. Please try again.'
+            );
         }
     }
 
@@ -1025,6 +1076,15 @@ class ApplicantsController extends Controller
         });
 
         if ($extraValidator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'title' => 'Validation failed',
+                    'message' => 'Please check the fields highlighted in red.',
+                    'errors' => $extraValidator->errors(),
+                ], 422);
+            }
+
             return back()->withErrors($extraValidator)->withInput();
         }
 
@@ -1087,25 +1147,21 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.edit', [
-                'id' => $applicantId,
-                'step' => 'voluntaryWork',
-            ])
-               ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Work experiences saved successfully! Proceed with this step.'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                'voluntaryWork',
+                'Work experiences saved successfully! Proceed with this step.'
+            );
 
         }catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save work experiences of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving work experiences of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving work experiences of an applicant. Please try again.'
+            );
         }
     }
 
@@ -1172,6 +1228,15 @@ class ApplicantsController extends Controller
         });
 
         if ($extraValidator->fails()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'title' => 'Validation failed',
+                    'message' => 'Please check the fields highlighted in red.',
+                    'errors' => $extraValidator->errors(),
+                ], 422);
+            }
+
             return back()->withErrors($extraValidator)->withInput();
         }
 
@@ -1233,25 +1298,21 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.edit', [
-                'id' => $applicantId,
-                'step' => 'learningAndDevelopment',
-            ])
-               ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Voluntary works saved successfully! Proceed with this step.'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                'learningAndDevelopment',
+                'Voluntary works saved successfully! Proceed with this step.'
+            );
 
         }catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save voluntary works of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving voluntary works of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving voluntary works of an applicant. Please try again.'
+            );
         }
     }
 
@@ -1361,25 +1422,21 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.edit', [
-                'id' => $applicantId,
-                'step' => 'otherInformation',
-            ])
-               ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Learning and development saved successfully! Proceed with this step.'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                'otherInformation',
+                'Learning and development saved successfully! Proceed with this step.'
+            );
 
         }catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save learning and development of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving learning and development of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving learning and development of an applicant. Please try again.'
+            );
         }
         
     }
@@ -1713,6 +1770,15 @@ class ApplicantsController extends Controller
 
         // ✅ Now, re-check after adding manual errors
         if ($validator->errors()->any()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'title' => 'Validation failed',
+                    'message' => 'Please check the fields highlighted in red.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
             return back()->withErrors($validator)->withInput();
         }
 
@@ -1821,21 +1887,20 @@ class ApplicantsController extends Controller
 
             $conn->commit();
 
-            return redirect()->route('applicants.index')
-               ->with([
-                'status' => 'success',
-                'title' => 'Success!',
-                'message' => 'Other information saved successfully!'
-            ]);
+            return $this->stepSavedResponse(
+                $request,
+                (int) $applicantId,
+                null,
+                'Other information saved successfully!'
+            );
         } catch (\Exception $e) {
             $conn->rollBack();
             Log::error('Failed to save other information of applicant: ' . $e->getMessage());
 
-            return redirect()->back()->with([
-                'status' => 'error',
-                'title' => 'Uh oh! Something went wrong.',
-                'message' => 'An error occurred while saving other information of an applicant. Please try again.'
-            ]);
+            return $this->stepErrorResponse(
+                $request,
+                'An error occurred while saving other information of an applicant. Please try again.'
+            );
         }
     }
 
@@ -1903,17 +1968,32 @@ class ApplicantsController extends Controller
         }
     }
 
-    public function getPds($id)
+    public function getPds(Request $request, $id = null)
     {
+        $id = $id ?? ($request->filled('applicantId') ? (int) $request->input('applicantId') : null);
+
+        if (! $id) {
+            return response()->json([
+                'personalInformation' => app(ShowApplicantPersonalInformation::class)->handle(),
+                'familyBackground' => app(ShowApplicantFamilyBackground::class)->handle(),
+                'educationalBackground' => app(ShowApplicantEducationalBackground::class)->handle(),
+                'civilServiceEligibility' => app(ShowApplicantCivilServiceEligibility::class)->handle(),
+                'workExperience' => app(ShowApplicantWorkExperience::class)->handle(),
+                'voluntaryWork' => app(ShowApplicantVoluntaryWork::class)->handle(),
+                'learningAndDevelopment' => app(ShowApplicantLearningAndDevelopment::class)->handle(),
+                'otherInformation' => app(ShowApplicantOtherInformation::class)->handle(),
+            ]);
+        }
+
         try {
-            $personalInformation = $this->getPersonalInformation($id)->getData(true);
-            $familyBackground = $this->getFamilyBackground($id)->getData(true);
-            $educationalBackground = $this->getEducationalBackground($id)->getData(true);
-            $civilServiceEligibility = $this->getCivilServiceEligibility($id)->getData(true);
-            $workExperience = $this->getWorkExperience($id)->getData(true);
-            $voluntaryWork = $this->getVoluntaryWork($id)->getData(true);
-            $learningAndDevelopment = $this->getLearningAndDevelopment($id)->getData(true);
-            $otherInformation = $this->getOtherInformation($id)->getData(true);
+            $personalInformation = (array) app(ShowApplicantPersonalInformation::class)->handle((int) $id);
+            $familyBackground = app(ShowApplicantFamilyBackground::class)->handle((int) $id);
+            $educationalBackground = app(ShowApplicantEducationalBackground::class)->handle((int) $id);
+            $civilServiceEligibility = app(ShowApplicantCivilServiceEligibility::class)->handle((int) $id);
+            $workExperience = app(ShowApplicantWorkExperience::class)->handle((int) $id);
+            $voluntaryWork = app(ShowApplicantVoluntaryWork::class)->handle((int) $id);
+            $learningAndDevelopment = app(ShowApplicantLearningAndDevelopment::class)->handle((int) $id);
+            $otherInformation = app(ShowApplicantOtherInformation::class)->handle((int) $id);
 
             return response()->json([
                 'personalInformation' => $personalInformation,
@@ -1936,7 +2016,64 @@ class ApplicantsController extends Controller
         }
     }
 
-    public function getPersonalInformation()
+    public function getPdsSection(string $section, Request $request)
+    {
+        $applicantId = $request->filled('applicantId')
+            ? (int) $request->input('applicantId')
+            : null;
+
+        return match ($section) {
+            'personalInformation' => app(ShowApplicantPersonalInformation::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'familyBackground' => app(ShowApplicantFamilyBackground::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'educationalBackground' => app(ShowApplicantEducationalBackground::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'civilServiceEligibility' => app(ShowApplicantCivilServiceEligibility::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'workExperience' => app(ShowApplicantWorkExperience::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'voluntaryWork' => app(ShowApplicantVoluntaryWork::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'learningAndDevelopment' => app(ShowApplicantLearningAndDevelopment::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'otherInformation' => app(ShowApplicantOtherInformation::class)->asController(
+                \Lorisleiva\Actions\ActionRequest::createFromBase($request),
+                $applicantId
+            ),
+            'review' => $applicantId ? $this->getPds($request, $applicantId) : response()->json([
+                'personalInformation' => app(ShowApplicantPersonalInformation::class)->handle(),
+                'familyBackground' => app(ShowApplicantFamilyBackground::class)->handle(),
+                'educationalBackground' => app(ShowApplicantEducationalBackground::class)->handle(),
+                'civilServiceEligibility' => app(ShowApplicantCivilServiceEligibility::class)->handle(),
+                'workExperience' => app(ShowApplicantWorkExperience::class)->handle(),
+                'voluntaryWork' => app(ShowApplicantVoluntaryWork::class)->handle(),
+                'learningAndDevelopment' => app(ShowApplicantLearningAndDevelopment::class)->handle(),
+                'otherInformation' => app(ShowApplicantOtherInformation::class)->handle(),
+            ]),
+            default => response()->json([
+                'status' => 'error',
+                'title' => 'Section Not Found',
+                'message' => "Unknown PDS section: {$section}",
+            ], 404),
+        };
+    }
+
+    public function getPersonalInformation($id = null)
     {
         $conn = DB::connection('mysql');
 
@@ -2128,8 +2265,18 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $educations = $conn->table('application_education')
-            ->where('application_id', $id)
+        if (! $id) {
+            return response()->json((object) [
+                'elementary' => [],
+                'secondary' => [],
+                'vocational' => [],
+                'college' => [],
+                'graduate' => [],
+            ]);
+        }
+
+        $educations = $conn->table('applicant_education')
+            ->where('applicant_id', $id)
             ->get();
 
         // Default structure
@@ -2177,8 +2324,12 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $eligibilities = $conn->table('application_eligibility')
-            ->where('application_id', $id)
+        if (! $id) {
+            return response()->json([]);
+        }
+
+        $eligibilities = $conn->table('applicant_eligibility')
+            ->where('applicant_id', $id)
             ->get();
 
         $civilServiceEligibilities = [];
@@ -2210,8 +2361,12 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $works = $conn->table('application_work_experience')
-            ->where('application_id', $id)
+        if (! $id) {
+            return response()->json([]);
+        }
+
+        $works = $conn->table('applicant_work_experience')
+            ->where('applicant_id', $id)
             ->orderBy('from_date', 'desc')
             ->get();
 
@@ -2240,8 +2395,12 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $works = $conn->table('application_voluntary_work')
-            ->where('application_id', $id)
+        if (! $id) {
+            return response()->json([]);
+        }
+
+        $works = $conn->table('applicant_voluntary_work')
+            ->where('applicant_id', $id)
             ->orderBy('from_date', 'desc')
             ->get();
 
@@ -2271,8 +2430,12 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $learnings = $conn->table('application_learning')
-            ->where('application_id', $id)
+        if (! $id) {
+            return response()->json([]);
+        }
+
+        $learnings = $conn->table('applicant_learning')
+            ->where('applicant_id', $id)
             ->orderBy('from_date', 'desc')
             ->get();
 
@@ -2317,16 +2480,26 @@ class ApplicantsController extends Controller
     {
         $conn = DB::connection('mysql');
 
-        $otherInfos = $conn->table('application_other_info')
-            ->where('application_id', $id)
+        if (! $id) {
+            return response()->json((object) [
+                'skills' => [],
+                'recognitions' => [],
+                'memberships' => [],
+                'questions' => $this->getDefaultQuestions(),
+                'references' => [],
+            ]);
+        }
+
+        $otherInfos = $conn->table('applicant_other_info')
+            ->where('applicant_id', $id)
             ->get();
 
-        $questions = $conn->table('application_question')
-            ->where('application_id', $id)
+        $questions = $conn->table('applicant_question')
+            ->where('applicant_id', $id)
             ->get();
 
-        $references = $conn->table('application_reference')
-            ->where('application_id', $id)
+        $references = $conn->table('applicant_reference')
+            ->where('applicant_id', $id)
             ->get();
 
         $otherInformation = (object) [
@@ -2390,3 +2563,27 @@ class ApplicantsController extends Controller
         return response()->json($otherInformation);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
