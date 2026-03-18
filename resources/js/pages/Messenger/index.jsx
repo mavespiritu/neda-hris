@@ -90,7 +90,7 @@ export default function Index() {
   }
 
   const sendTypingWhisper = () => {
-    if (!activeId || !me?.id) return
+    if (!activeId || !me?.id || !window.Echo) return
 
     const now = Date.now()
     if (now - lastTypingRef.current < 700) return
@@ -104,6 +104,10 @@ export default function Index() {
   }
 
   useEffect(() => {
+    if (!window.Echo) {
+      return undefined
+    }
+
     window.Echo.join("messenger.presence")
       .here((presenceUsers) => {
         setOnlineUserIds(new Set(presenceUsers.map((u) => Number(u.id))))
@@ -347,6 +351,7 @@ export default function Index() {
 
   useEffect(() => {
     if (!activeId) return
+    if (!window.Echo) return
 
     const cached = messagesCacheRef.current.get(Number(activeId))
     const hasCached = Boolean(cached?.data?.length)
@@ -415,6 +420,7 @@ export default function Index() {
 
   useEffect(() => {
     if (!me?.id) return
+    if (!window.Echo) return
 
     window.Echo.private(`user.${me.id}`).listen(".messenger.conversation.ping", (e) => {
       setConversations((prev) => {
