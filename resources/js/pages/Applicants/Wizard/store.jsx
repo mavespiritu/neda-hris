@@ -9,6 +9,29 @@ import {
   savePdsSection,
 } from "./api"
 
+const normalizeOtherInformation = (sectionData = {}) => {
+  if (!sectionData || Array.isArray(sectionData)) {
+    return sectionData
+  }
+
+  const references = Array.isArray(sectionData.references)
+    ? [...sectionData.references]
+    : []
+
+  while (references.length < 3) {
+    references.push({
+      name: "",
+      address: "",
+      contact_no: "",
+    })
+  }
+
+  return {
+    ...sectionData,
+    references: references.slice(0, 3),
+  }
+}
+
 const mapOptions = (rows = []) =>
   rows
     .map((row) => ({
@@ -316,7 +339,10 @@ const store = create((set, get) => ({
 
   try {
     const response = await getPdsSection(section, payload)
-    const sectionData = response.data
+    const responseData = response.data
+    const sectionData = section === "otherInformation"
+      ? normalizeOtherInformation(responseData)
+      : responseData
 
     set((state) => ({
       pdsState: {
@@ -674,3 +700,6 @@ const store = create((set, get) => ({
 }))
 
 export default store
+
+
+

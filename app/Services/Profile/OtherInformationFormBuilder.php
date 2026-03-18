@@ -94,6 +94,21 @@ class OtherInformationFormBuilder
             }
         }
 
+        $otherInformation->references = $this->fillReferences($otherInformation->references);
+
         return $otherInformation;
+    }
+
+    private function fillReferences(array $references = []): array
+    {
+        while (count($references) < 3) {
+            $references[] = (object) [
+                'name' => '',
+                'address' => '',
+                'contact_no' => '',
+            ];
+        }
+
+        return array_slice($references, 0, 3);
     }
 }
