@@ -52,7 +52,7 @@ class TravelRequestPolicy
         };
     }
 
-    private function isReviewer(Authenticatable $user): bool
+    private function hasSignatoryAssignment(Authenticatable $user, string $type): bool
     {
         if (! $this->isStaffUser($user)) {
             return false;
@@ -60,9 +60,26 @@ class TravelRequestPolicy
 
         return DB::connection('mysql2')
             ->table('travel_order_signatories')
-            ->where('type', 'Reviewer_VR')
+            ->where('type', $type)
             ->where('signatory', (string) $user->ipms_id)
             ->exists();
+    }
+
+    private function isReviewer(Authenticatable $user): bool
+    {
+        return $this->hasSignatoryAssignment($user, 'Reviewer_VR');
+    }
+
+    private function isApprover(Authenticatable $user): bool
+    {
+        return $this->hasSignatoryAssignment($user, 'Approver_VR');
+    }
+
+    private function canSeeAllTravelRequests(Authenticatable $user): bool
+    {
+        return $this->isReviewer($user)
+            || $this->isApprover($user)
+            || $user->hasRole(['HRIS_RD', 'HRIS_ARD', 'HRIS_PRU', 'HRIS_Administrator']);
     }
 
     private function latestStatus(int|string $travelRequestId): string
@@ -222,13 +239,11 @@ class TravelRequestPolicy
             return Response::deny('Travel request not found.');
         }
 
-        $userRoles = $user->roles->pluck('name')->toArray();
-
-        $globalRoles = ['HRIS_RD', 'HRIS_ARD', 'HRIS_PRU', 'HRIS_Administrator'];
-
-        if (count(array_intersect($userRoles, $globalRoles)) > 0) {
+        if ($this->canSeeAllTravelRequests($user)) {
             return Response::allow();
         }
+
+        $userRoles = $user->roles->pluck('name')->toArray();
 
         $divisionRoles = ['HRIS_DC', 'HRIS_Staff'];
 
@@ -265,7 +280,7 @@ class TravelRequestPolicy
 
     public function filterAny(Authenticatable $user): Response
     {
-        if (! $this->isReviewer($user)) {
+        if (! $this->canSeeAllTravelRequests($user)) {
             return Response::deny('Not allowed to filter any travel requests.');
         }
 
@@ -358,12 +373,11 @@ class TravelRequestPolicy
             return Response::deny('Only submitted travel requests can be generated.');
         }
 
-        $userRoles = $user->roles->pluck('name')->toArray();
-
-        $globalRoles = ['HRIS_RD', 'HRIS_ARD', 'HRIS_PRU', 'HRIS_Administrator'];
-        if (count(array_intersect($userRoles, $globalRoles)) > 0) {
+        if ($this->canSeeAllTravelRequests($user)) {
             return Response::allow();
         }
+
+        $userRoles = $user->roles->pluck('name')->toArray();
 
         $divisionRoles = ['HRIS_DC', 'HRIS_Staff'];
         if (
@@ -396,3 +410,4 @@ class TravelRequestPolicy
         return Response::deny('You are not authorized to view this travel request.');
     }
 }
+

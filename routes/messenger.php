@@ -15,8 +15,5 @@ Route::middleware(['web', 'auth.any', 'verified'])
         Route::get('/conversations', ListConversations::class)->name('conversations');
         Route::get('/conversations/{conversation}/messages', ListConversationMessages::class)->name('messages');
         Route::post('/conversations/{conversation}/messages', SendConversationMessage::class)->name('send');
-        Route::post('/messenger/start-direct', \App\Actions\Messenger\StartDirectConversation::class)->name('start-direct');
+        Route::post('/start-direct', \App\Actions\Messenger\StartDirectConversation::class)->name('start-direct');
     });
-
-
-
