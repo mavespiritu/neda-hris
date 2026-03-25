@@ -247,12 +247,11 @@ class NotificationController extends Controller
 
             $submitter = auth()->user();
 
-            $isArd = $submitter->roles()->where('name', 'HRIS_ARD')->exists();
+            $skipEndorsement = $submitter->hasAnyRole(['HRIS_DC', 'HRIS_ARD']);
 
-            if ($isArd) {
-                // Notify RD (no division filter)
+            if ($skipEndorsement) {
                 $approvers = User::whereHas('roles', function ($query) {
-                        $query->where('name', 'HRIS_RD');
+                        $query->where('name', 'HRIS_ARD');
                     })
                     ->get();
 
@@ -264,11 +263,10 @@ class NotificationController extends Controller
 
                 if ($approvers->isNotEmpty()) {
                     Notification::send($approvers, new NotifyArdOfRtoEndorsement($payload));
-                }else{
-                    Log::warning("No HRIS_RD users found for ARD submission. RTO ID: {$rto->id}");
+                } else {
+                    Log::warning("No HRIS_ARD users found for direct approval. RTO ID: {$rto->id}");
                 }
             } else {
-                // Default: notify supervisors in the staff's division
                 $approvers = User::whereHas('roles', function ($query) {
                         $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
                     })
@@ -281,7 +279,7 @@ class NotificationController extends Controller
 
                 if ($approvers->isNotEmpty()) {
                     Notification::send($approvers, new NotifySupervisorOfRtoSubmission($payload));
-                }else{
+                } else {
                     Log::warning("No supervisors found for division: {$staff->division_id}. RTO ID: {$rto->id}");
                 }
             }
@@ -699,12 +697,11 @@ class NotificationController extends Controller
 
             $submitter = auth()->user();
 
-            $isArd = $submitter->roles()->where('name', 'HRIS_ARD')->exists();
+            $skipEndorsement = $submitter->hasAnyRole(['HRIS_DC', 'HRIS_ARD']);
 
-            if ($isArd) {
-                // Notify RD (no division filter)
+            if ($skipEndorsement) {
                 $approvers = User::whereHas('roles', function ($query) {
-                        $query->where('name', 'HRIS_RD');
+                        $query->where('name', 'HRIS_ARD');
                     })
                     ->get();
 
@@ -716,11 +713,10 @@ class NotificationController extends Controller
 
                 if ($approvers->isNotEmpty()) {
                     Notification::send($approvers, new NotifyArdOfRaaEndorsement($payload));
-                }else{
-                    Log::warning("No HRIS_RD users found for ARD submission. RTO ID: {$rto->id}");
+                } else {
+                    Log::warning("No HRIS_ARD users found for direct approval. RAA ID: {$raa->id}");
                 }
             } else {
-                // Default: notify supervisors in the staff's division
                 $approvers = User::whereHas('roles', function ($query) {
                         $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
                     })
@@ -733,7 +729,7 @@ class NotificationController extends Controller
 
                 if ($approvers->isNotEmpty()) {
                     Notification::send($approvers, new NotifySupervisorOfRaaSubmission($payload));
-                }else{
+                } else {
                     Log::warning("No supervisors found for division: {$staff->division_id}. RTO ID: {$rto->id}");
                 }
             }
@@ -1154,3 +1150,4 @@ class NotificationController extends Controller
         }    
     }
 }
+

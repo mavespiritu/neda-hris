@@ -19,6 +19,3 @@ Route::middleware(['web', 'auth.any', 'verified'])
         Route::post('/start-conversation', StartConversation::class)->name('start-conversation');
         Route::post('/start-direct', \App\Actions\Messenger\StartDirectConversation::class)->name('start-direct');
     });
-
-
-

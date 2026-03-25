@@ -78,10 +78,28 @@ class RtoController extends Controller
             ->whereIn('emp_id', $employeeIds)
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
             ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
+            ->when($request->filled('status'), function ($q) use ($request) {
+                $status = (string) $request->status;
+
+                $q->whereExists(function ($sub) use ($status) {
+                    $sub->select(DB::raw(1))
+                        ->from('submission_history as sh')
+                        ->whereColumn('sh.model_id', 'flexi_rto.id')
+                        ->where('sh.model', 'RTO')
+                        ->where('sh.status', $status)
+                        ->whereRaw("sh.id = (SELECT MAX(sh2.id) FROM submission_history as sh2 WHERE sh2.model = 'RTO' AND sh2.model_id = flexi_rto.id)");
+                });
+            })
             ->orderBy('date', 'desc');
 
         $targets = $targetsQuery->paginate(20);
         $targetIds = $targets->pluck('id')->all();
+
+        $submitterRolesById = User::whereIn('ipms_id', $targets->pluck('emp_id')->filter()->unique()->all())
+            ->get()
+            ->mapWithKeys(fn ($user) => [
+                (string) $user->ipms_id => $user->getAllRolesRecursive()->pluck('name')->values()->all(),
+            ]);
 
         /**
          * 4. Histories
@@ -104,8 +122,10 @@ class RtoController extends Controller
         /**
          * 6. Transform Data
          */
-        $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $histories, $outputs) {
+        $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $histories, $outputs, $submitterRolesById) {
             $item->employee_name = $employees[$item->emp_id]->name ?? null;
+            $item->submitter_roles = $submitterRolesById->get((string) $item->emp_id, []);
+            $item->skip_endorsement = collect($item->submitter_roles)->intersect(['HRIS_DC', 'HRIS_ARD'])->isNotEmpty();
 
             $latestHistory = $histories[$item->id][0] ?? null;
             if ($latestHistory) {
@@ -159,8 +179,11 @@ class RtoController extends Controller
                     'label' => $emp->name
                 ])->values(),
                 'dates'     => $fridays,
+                'statuses'  => collect(['Draft', 'Submitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
+                    ->map(fn ($status) => ['value' => $status, 'label' => $status])
+                    ->values(),
                 'targets'   => $targets,
-                'filters'   => $request->only(['employee', 'date', 'sort', 'direction', 'search']),
+                'filters'   => $request->only(['emp_id', 'date', 'status', 'sort', 'direction', 'search']),
             ],
         ]);
     }
@@ -985,3 +1008,6 @@ class RtoController extends Controller
         return $pdf->download("{$today}_RTO_{$rtoDate}.pdf");
     }
 }
+
+
+

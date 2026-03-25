@@ -103,6 +103,7 @@ class RaaController extends Controller
                 'sh_raa.acted_by as raa_acted_by',
                 'sh_raa.remarks as raa_remarks',
                 'sh_raa.date_acted as raa_date_acted',
+                'raa.created_by as raa_created_by',
                 DB::raw('(
                     CASE 
                         WHEN rto.emp_id = "'.auth()->user()->ipms_id.'" 
@@ -115,7 +116,17 @@ class RaaController extends Controller
             ->whereIn('rto.emp_id', $employeeIds)
             ->where('sh_rto.status', 'Approved')
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
-            ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')));
+            ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
+            ->when($request->filled('status'), function ($q) use ($request) {
+                $status = (string) $request->status;
+
+                if ($status === 'Draft') {
+                    $q->whereNull('sh_raa.status');
+                    return;
+                }
+
+                $q->where('sh_raa.status', $status);
+            });
 
 
         if ($search) {
@@ -140,10 +151,18 @@ class RaaController extends Controller
 
         $targets = $targetsQuery->paginate(20);
 
-        $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $conn2) {
+        $submitterRolesById = User::whereIn('ipms_id', $targets->pluck('emp_id')->filter()->unique()->all())
+            ->get()
+            ->mapWithKeys(fn ($user) => [
+                (string) $user->ipms_id => $user->getAllRolesRecursive()->pluck('name')->values()->all(),
+            ]);
+
+        $targets->getCollection()->transform(function ($item) use ($employees, $allEmployees, $conn2, $submitterRolesById) {
             $item->employee_name     = $employees[$item->emp_id]->name ?? null;
             $item->rto_acted_by_name = $allEmployees[$item->rto_acted_by]->name ?? null;
             $item->raa_acted_by_name = $allEmployees[$item->raa_acted_by]->name ?? null;
+            $item->submitter_roles   = $submitterRolesById->get((string) $item->emp_id, []);
+            $item->skip_endorsement  = collect($item->submitter_roles)->intersect(['HRIS_DC', 'HRIS_ARD'])->isNotEmpty();
 
             $item->outputs = $conn2->table('flexi_target')
                 ->where('rto_id', $item->id)
@@ -199,8 +218,11 @@ class RaaController extends Controller
                     'label' => $emp->name,
                 ])->values(),
                 'dates'   => $fridays,
+                'statuses'  => collect(['Draft', 'Submitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
+                    ->map(fn ($status) => ['value' => $status, 'label' => $status])
+                    ->values(),
                 'targets' => $targets,
-                'filters' => $request->only(['employee', 'date', 'sort', 'direction', 'search']),
+                'filters' => $request->only(['emp_id', 'date', 'status', 'sort', 'direction', 'search']),
             ],
         ]);
     }
@@ -259,6 +281,7 @@ class RaaController extends Controller
                 'sh_raa.acted_by as raa_acted_by',
                 'sh_raa.remarks as raa_remarks',
                 'sh_raa.date_acted as raa_date_acted',
+                'raa.created_by as raa_created_by',
                 // isLocked logic
                 DB::raw('(
                     CASE 
@@ -1228,3 +1251,5 @@ class RaaController extends Controller
         return $pdf->download("{$today}_RAA_{$rtoDate}.pdf");
     }
 }
+
+

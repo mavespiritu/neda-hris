@@ -39,6 +39,7 @@ import { format } from "date-fns"
 import StatusBadge from '@/components/StatusBadge'
 import { useToast } from "@/hooks/use-toast"
 import { Label } from "@/components/ui/label"
+import SingleComboBox from "@/components/SingleComboBox"
 import RichTextEditor from "@/components/RichTextEditor"
 
 const breadcrumbItems = [
@@ -51,7 +52,7 @@ const Rto = () => {
 
     const { toast } = useToast()
 
-    const { auth: { user }, data: { targets, employees, dates } } = usePage().props
+    const { auth: { user }, data: { targets, employees, dates, statuses, filters: serverFilters } } = usePage().props
 
     const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
 
@@ -204,13 +205,18 @@ const Rto = () => {
             const { props } = usePage()
             const roles = props.auth.user?.roles || [] 
             const status = row.original.status
+            const skipEndorsement = !!row.original.skip_endorsement
 
             let actions = []
 
-            if (["Draft", "Needs Revision"].includes(status) && roles.includes("HRIS_Staff", "HRIS_HR")) {
+            if (["Draft", "Needs Revision"].includes(status) && roles.some(r => ["HRIS_Staff", "HRIS_HR"].includes(r))) {
                 actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
             }
-            if (status === "Submitted" && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
+            if (status === "Submitted" && skipEndorsement && roles.some(r => ["HRIS_ARD", "HRIS_RD"].includes(r))) {
+                actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
+                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
+            } else if (status === "Submitted" && !skipEndorsement && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
                 actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
             }
@@ -246,7 +252,7 @@ const Rto = () => {
         }
     ], [])
 
-    const [filters, setFilters] = useState({})
+    const [filters, setFilters] = useState(serverFilters || {})
 
     const { 
         TableView,
@@ -295,6 +301,31 @@ const Rto = () => {
                 description="Record your itemized target outputs here if you are under flexiplace arrangement"
                 breadcrumbItems={breadcrumbItems}
             />
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
+                <Button
+                    variant={!filters.status ? "default" : "outline"}
+                    size="sm"
+                    type="button"
+                    className="h-7 rounded-full px-3 text-xs"
+                    onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}
+                >
+                    All
+                </Button>
+                {statuses.map((statusOption) => (
+                    <Button
+                        key={statusOption.value}
+                        variant={filters.status === statusOption.value ? "default" : "outline"}
+                        size="sm"
+                        type="button"
+                        className="h-7 rounded-full px-3 text-xs"
+                        onClick={() => setFilters((prev) => ({ ...prev, status: statusOption.value }))}
+                    >
+                        {statusOption.label}
+                    </Button>
+                ))}
+            </div>
+
             <TableView />
             {isFormOpen && (
                 <Form
@@ -313,6 +344,7 @@ const Rto = () => {
                     onApply={(appliedFilters) => setFilters(appliedFilters)}
                     initialValues={filters}
                     employees={employees}
+                    statuses={statuses}
                 />
             )}
 
@@ -367,3 +399,11 @@ const Rto = () => {
 }
 
 export default Rto
+
+
+
+
+
+
+
+
