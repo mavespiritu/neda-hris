@@ -6,14 +6,15 @@ import { Label } from "@/components/ui/label"
 import SingleComboBox from "@/components/SingleComboBox"
 import DatePicker from "@/components/DatePicker"
 
-const Filter = ({ onClose, open, onApply, initialValues, employees }) => {
+const Filter = ({ onClose, open, onApply, initialValues, employees, statuses }) => {
 
-  const emptyInitialValues = { emp_id: "", date: "" }
+  const emptyInitialValues = { emp_id: "", date: "", status: "" }
   const firstOpenRef = useRef(true) // track first open
 
   const { data, setData } = useForm({
     emp_id: initialValues?.emp_id || "",
     date: initialValues?.date || "",
+    status: initialValues?.status || "",
   })
 
   useEffect(() => {
@@ -74,6 +75,17 @@ const Filter = ({ onClose, open, onApply, initialValues, employees }) => {
               onDateChange={(date) => setData("date", date)}
             />
           </div>
+          <div className="space-y-1">
+            <Label>Status</Label>
+            <SingleComboBox
+              items={statuses}
+              onChange={(value) => setData("status", value)}
+              placeholder="Select status"
+              name="status"
+              id="status"
+              value={data.status}
+            />
+          </div>
 
           <div className="flex justify-end gap-2">
             <DialogClose asChild>
@@ -98,3 +110,4 @@ const Filter = ({ onClose, open, onApply, initialValues, employees }) => {
 }
 
 export default Filter
+

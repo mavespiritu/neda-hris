@@ -51,7 +51,7 @@ const Raa = () => {
 
     const { toast } = useToast()
 
-    const { auth: { user }, data: { targets, employees, dates } } = usePage().props
+    const { auth: { user }, data: { targets, employees, dates, statuses, filters: serverFilters } } = usePage().props
 
     const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
 
@@ -259,25 +259,30 @@ const Raa = () => {
             const roles = props.auth.user?.roles || [] 
             const status = row.original.raa_status
             const outputs = row.original.outputs || []
+            const skipEndorsement = !!row.original.skip_endorsement
 
             // Check if there are any accomplishments encoded
             const hasAccomplishments = outputs.some(output => (output.accomplishments || []).length > 0)
 
             let actions = []
 
-            if ([null, "Draft", "Needs Revision"].includes(status) && roles.includes("HRIS_Staff", "HRIS_HR") && hasAccomplishments) {
+            if ([null, "Draft", "Needs Revision"].includes(status) && roles.some(r => ["HRIS_Staff", "HRIS_HR"].includes(r)) && hasAccomplishments) {
                 actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
             }
-            if (status === "Submitted" && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
+            if (status === "Submitted" && skipEndorsement && roles.some(r => ["HRIS_ARD", "HRIS_RD"].includes(r))) {
+                actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
+                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
+            } else if (status === "Submitted" && !skipEndorsement && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
                 actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
             }
-            if (status === "Endorsed" && roles.some(r => ["HRIS_ARD", "HRIS_HR"].includes(r))) {
+            if (status === "Endorsed" && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
                 actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                 actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
             }
-            if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_HR"].includes(r))) {
+            if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
                 actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
             }
 
@@ -304,7 +309,7 @@ const Raa = () => {
         }
     ], [])
 
-    const [filters, setFilters] = useState({})
+    const [filters, setFilters] = useState(serverFilters || {})
 
     const { 
         TableView,
@@ -347,6 +352,24 @@ const Raa = () => {
                 description="Browse RTOs here ito accomplish RAA"
                 breadcrumbItems={breadcrumbItems}
             />
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
+                <Button variant={!filters.status ? "default" : "outline"} size="sm" type="button" onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}>
+                    All
+                </Button>
+                {statuses.map((statusOption) => (
+                    <Button
+                        key={statusOption.value}
+                        variant={filters.status === statusOption.value ? "default" : "outline"}
+                        size="sm"
+                        type="button"
+                        onClick={() => setFilters((prev) => ({ ...prev, status: statusOption.value }))}
+                    >
+                        {statusOption.label}
+                    </Button>
+                ))}
+            </div>
+
             <TableView />
             {isFormOpen && (
                 <Form
@@ -419,3 +442,5 @@ const Raa = () => {
 }
 
 export default Raa
+
+
