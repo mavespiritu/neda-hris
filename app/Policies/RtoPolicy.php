@@ -21,7 +21,13 @@ class RtoPolicy
 
         $rolePriorities = config('roles.priorities', []);
 
-        $userRoles = $user->roles->pluck('name')->toArray();
+        $userDivision = $user->division ?: $conn3->table('tblemployee')
+            ->where('emp_id', $user->ipms_id)
+            ->value('division_id');
+
+        $userRoles = method_exists($user, 'getAllRolesRecursive')
+            ? $user->getAllRolesRecursive()->pluck('name')->toArray()
+            : $user->roles->pluck('name')->toArray();
 
         $highestRole = collect($userRoles)
             ->mapWithKeys(fn ($role) => [$role => $rolePriorities[$role] ?? 0])
@@ -35,9 +41,11 @@ class RtoPolicy
 
         return match ($highestRole) {
             'HRIS_RD', 'HRIS_ARD', 'HRIS_HR' => $q,
-            'HRIS_ADC', 'HRIS_DC'            => $q->where('division_id', $user->division),
+            'HRIS_ADC', 'HRIS_DC'            => $q->where('division_id', $userDivision),
             'HRIS_Staff'                     => $q->where('emp_id', $user->ipms_id),
             default                          => $q->whereRaw('1=0'),
         };
     }
 }
+
+

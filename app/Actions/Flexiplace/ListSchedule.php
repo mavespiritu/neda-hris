@@ -49,17 +49,26 @@ class ListSchedule
             ->orderBy('mname');
 
         if (! $isPublic) {
-            $hasDCRole = $user->hasRole('HRIS_DC');
-            $hasADCRole = $user->hasRole('HRIS_ADC');
-            $hasStaffRole = $user->hasRole('HRIS_Staff');
-            $hasHRRole = $user->hasRole('HRIS_HR');
+            $userRoles = method_exists($user, 'getAllRolesRecursive')
+                ? $user->getAllRolesRecursive()->pluck('name')->toArray()
+                : $user->roles->pluck('name')->toArray();
 
-            if (! $hasHRRole) {
-                if ($hasDCRole || $hasADCRole) {
-                    $employeesQuery->where('division_id', $user->division);
-                } elseif ($hasStaffRole) {
-                    $employeesQuery->where('emp_id', $user->ipms_id);
+            $userDivision = $user->division ?: $conn3->table('tblemployee')
+                ->where('emp_id', $user->ipms_id)
+                ->value('division_id');
+
+            if (in_array('HRIS_HR', $userRoles, true)) {
+                // no additional filter
+            } elseif (count(array_intersect($userRoles, ['HRIS_DC', 'HRIS_ADC'])) > 0) {
+                if (filled($userDivision)) {
+                    $employeesQuery->where('division_id', $userDivision);
+                } else {
+                    $employeesQuery->whereRaw('1=0');
                 }
+            } elseif (in_array('HRIS_Staff', $userRoles, true)) {
+                $employeesQuery->where('emp_id', $user->ipms_id);
+            } else {
+                $employeesQuery->whereRaw('1=0');
             }
         }
 
@@ -118,3 +127,7 @@ class ListSchedule
         ]);
     }
 }
+
+
+
+

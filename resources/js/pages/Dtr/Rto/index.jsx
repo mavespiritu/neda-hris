@@ -303,7 +303,13 @@ const Rto = () => {
             />
             <div className="mb-4 flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
-                <Button variant={!filters.status ? "default" : "outline"} size="sm" type="button" onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}>
+                <Button
+                    variant={!filters.status ? "default" : "outline"}
+                    size="sm"
+                    type="button"
+                    className="h-7 rounded-full px-3 text-xs"
+                    onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}
+                >
                     All
                 </Button>
                 {statuses.map((statusOption) => (
@@ -312,6 +318,7 @@ const Rto = () => {
                         variant={filters.status === statusOption.value ? "default" : "outline"}
                         size="sm"
                         type="button"
+                        className="h-7 rounded-full px-3 text-xs"
                         onClick={() => setFilters((prev) => ({ ...prev, status: statusOption.value }))}
                     >
                         {statusOption.label}
@@ -392,6 +399,7 @@ const Rto = () => {
 }
 
 export default Rto
+
 
 
 
