@@ -147,31 +147,46 @@ export const middleInitial = (middle_name) => {
   }
 
 export const formatFullName = (name) => {
-  if (!name) return '';
+  if (!name) return ""
+
+  const capitalizeSegment = (segment) => {
+    if (!segment) return ""
+
+    return segment
+      .toLowerCase()
+      .split(/([-'`])/)
+      .map((part) => {
+        if (["-", "'", "`"].includes(part)) return part
+        if (!part) return ""
+
+        return part.charAt(0).toUpperCase() + part.slice(1)
+      })
+      .join("")
+  }
 
   const capitalizeWords = (str) =>
     str
       .toLowerCase()
-      .split(' ')
+      .split(/\s+/)
       .filter(Boolean)
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+      .map(capitalizeSegment)
+      .join(" ")
 
-  const [last, rest] = name.split(',').map(s => s.trim());
+  const [last, rest] = name.split(",").map((s) => s.trim())
 
-  if (!rest) return capitalizeWords(last);
+  if (!rest) return capitalizeWords(last)
 
-  // Keep middle initial uppercase (P.)
   const formattedRest = rest
-    .split(' ')
-    .map(word =>
-      word.length === 2 && word.endsWith('.')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) =>
+      word.length === 2 && word.endsWith(".")
         ? word.toUpperCase()
-        : capitalizeWords(word)
+        : capitalizeSegment(word)
     )
-    .join(' ');
+    .join(" ")
 
-  return `${capitalizeWords(last)}, ${formattedRest}`;
+  return `${capitalizeWords(last)}, ${formattedRest}`
 }
 
 export const formatAmount = (amount) => {

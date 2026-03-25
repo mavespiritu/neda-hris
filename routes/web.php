@@ -1,23 +1,15 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Laravel\Socialite\Facades\Socialite;
 use Inertia\Inertia;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\MyCgaController;
-use App\Http\Controllers\StaffCgaController;
-use App\Http\Controllers\ReviewCgaController;
-use App\Http\Controllers\CompareCgaController;
-use App\Http\Controllers\TrainingController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\SettingsController;
 use App\Actions\Settings\ShowSettings;
 use App\Http\Controllers\Auth\GoogleController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /* Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -118,6 +110,11 @@ require __DIR__ . '/vacancies.php';
 require __DIR__ . '/vacancies.requirements.php';
 require __DIR__ . '/vacancies.applicants.php';
 require __DIR__ . '/trainings.php';
+
+require __DIR__ . '/ipcr.php';
+require __DIR__ . '/dpcr.php';
+require __DIR__ . '/opcr.php';
+require __DIR__ . '/performance.php';
 
 require __DIR__ . '/jobs.php';
 require __DIR__ . '/jobs.applications.php';

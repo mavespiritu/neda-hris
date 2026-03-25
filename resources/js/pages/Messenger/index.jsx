@@ -7,16 +7,13 @@ import Messages from "./Messages"
 
 const CONVO_LIMIT = 20
 const MSG_LIMIT = 20
-const CACHE_TTL = 30_000
-const CONVERSATIONS_CACHE_KEY = "messenger:conversations"
-const MESSAGES_CACHE_KEY = "messenger:messages"
 
 export default function Index() {
   const { auth, users = [] } = usePage().props
   const me = auth?.user
 
   const [conversations, setConversations] = useState([])
-  const [receiverId, setReceiverId] = useState("")
+  const [selectedUserIds, setSelectedUserIds] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [onlineUserIds, setOnlineUserIds] = useState(new Set())
 
@@ -25,6 +22,7 @@ export default function Index() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false)
 
   const [conversationsLoading, setConversationsLoading] = useState(false)
   const [loadingMoreConversations, setLoadingMoreConversations] = useState(false)
@@ -36,35 +34,11 @@ export default function Index() {
   const lastTypingRef = useRef(0)
   const listRef = useRef(null)
   const convoListRef = useRef(null)
-
-  const conversationsCacheRef = useRef({ data: [], ts: 0 })
-  const messagesCacheRef = useRef(new Map())
+  const messagesByConversationRef = useRef(new Map())
+  const activeMessagesRequestRef = useRef(0)
 
   const avatarUrl = (ipmsId) =>
     ipmsId ? `/employees/image/${ipmsId}` : "https://www.gravatar.com/avatar/?d=mp&s=200"
-
-  const isFreshCache = (ts) => Date.now() - Number(ts || 0) < CACHE_TTL
-
-  const saveConversationsCache = (data) => {
-    const payload = { data, ts: Date.now() }
-    conversationsCacheRef.current = payload
-    try {
-      localStorage.setItem(CONVERSATIONS_CACHE_KEY, JSON.stringify(payload))
-    } catch {}
-  }
-
-  const saveMessagesCache = (conversationId, data, hasMoreValue) => {
-    const key = Number(conversationId)
-    const payload = { data, hasMore: Boolean(hasMoreValue), ts: Date.now() }
-    messagesCacheRef.current.set(key, payload)
-
-    try {
-      localStorage.setItem(
-        MESSAGES_CACHE_KEY,
-        JSON.stringify(Object.fromEntries(messagesCacheRef.current.entries()))
-      )
-    } catch {}
-  }
 
   const formatSentAt = (value) => {
     if (!value) return ""
@@ -124,7 +98,7 @@ export default function Index() {
       })
 
     return () => {
-      window.Echo.leave("presence-messenger.presence")
+      window.Echo.leave("messenger.presence")
     }
   }, [])
 
@@ -155,9 +129,62 @@ export default function Index() {
     [safeConversations, activeId]
   )
 
+  const selectedUsers = useMemo(() => {
+    const map = new Map()
+
+    for (const u of safeUsers || []) {
+      if (u?.id == null || Number(u.id) === Number(me?.id)) continue
+      map.set(Number(u.id), u)
+    }
+
+    return selectedUserIds.map((id) => map.get(Number(id))).filter(Boolean)
+  }, [safeUsers, me?.id, selectedUserIds])
+
   const orderedMessages = useMemo(() => {
     return [...messages].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
   }, [messages])
+
+  const cacheConversationMessages = (conversationId, data, hasMoreValue) => {
+    messagesByConversationRef.current.set(Number(conversationId), {
+      data,
+      hasMore: Boolean(hasMoreValue),
+      ts: Date.now(),
+    })
+  }
+
+  const getCachedConversationMessages = (conversationId) => {
+    return messagesByConversationRef.current.get(Number(conversationId)) || null
+  }
+
+  const fetchConversationMessages = async (conversationId, { beforeId = null, limit = MSG_LIMIT } = {}) => {
+    const params = { limit }
+    if (beforeId) params.before_id = beforeId
+
+    const res = await axios.get(route("messenger.messages", conversationId), { params })
+    const chunk = res.data?.data || []
+    const nextHasMore = Boolean(res.data?.has_more)
+
+    cacheConversationMessages(conversationId, chunk, nextHasMore)
+
+    return { chunk, hasMore: nextHasMore }
+  }
+
+  const prefetchConversationMessages = async (conversationIds = []) => {
+    const ids = [...new Set(conversationIds.map((id) => Number(id)).filter(Boolean))]
+
+    await Promise.allSettled(
+      ids.map(async (conversationId) => {
+        if (conversationId === Number(activeId)) return
+        if (getCachedConversationMessages(conversationId)?.data?.length) return
+
+        try {
+          await fetchConversationMessages(conversationId, { limit: MSG_LIMIT })
+        } catch {
+          // Prefetch is opportunistic only.
+        }
+      })
+    )
+  }
 
   const updateConversationPreview = (conversationId, lastMessage, lastAt) => {
     setConversations((prev) => {
@@ -173,38 +200,95 @@ export default function Index() {
       const next = [...prev]
       next.splice(idx, 1)
       next.unshift(updated)
-      saveConversationsCache(next)
       return next
     })
   }
 
-  const upsertConversationToTop = (conversationId, fallbackName = "Conversation") => {
+  const buildGroupTitle = (names = []) => {
+    const clean = names
+      .map((name) => String(name || "").trim())
+      .filter(Boolean)
+
+    if (!clean.length) return "Group Chat"
+    if (clean.length <= 3) return clean.join(", ")
+    return `${clean.slice(0, 2).join(", ")} + ${clean.length - 2} others`
+  }
+
+  const buildParticipantSnapshot = (user) => ({
+    id: Number(user?.id),
+    ipms_id: user?.ipms_id ?? null,
+    name: user?.name ?? "Member",
+    avatar: user?.avatar || (user?.ipms_id ? `/employees/image/${user.ipms_id}` : null),
+  })
+
+  const upsertConversationToTop = (
+    conversationId,
+    fallbackName = "Conversation",
+    type = "direct",
+    participants = [],
+    options = {}
+  ) => {
     setConversations((prev) => {
       const idx = prev.findIndex((c) => Number(c.id) === Number(conversationId))
+      const resolvedParticipants = participants.length
+        ? participants
+        : (idx >= 0 ? prev[idx].participants || [] : [])
+      const directParticipant = type === "direct" ? resolvedParticipants[0] || null : null
+      const resolvedName = type === "group"
+        ? fallbackName
+        : (directParticipant?.name || fallbackName)
 
       if (idx >= 0) {
-        const found = prev[idx]
+        const found = {
+          ...prev[idx],
+          type,
+          name: resolvedName,
+          title: type === "group" ? fallbackName : null,
+          other_user_id: type === "direct"
+            ? (Number(directParticipant?.id ?? prev[idx].other_user_id ?? 0) || null)
+            : null,
+          other_user_ipms_id: type === "direct"
+            ? (directParticipant?.ipms_id ?? prev[idx].other_user_ipms_id ?? null)
+            : null,
+          other_user_avatar: type === "direct"
+            ? (directParticipant?.avatar
+              || (directParticipant?.ipms_id ? `/employees/image/${directParticipant.ipms_id}` : prev[idx].other_user_avatar)
+              || "https://www.gravatar.com/avatar/?d=mp&s=200")
+            : null,
+          skip_initial_fetch: Boolean(options.skipInitialFetch ?? prev[idx].skip_initial_fetch ?? false),
+          participants: type === "group"
+            ? resolvedParticipants
+            : prev[idx].participants || resolvedParticipants,
+        }
         const next = [...prev]
         next.splice(idx, 1)
         next.unshift(found)
-        saveConversationsCache(next)
         return next
       }
 
-      const receiver = safeUsers.find((u) => Number(u.id) === Number(receiverId))
       const created = {
         id: Number(conversationId),
-        type: "direct",
-        name: receiver?.name || fallbackName,
-        title: null,
-        other_user_id: Number(receiverId),
-        other_user_ipms_id: receiver?.ipms_id ?? null,
+        type,
+        name: resolvedName,
+        title: type === "group" ? fallbackName : null,
+        other_user_id: type === "direct"
+          ? (Number(directParticipant?.id ?? 0) || null)
+          : null,
+        other_user_ipms_id: type === "direct"
+          ? (directParticipant?.ipms_id ?? null)
+          : null,
+        other_user_avatar: type === "direct"
+          ? (directParticipant?.avatar
+            || (directParticipant?.ipms_id ? `/employees/image/${directParticipant.ipms_id}` : null)
+            || "https://www.gravatar.com/avatar/?d=mp&s=200")
+          : null,
+        skip_initial_fetch: Boolean(options.skipInitialFetch),
+        participants: resolvedParticipants,
         last_message: null,
         last_message_at: null,
       }
 
       const next = [created, ...prev]
-      saveConversationsCache(next)
       return next
     })
   }
@@ -232,17 +316,16 @@ export default function Index() {
           const merged = [...prev, ...chunk]
           const uniq = new Map()
           for (const c of merged) uniq.set(c.id, c)
-          const next = [...uniq.values()]
-          saveConversationsCache(next)
-          return next
+          return [...uniq.values()]
         })
       } else {
         setConversations(chunk)
-        saveConversationsCache(chunk)
 
         if (!activeId && chunk.length) {
           setActiveId(chunk[0].id)
         }
+
+        void prefetchConversationMessages(chunk.slice(0, 8).map((conversation) => conversation.id))
       }
     } finally {
       if (!silent) {
@@ -252,13 +335,15 @@ export default function Index() {
     }
   }
 
-  const fetchMessages = async ({ beforeId = null, prepend = false, silent = false } = {}) => {
-    if (!activeId) return
+  const fetchMessages = async ({
+    conversationId = activeId,
+    beforeId = null,
+    prepend = false,
+    silent = false,
+    requestToken = null,
+  } = {}) => {
+    if (!conversationId) return
 
-    const params = { limit: MSG_LIMIT }
-    if (beforeId) params.before_id = beforeId
-
-    const convoId = Number(activeId)
     const el = listRef.current
     const prevHeight = el?.scrollHeight ?? 0
 
@@ -266,9 +351,15 @@ export default function Index() {
     else if (!silent) setMessagesLoading(true)
 
     try {
-      const res = await axios.get(route("messenger.messages", activeId), { params })
-      const chunk = res.data?.data || []
-      const nextHasMore = Boolean(res.data?.has_more)
+      const convoId = Number(conversationId)
+      const { chunk, hasMore: nextHasMore } = await fetchConversationMessages(convoId, {
+        beforeId,
+        limit: MSG_LIMIT,
+      })
+
+      if (requestToken != null && requestToken !== activeMessagesRequestRef.current) {
+        return
+      }
 
       setHasMore(nextHasMore)
 
@@ -278,7 +369,7 @@ export default function Index() {
           const uniq = new Map()
           for (const m of merged) uniq.set(m.id, m)
           const next = [...uniq.values()].sort((a, b) => Number(a.id) - Number(b.id))
-          saveMessagesCache(convoId, next, nextHasMore)
+          cacheConversationMessages(convoId, next, nextHasMore)
           return next
         })
 
@@ -288,7 +379,7 @@ export default function Index() {
         })
       } else {
         setMessages(chunk)
-        saveMessagesCache(convoId, chunk, nextHasMore)
+        cacheConversationMessages(convoId, chunk, nextHasMore)
 
         requestAnimationFrame(() => {
           if (!el) return
@@ -301,62 +392,92 @@ export default function Index() {
     }
   }
 
-  const startDirect = async () => {
+  const startConversation = async () => {
     try {
-      if (!receiverId) return
+      if (!selectedUserIds.length) return
 
-      const res = await axios.post(route("messenger.start-direct"), {
-        user_id: Number(receiverId),
+      const selectedRecipients = selectedUsers
+      const isGroup = selectedRecipients.length > 1
+      const displayName = isGroup
+        ? buildGroupTitle(selectedRecipients.map((user) => user.name))
+        : (selectedRecipients[0]?.name || "Conversation")
+
+      const res = await axios.post(route("messenger.start-conversation"), {
+        user_ids: selectedUserIds.map((id) => Number(id)),
       })
 
       const conversationId = res.data?.id
       if (!conversationId) return
 
-      upsertConversationToTop(conversationId)
+      const shouldSkipInitialFetch = true
+
+      upsertConversationToTop(
+        conversationId,
+        displayName,
+        isGroup ? "group" : "direct",
+        selectedRecipients.map((user) => buildParticipantSnapshot(user)),
+        { skipInitialFetch: shouldSkipInitialFetch }
+      )
       setActiveId(conversationId)
-      setReceiverId("")
+      setSelectedUserIds([])
+      setIsCreatingConversation(false)
+      return true
     } catch (error) {
-      console.log("startDirect error:", error.response?.data || error)
+      console.log("startConversation error:", error.response?.data || error)
+      return false
     }
   }
 
+  const handleNewMessage = () => {
+    setActiveId(null)
+    setMessages([])
+    setHasMore(true)
+    setBody("")
+    setReplyTo(null)
+    setTypingUser(null)
+    setSelectedUserIds([])
+    setIsCreatingConversation(true)
+  }
+
+  const handleSelectConversation = (conversationId) => {
+    setActiveId(conversationId)
+    setIsCreatingConversation(false)
+    setSelectedUserIds([])
+    setReplyTo(null)
+    setBody("")
+  }
+
+  const handlePreviewConversation = (conversationId) => {
+    setActiveId(conversationId)
+    setIsCreatingConversation(true)
+    setBody("")
+    setReplyTo(null)
+    setTypingUser(null)
+  }
+
+  const resolveDirectConversationId = (userId) => {
+    const match = safeConversations.find((c) => {
+      if (c?.type !== "direct") return false
+      return Number(c.other_user_id) === Number(userId)
+    })
+
+    return match?.id ?? null
+  }
+
   useEffect(() => {
-    let hasCachedConversations = false
-
-    try {
-      const rawConvo = localStorage.getItem(CONVERSATIONS_CACHE_KEY)
-      if (rawConvo) {
-        const parsed = JSON.parse(rawConvo)
-        if (Array.isArray(parsed?.data)) {
-          conversationsCacheRef.current = parsed
-          setConversations(parsed.data)
-          hasCachedConversations = parsed.data.length > 0
-          if (!activeId && parsed.data.length) setActiveId(parsed.data[0].id)
-        }
-      }
-
-      const rawMsg = localStorage.getItem(MESSAGES_CACHE_KEY)
-      if (rawMsg) {
-        const parsed = JSON.parse(rawMsg)
-        if (parsed && typeof parsed === "object") {
-          for (const [k, v] of Object.entries(parsed)) {
-            messagesCacheRef.current.set(Number(k), v)
-          }
-        }
-      }
-    } catch {}
-
-    fetchConversations({ silent: hasCachedConversations })
+    fetchConversations()
   }, [])
 
   useEffect(() => {
     if (!activeId) return
     if (!window.Echo) return
 
-    const cached = messagesCacheRef.current.get(Number(activeId))
-    const hasCached = Boolean(cached?.data?.length)
+    const requestToken = ++activeMessagesRequestRef.current
+    setTypingUser(null)
+    const cached = getCachedConversationMessages(activeId)
+    const shouldSkipInitialFetch = Boolean(activeConversation?.skip_initial_fetch && !cached?.data?.length)
 
-    if (hasCached) {
+    if (cached?.data?.length) {
       setMessages(cached.data)
       setHasMore(Boolean(cached.hasMore))
     } else {
@@ -364,9 +485,13 @@ export default function Index() {
       setHasMore(true)
     }
 
-    setTypingUser(null)
-
-    fetchMessages({ silent: hasCached && isFreshCache(cached?.ts) })
+    if (!shouldSkipInitialFetch) {
+      fetchMessages({
+        conversationId: activeId,
+        silent: Boolean(cached?.data?.length),
+        requestToken,
+      })
+    }
 
     const channelName = `conversation.${activeId}`
     const channel = window.Echo.private(channelName)
@@ -375,7 +500,7 @@ export default function Index() {
       setMessages((prev) => {
         if (prev.some((m) => m.id === e.id)) return prev
         const next = [...prev, e].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
-        saveMessagesCache(activeId, next, hasMore)
+        cacheConversationMessages(activeId, next, hasMore)
         return next
       })
 
@@ -414,9 +539,10 @@ export default function Index() {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }
+      activeMessagesRequestRef.current += 1
       window.Echo.leave(`private-${channelName}`)
     }
-  }, [activeId, me?.id, hasMore])
+  }, [activeId, activeConversation?.skip_initial_fetch, me?.id])
 
   useEffect(() => {
     if (!me?.id) return
@@ -435,7 +561,6 @@ export default function Index() {
           const next = [...prev]
           next.splice(idx, 1)
           next.unshift(updated)
-          saveConversationsCache(next)
           return next
         }
 
@@ -452,7 +577,6 @@ export default function Index() {
           },
           ...prev,
         ]
-        saveConversationsCache(next)
         return next
       })
     })
@@ -479,7 +603,7 @@ export default function Index() {
 
     if (el.scrollTop <= 10) {
       const oldestId = orderedMessages[0]?.id
-      if (oldestId) fetchMessages({ beforeId: oldestId, prepend: true })
+      if (oldestId) fetchMessages({ conversationId: activeId, beforeId: oldestId, prepend: true })
     }
   }
 
@@ -487,31 +611,69 @@ export default function Index() {
     e.preventDefault()
     if (!body.trim() || !activeId) return
 
-    const res = await axios.post(route("messenger.send", activeId), {
-      body,
-      reply_to_id: replyTo?.id ?? null,
-    })
-    const msg = res.data?.data
-
-    if (msg) {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev
-        const next = [...prev, msg].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
-        saveMessagesCache(activeId, next, hasMore)
-        return next
-      })
-
-      updateConversationPreview(activeId, msg.body, msg.created_at)
-      setTypingUser(null)
-      setReplyTo(null)
-
-      requestAnimationFrame(() => {
-        if (!listRef.current) return
-        listRef.current.scrollTop = listRef.current.scrollHeight
-      })
+    const draft = body
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const optimisticMessage = {
+      id: tempId,
+      sender_id: me?.id,
+      sender_name: me?.name || "You",
+      sender_ipms_id: me?.ipms_id ?? null,
+      sender_gender: null,
+      body: draft,
+      created_at: new Date().toISOString(),
+      reply_to: replyTo
+        ? {
+            id: replyTo.id,
+            sender_id: replyTo.sender_id,
+            sender_name: replyTo.sender_name,
+            sender_gender: replyTo.sender_gender ?? null,
+            body: replyTo.body,
+          }
+        : null,
     }
 
     setBody("")
+    setReplyTo(null)
+
+    setMessages((prev) => {
+      const next = [...prev, optimisticMessage]
+      cacheConversationMessages(activeId, next, hasMore)
+      return next
+    })
+
+    updateConversationPreview(activeId, draft, optimisticMessage.created_at)
+
+    try {
+      const res = await axios.post(route("messenger.send", activeId), {
+        body: draft,
+        reply_to_id: replyTo?.id ?? null,
+      })
+      const msg = res.data?.data
+
+      if (msg) {
+        setMessages((prev) => {
+          const replaced = prev.map((m) => (m.id === tempId ? msg : m))
+          const uniq = new Map()
+          for (const m of replaced) uniq.set(m.id, m)
+          const next = [...uniq.values()].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
+          cacheConversationMessages(activeId, next, hasMore)
+          return next
+        })
+
+        updateConversationPreview(activeId, msg.body, msg.created_at)
+        setTypingUser(null)
+
+        requestAnimationFrame(() => {
+          if (!listRef.current) return
+          listRef.current.scrollTop = listRef.current.scrollHeight
+        })
+      }
+    } catch (error) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId))
+      setBody(draft)
+      setReplyTo(replyTo)
+      console.log("messenger.send error:", error.response?.data || error)
+    }
   }
 
   return (
@@ -520,15 +682,11 @@ export default function Index() {
 
       <div className="h-[calc(100vh-140px)] min-h-0 grid grid-cols-[clamp(240px,28vw,340px)_minmax(0,1fr)] gap-4">
         <Conversations
-          me={me}
-          safeUsers={safeUsers}
-          receiverId={receiverId}
-          setReceiverId={setReceiverId}
-          startDirect={startDirect}
           onlineUserIds={onlineUserIds}
           safeConversations={safeConversations}
           activeId={activeId}
-          setActiveId={setActiveId}
+          onNewMessage={handleNewMessage}
+          onSelectConversation={handleSelectConversation}
           conversationsLoading={conversationsLoading}
           loadingMoreConversations={loadingMoreConversations}
           convoListRef={convoListRef}
@@ -538,15 +696,24 @@ export default function Index() {
 
         <div className="border rounded p-2 min-h-0 min-w-0 flex flex-col overflow-hidden">
           <SelectedConversation
+            me={me}
+            safeUsers={safeUsers}
             activeConversation={activeConversation}
+            selectedUserIds={selectedUserIds}
+            setSelectedUserIds={setSelectedUserIds}
+            isComposing={isCreatingConversation || selectedUserIds.length > 0}
             onlineUserIds={onlineUserIds}
             avatarUrl={avatarUrl}
             typingUser={typingUser}
+            startConversation={startConversation}
+            onPreviewConversation={handlePreviewConversation}
+            resolveDirectConversationId={resolveDirectConversationId}
           />
 
           <Messages
             me={me}
             orderedMessages={orderedMessages}
+            activeConversationId={activeId}
             listRef={listRef}
             handleMessageScroll={handleMessageScroll}
             messagesLoading={messagesLoading}
@@ -569,3 +736,4 @@ export default function Index() {
     </>
   )
 }
+

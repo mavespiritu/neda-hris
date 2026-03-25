@@ -2,6 +2,7 @@ import PageTitle from "@/components/PageTitle"
 import useCrudTable from "@/hooks/useCrudTable"
 import { usePage, router, Link } from '@inertiajs/react'
 import { useState, useEffect, useMemo } from "react"
+import axios from "axios"
 import { useHasRole } from "@/hooks/useAuth"
 import { Loader2, Search, Filter, ChevronRight, MapPin, Banknote, FileCog, Building, ChevronLeft, Pencil, ArrowRight, Send, Upload, User, CircleCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -46,8 +47,261 @@ const steps = [
   },
 ]
 
-const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPercent}) => (
+const getStoredStepKey = (hashedId) => `job-application-step:${hashedId}`
+
+const normalizeValue = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+
+const getArrayItemSignature = (section, item = {}) => {
+  switch (section) {
+    case "educationalBackground":
+      return [
+        normalizeValue(item.level),
+        normalizeValue(item.school),
+        normalizeValue(item.course),
+        normalizeValue(item.from_year || item.from_date),
+        normalizeValue(item.to_year || item.to_date),
+        normalizeValue(item.year_graduated),
+      ].join("|")
+    case "civilServiceEligibility":
+      return [
+        normalizeValue(item.eligibility),
+        normalizeValue(item.exam_date),
+        normalizeValue(item.rating),
+      ].join("|")
+    case "workExperience":
+      return [
+        normalizeValue(item.agency),
+        normalizeValue(item.position),
+        normalizeValue(item.from_date),
+        normalizeValue(item.to_date),
+        normalizeValue(item.appointment),
+      ].join("|")
+    case "voluntaryWork":
+      return [
+        normalizeValue(item.org_name),
+        normalizeValue(item.from_date),
+        normalizeValue(item.to_date),
+        normalizeValue(item.nature_of_work),
+      ].join("|")
+    case "learningAndDevelopment":
+      return [
+        normalizeValue(item.seminar_title),
+        normalizeValue(item.from_date),
+        normalizeValue(item.to_date),
+        normalizeValue(item.hours),
+      ].join("|")
+    default:
+      return JSON.stringify(item)
+  }
+}
+
+const flattenEducationalBackground = (education = {}) => [
+  ...(education.elementary || []),
+  ...(education.secondary || []),
+  ...(education.vocational || []),
+  ...(education.college || []),
+  ...(education.graduate || []),
+]
+
+const getNewArrayEntries = (section, submittedItems = [], liveItems = []) => {
+  const submittedSignatures = new Set(submittedItems.map((item) => getArrayItemSignature(section, item)))
+  return liveItems.filter((item) => !submittedSignatures.has(getArrayItemSignature(section, item)))
+}
+
+const getChangedPersonalInformation = (submitted = {}, live = {}) => {
+  const fields = [
+    ["Mobile No.", "mobile_no"],
+    ["Email Address", "email_address"],
+    ["Telephone No.", "telephone_no"],
+    ["Residential Address", "residential_house_no"],
+    ["Residential Street", "residential_street"],
+    ["Residential Barangay", "residential_barangay_name"],
+    ["Residential City", "residential_city_name"],
+    ["Residential Province", "residential_province_name"],
+    ["Permanent Address", "permanent_house_no"],
+    ["Permanent Street", "permanent_street"],
+    ["Permanent Barangay", "permanent_barangay_name"],
+    ["Permanent City", "permanent_city_name"],
+    ["Permanent Province", "permanent_province_name"],
+  ]
+
+  return fields
+    .filter(([, key]) => normalizeValue(submitted?.[key]) !== normalizeValue(live?.[key]))
+    .map(([label, key]) => ({
+      label,
+      submitted: submitted?.[key] || "-",
+      current: live?.[key] || "-",
+    }))
+}
+
+const formatChangeEntry = (section, item) => {
+  switch (section) {
+    case "educationalBackground":
+      return `${item.level || "-"} - ${item.course || "-"} - ${item.school || "-"}`
+    case "civilServiceEligibility":
+      return `${item.eligibility || "-"} (${item.rating || "-"})`
+    case "workExperience":
+      return `${item.position || "-"} - ${item.agency || "-"}`
+    case "voluntaryWork":
+      return `${item.org_name || "-"} - ${item.nature_of_work || "-"}`
+    case "learningAndDevelopment":
+      return `${item.seminar_title || "-"}`
+    default:
+      return "-"
+  }
+}
+
+const ProfileChangesPanel = ({ submittedReview, liveReview, isLoading }) => {
+  const changes = useMemo(() => {
+    if (!submittedReview || !liveReview) {
+      return null
+    }
+
+    const personalChanges = getChangedPersonalInformation(
+      submittedReview.personalInformation,
+      liveReview.personalInformation
+    )
+
+    const sectionChanges = [
+      {
+        key: "educationalBackground",
+        label: "Educational Background",
+        items: getNewArrayEntries(
+          "educationalBackground",
+          flattenEducationalBackground(submittedReview.educationalBackground),
+          flattenEducationalBackground(liveReview.educationalBackground)
+        ),
+      },
+      {
+        key: "civilServiceEligibility",
+        label: "Civil Service Eligibility",
+        items: getNewArrayEntries(
+          "civilServiceEligibility",
+          submittedReview.civilServiceEligibility || [],
+          liveReview.civilServiceEligibility || []
+        ),
+      },
+      {
+        key: "workExperience",
+        label: "Work Experience",
+        items: getNewArrayEntries(
+          "workExperience",
+          submittedReview.workExperience || [],
+          liveReview.workExperience || []
+        ),
+      },
+      {
+        key: "voluntaryWork",
+        label: "Voluntary Work",
+        items: getNewArrayEntries(
+          "voluntaryWork",
+          submittedReview.voluntaryWork || [],
+          liveReview.voluntaryWork || []
+        ),
+      },
+      {
+        key: "learningAndDevelopment",
+        label: "Learning and Development",
+        items: getNewArrayEntries(
+          "learningAndDevelopment",
+          submittedReview.learningAndDevelopment || [],
+          liveReview.learningAndDevelopment || []
+        ),
+      },
+    ].filter((section) => section.items.length > 0)
+
+    return {
+      personalChanges,
+      sectionChanges,
+      hasChanges: personalChanges.length > 0 || sectionChanges.length > 0,
+    }
+  }, [submittedReview, liveReview])
+
+  if (isLoading) {
+    return (
+      <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 flex items-center gap-2 border-l-4 border-blue-400">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <p className="font-medium">Checking current profile changes since your last submission...</p>
+      </div>
+    )
+  }
+
+  if (!changes?.hasChanges) {
+    return (
+      <div className="rounded-md bg-green-50 p-3 text-sm text-green-700 flex items-start gap-2 border-l-4 border-green-400">
+        <CircleCheck className="w-4 h-4 mt-0.5" />
+        <p className="font-medium">No new profile changes detected since your last submission.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800 flex flex-col gap-3 border-l-4 border-blue-400">
+      <div className="flex items-start gap-2">
+        <CircleCheck className="w-4 h-4 mt-0.5" />
+        <div>
+          <p className="font-semibold">Current Profile Changes Since Last Submission</p>
+          <p className="text-blue-700">
+            The profile below is still your last submitted snapshot. These are the new or changed live profile details that will be included once you re-submit.
+          </p>
+        </div>
+      </div>
+
+      {changes.personalChanges.length > 0 && (
+        <div className="rounded-md border border-blue-200 bg-white/70 p-3">
+          <p className="font-medium mb-2">Updated Personal Information</p>
+          <div className="space-y-2">
+            {changes.personalChanges.map((change) => (
+              <div key={change.label} className="text-xs">
+                <span className="font-semibold">{change.label}:</span> {change.submitted} -> {change.current}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {changes.sectionChanges.map((section) => (
+        <div key={section.key} className="rounded-md border border-blue-200 bg-white/70 p-3">
+          <p className="font-medium mb-2">
+            {section.label}: {section.items.length} new entr{section.items.length === 1 ? "y" : "ies"}
+          </p>
+          <div className="space-y-1">
+            {section.items.map((item, index) => (
+              <div key={`${section.key}-${index}`} className="text-xs">
+                {formatChangeEntry(section.key, item)}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPercent, reviewDataOverride, isReopenedSubmission, liveReviewData, liveReviewLoading }) => (
   <div className="flex flex-col gap-4">
+    {isReopenedSubmission && (
+      <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 flex flex-col gap-2 border-l-4 border-amber-400">
+        <div className="flex items-start gap-2">
+          <TriangleAlert className="w-4 h-4 mt-0.5" />
+          <p className="font-semibold">Reopened Submission</p>
+        </div>
+        <p className="pl-6">
+          You are viewing the profile details from your last submitted application copy. Any new edits you make before re-submitting will replace that submitted snapshot.
+        </p>
+      </div>
+    )}
+    {isReopenedSubmission && (
+      <ProfileChangesPanel
+        submittedReview={reviewDataOverride}
+        liveReview={liveReviewData}
+        isLoading={liveReviewLoading}
+      />
+    )}
     {progressPercent >= 100 && (
     <div className="rounded-md bg-green-50 p-3 text-sm text-green-700 flex flex-col gap-2 border-l-4 border-green-400">
         <div className="flex items-start gap-2">
@@ -68,7 +322,7 @@ const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPer
         </Button>
         </Link>
     </div>)}
-    <Review />
+    <Review reviewDataOverride={reviewDataOverride} />
     <div className="flex justify-end gap-4">
         {progressPercent >= 100 && (
             <Button onClick={handleNext} disabled={currentStep === steps.length - 1} className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -86,9 +340,14 @@ const StepProfile = ({ job, handlePrevious, handleNext, currentStep, progressPer
   </div>
 )
 
-const StepDocument = ({job, applicant, handlePrevious, handleNext, currentStep}) => (
+const StepDocument = ({job, applicant, handlePrevious, handleNext, currentStep, reviewDataOverride, isReopenedSubmission}) => (
   <div className="flex flex-col gap-4">
-    <ChooseDocuments job={job} applicant={applicant} />
+    <ChooseDocuments
+      job={job}
+      applicant={applicant}
+      submittedProfileReview={reviewDataOverride}
+      isReopenedSubmission={isReopenedSubmission}
+    />
     <div className="flex justify-between gap-4">
         <Button 
           variant="outline" 
@@ -112,9 +371,9 @@ const StepDocument = ({job, applicant, handlePrevious, handleNext, currentStep})
   </div>
 )
 
-const StepReview = ({job, applicant, handlePrevious, handleNext, currentStep}) => (
+const StepReview = ({job, applicant, handlePrevious, handleNext, currentStep, isReopenedSubmission}) => (
   <div className="flex flex-col gap-4">
-    <ReviewAndSubmit job={job} applicant={applicant} />
+    <ReviewAndSubmit job={job} applicant={applicant} isReopenedSubmission={isReopenedSubmission} />
     <div className="flex justify-between gap-4">
         <Button 
           variant="outline" 
@@ -130,13 +389,85 @@ const StepReview = ({job, applicant, handlePrevious, handleNext, currentStep}) =
 
 const apply = () => {
 
-    const { job, applicant, progress } = usePage().props
+    const { job, applicant, progress, isReopenedSubmission = false, submittedProfileReview = null } = usePage().props
 
     const progressPercent = progress
         ? parseFloat(progress).toFixed(2)
         : "0.00"
+    const resolvedSteps = useMemo(
+        () => steps.map((step) =>
+            step.id === "complete"
+                ? {
+                    ...step,
+                    title: isReopenedSubmission ? "Re-submit Application" : "Submit Application",
+                }
+                : step
+        ),
+        [isReopenedSubmission]
+    )
 
     const [currentStep, setCurrentStep] = useState(0)
+    const [liveReviewData, setLiveReviewData] = useState(null)
+    const [liveReviewLoading, setLiveReviewLoading] = useState(false)
+    const storedStepKey = useMemo(() => getStoredStepKey(job?.hashed_id), [job?.hashed_id])
+
+    useEffect(() => {
+        if (!storedStepKey || typeof window === "undefined") return
+
+        const navigationEntry = window.performance?.getEntriesByType?.("navigation")?.[0]
+        const isReload = navigationEntry?.type === "reload"
+
+        if (!isReload) {
+            setCurrentStep(0)
+            window.sessionStorage.removeItem(storedStepKey)
+            return
+        }
+
+        const storedStep = window.sessionStorage.getItem(storedStepKey)
+        const parsedStep = Number.parseInt(storedStep ?? "", 10)
+
+        if (!Number.isNaN(parsedStep) && parsedStep >= 0 && parsedStep < steps.length) {
+            setCurrentStep(parsedStep)
+        }
+    }, [storedStepKey])
+
+    useEffect(() => {
+        if (!storedStepKey || typeof window === "undefined") return
+
+        window.sessionStorage.setItem(storedStepKey, String(currentStep))
+    }, [currentStep, storedStepKey])
+
+    useEffect(() => {
+        if (!isReopenedSubmission) {
+            setLiveReviewData(null)
+            return
+        }
+
+        let isMounted = true
+
+        const fetchLiveReview = async () => {
+            try {
+                setLiveReviewLoading(true)
+                const { data } = await axios.get(route("profile.review"))
+
+                if (isMounted) {
+                    setLiveReviewData(data)
+                }
+            } catch (error) {
+                console.error("Failed to load current profile review:", error)
+            } finally {
+                if (isMounted) {
+                    setLiveReviewLoading(false)
+                }
+            }
+        }
+
+        fetchLiveReview()
+
+        return () => {
+            isMounted = false
+        }
+    }, [isReopenedSubmission])
 
     const handleNext = () => {
         if (currentStep < steps.length - 1) {
@@ -157,11 +488,11 @@ const apply = () => {
     const StepContent = () => {
         switch (currentStep) {
         case 0:
-            return <StepProfile job={job} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} progressPercent={progressPercent} />
+            return <StepProfile job={job} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} progressPercent={progressPercent} reviewDataOverride={submittedProfileReview} isReopenedSubmission={isReopenedSubmission} liveReviewData={liveReviewData} liveReviewLoading={liveReviewLoading} />
         case 1:
-            return <StepDocument job={job} applicant={applicant} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} />
+            return <StepDocument job={job} applicant={applicant} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} reviewDataOverride={submittedProfileReview} isReopenedSubmission={isReopenedSubmission} />
         case 2:
-            return <StepReview job={job} applicant={applicant} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} />
+            return <StepReview job={job} applicant={applicant} handlePrevious={handlePrevious} handleNext={handleNext} currentStep={currentStep} isReopenedSubmission={isReopenedSubmission} />
         default:
             return null
         }
@@ -217,7 +548,7 @@ const apply = () => {
                     </div>
                 </div>
                 <div className="w-full lg:w-[75%] mt-8 mb-4">
-                    <Stepper steps={steps} currentStep={currentStep} onStepClick={handleStepClick} />
+                    <Stepper steps={resolvedSteps} currentStep={currentStep} onStepClick={handleStepClick} />
                 </div>
 
                 {progressPercent < 100 && (

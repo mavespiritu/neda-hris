@@ -55,15 +55,31 @@ class ApplicationsController extends Controller
             ->whereIn('id', $vacancyIds)
             ->get()
             ->keyBy('id'); 
+        $editRequests = $conn->table('app_edit_requests')
+            ->select('application_id', 'status', 'remarks', 'opened_at', 'expires_at', 'closed_at')
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->orderByDesc('id')
+            ->get()
+            ->unique('application_id')
+            ->keyBy('application_id');
 
-        $applications->getCollection()->transform(function ($app) use ($vacancies) {
+        $applications->getCollection()->transform(function ($app) use ($vacancies, $editRequests) {
             $vacancy = $vacancies->get($app->vacancy_id);
+            $editRequest = $editRequests->get($app->id);
+            $hasActiveEditWindow = $editRequest
+                && $editRequest->status === 'Open'
+                && $editRequest->expires_at
+                && now()->lessThanOrEqualTo(Carbon::parse($editRequest->expires_at));
 
             $app->reference_no = $vacancy->reference_no ?? null;
             $app->appointment_status = $vacancy->appointment_status ?? null;
             $app->item_no = $vacancy->item_no ?? null;
             $app->position = $vacancy->position_description ?? null;
             $app->hashed_id = sha1($vacancy->id);
+            $app->can_edit_submission = $hasActiveEditWindow;
+            $app->edit_request_status = $editRequest->status ?? null;
+            $app->edit_request_expires_at = $editRequest->expires_at ?? null;
+            $app->edit_request_remarks = $editRequest->remarks ?? null;
 
             return $app;
         });

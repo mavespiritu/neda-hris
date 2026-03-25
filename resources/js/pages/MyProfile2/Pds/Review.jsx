@@ -68,10 +68,11 @@ const Review = ({
   applicantId,
   profileType,
   section = "review",
+  reviewDataOverride = null,
 }) => {
   const { loading, pdsState, fetchPdsSection } = store()
 
-  const reviewData = pdsState.review || _review
+  const reviewData = reviewDataOverride || pdsState.review || _review
 
   const {
     personalInformation = {},
@@ -95,8 +96,12 @@ const Review = ({
   const [residentialBarangayName, setResidentialBarangayName] = useState("")
 
   useEffect(() => {
+    if (reviewDataOverride) {
+      return
+    }
+
     fetchPdsSection(section, { applicantId, profileType })
-  }, [applicantId, profileType, section])
+  }, [applicantId, profileType, section, reviewDataOverride])
 
   useEffect(() => {
     const fetchAddressNames = async () => {
@@ -202,13 +207,13 @@ const Review = ({
       </CardHeader>
 
       <CardContent className="relative border-t">
-        {loading && (
+        {!reviewDataOverride && loading && (
           <div className="absolute inset-0 z-20 flex items-center justify-center rounded-md bg-white/50 backdrop-blur-[2px]">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        <div className={`${loading ? "pointer-events-none blur-[1.5px] opacity-70" : ""} flex flex-col gap-4 transition`}>
+        <div className={`${!reviewDataOverride && loading ? "pointer-events-none blur-[1.5px] opacity-70" : ""} flex flex-col gap-4 transition`}>
           <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
             <AccordionItem value="item-1">
               <AccordionTrigger>

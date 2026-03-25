@@ -97,6 +97,21 @@ class HomeController extends Controller
             }
         }
 
+        $positionsPosted = (clone $vacancies)->count();
+
+        $applicationsSubmitted = $conn->table('application as a')
+            ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
+            ->whereIn('a.vacancy_id', $vacancyIds)
+            ->where('a.status', 'Submitted')
+            ->count();
+
+        $applicantsCatered = $conn->table('application as a')
+            ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
+            ->whereIn('a.vacancy_id', $vacancyIds)
+            ->where('a.status', 'Submitted')
+            ->distinct()
+            ->count('a.user_id');
+
         $vacancies = $vacancies->paginate(9)->withQueryString();
 
         $competencies = $conn2->table('vacancy_competencies as vc')
@@ -137,6 +152,11 @@ class HomeController extends Controller
         return Inertia::render('Home', [
             'data' => [
                 'jobs' => $vacancies,
+                'stats' => [
+                    'positions_posted' => $positionsPosted,
+                    'applicants_catered' => $applicantsCatered,
+                    'applications_submitted' => $applicationsSubmitted,
+                ],
                 'filters' => $request->only(['search', 'filter']),
             ],
         ]);

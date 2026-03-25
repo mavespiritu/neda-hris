@@ -7,6 +7,7 @@ use App\Events\MessageSent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Traits\BuildsEmployeeNameMap;
+use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\ActionRequest;
@@ -14,7 +15,7 @@ use Lorisleiva\Actions\Concerns\AsAction;
 
 class SendConversationMessage
 {
-    use AsAction, BuildsEmployeeNameMap;
+    use AsAction, BuildsEmployeeNameMap, UsesMessengerRedisCache;
 
     public function authorize(ActionRequest $request): bool
     {
@@ -69,15 +70,20 @@ class SendConversationMessage
             ? ($gendersById[$message->replyTo->sender?->ipms_id] ?? null)
             : null;
 
-        broadcast(new MessageSent($message))->toOthers();
-
         $recipientIds = $conversation->participants()
             ->where('users.id', '!=', $request->user()->id)
-            ->pluck('users.id');
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $this->bumpConversationMessagesVersion((int) $conversation->id);
+        $this->bumpConversationListVersion((int) $request->user()->id);
 
         foreach ($recipientIds as $recipientId) {
+            $this->bumpConversationListVersion($recipientId);
+
             broadcast(new ConversationPing(
-                recipientUserId: (int) $recipientId,
+                recipientUserId: $recipientId,
                 conversationId: (int) $conversation->id,
                 senderId: (int) $message->sender_id,
                 senderName: (string) $senderName,
@@ -85,6 +91,8 @@ class SendConversationMessage
                 createdAt: $message->created_at?->toISOString()
             ));
         }
+
+        broadcast(new MessageSent($message))->toOthers();
 
         return response()->json([
             'data' => [

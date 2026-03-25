@@ -1,4 +1,3 @@
-// src/Pages/JobPortal/Applicants/AssessApplicantForm.jsx
 import { useState, useEffect, useMemo } from "react"
 import axios from "axios"
 import {
@@ -23,57 +22,69 @@ import { Switch } from "@/components/ui/switch"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Loader2 } from "lucide-react"
 import clsx from "clsx"
+import { formatDateRange } from "@/lib/utils.jsx" 
+
+const createDefaultForm = () => ({
+  remarks: "",
+  prescribed: {
+    education: { status: false, remarks: "" },
+    training: { status: false, remarks: "" },
+    experience: { status: false, remarks: "" },
+    eligibility: { status: false, remarks: "" },
+  },
+  preferred: {
+    education: { status: false, remarks: "" },
+    training: { status: false, remarks: "" },
+    experience: { status: false, remarks: "" },
+    eligibility: { status: false, remarks: "" },
+  },
+})
+
+const emptyProfileData = {
+  education: [],
+  training: [],
+  experience: [],
+  eligibility: [],
+}
 
 const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
-  const [profileData, setProfileData] = useState({
-    education: [],
-    training: [],
-    experience: [],
-    eligibility: [],
-  })
+  const [profileData, setProfileData] = useState(emptyProfileData)
+  const [form, setForm] = useState(createDefaultForm())
 
-  const [form, setForm] = useState({
-    remarks: "",
-    prescribed: {
-      education: { status: false, remarks: "" },
-      training: { status: false, remarks: "" },
-      experience: { status: false, remarks: "" },
-      eligibility: { status: false, remarks: "" },
-    },
-    preferred: {
-      education: { status: false, remarks: "" },
-      training: { status: false, remarks: "" },
-      experience: { status: false, remarks: "" },
-      eligibility: { status: false, remarks: "" },
-    },
-  })
-
-  // 🧩 Fetch applicant qualifications from backend
   useEffect(() => {
-  if (!open || !applicant?.id) return
-  const fetchQualifications = async () => {
-    try {
-      setIsLoadingProfile(true)
-      const { data } = await axios.get(
-        route("vacancies.applicants.qualifications", applicant.id)
-      )
-      setProfileData({
-        education: data.educations || [],
-        training: data.learnings || [],
-        experience: data.workExperiences || [],
-        eligibility: data.eligibilities || [],
-      })
-    } catch (error) {
-      console.error("Error fetching qualifications:", error)
-    } finally {
-      setIsLoadingProfile(false)
-    }
-  }
+    if (!open || !applicant?.id) return
 
-  fetchQualifications()
-}, [open, applicant?.id])
+    const fetchQualifications = async () => {
+      try {
+        setIsLoadingProfile(true)
+        const { data } = await axios.get(
+          route("vacancies.applicants.qualifications", applicant.id)
+        )
+
+        setProfileData({
+          education: data.educations || [],
+          training: data.learnings || [],
+          experience: data.workExperiences || [],
+          eligibility: data.eligibilities || [],
+        })
+      } catch (error) {
+        console.error("Error fetching qualifications:", error)
+        setProfileData(emptyProfileData)
+      } finally {
+        setIsLoadingProfile(false)
+      }
+    }
+
+    fetchQualifications()
+  }, [open, applicant?.id])
+
+  useEffect(() => {
+    if (!open) return
+
+    setForm(createDefaultForm())
+  }, [open, applicant?.id])
 
   const handleQualificationChange = (section, key, field, value) => {
     setForm((prev) => ({
@@ -91,6 +102,7 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 800))
       console.log("Assessment saved for:", applicant?.name, form)
@@ -100,7 +112,6 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
     }
   }
 
-  // 🧩 Build qualifications dynamically from vacancy props
   const prescribedQualifications = [
     { key: "education", label: "Education", required: vacancy?.prescribed_education || "" },
     { key: "training", label: "Training", required: vacancy?.prescribed_training || "" },
@@ -115,7 +126,6 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
     { key: "eligibility", label: "Eligibility", required: vacancy?.preferred_eligibility || "" },
   ]
 
-  // 🧠 Compute section statuses
   const prescribedStatus = useMemo(() => {
     const allPassed = Object.values(form.prescribed).every((q) => q.status)
     return allPassed ? "Passed" : "Failed"
@@ -135,44 +145,105 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
     const items = profileData[key] || []
     if (!items.length) return <span className="text-gray-400 text-xs italic">No record</span>
 
-    // Custom display per type
     switch (key) {
       case "education":
         return (
-          <ul className="text-xs list-disc ml-4">
-            {items.map((edu, i) => (
-              <li key={i}>
-                {edu.degree || edu.course} – {edu.school_name} ({edu.to_year})
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="text-xs">
+                  <TableHead>Education</TableHead>
+                  <TableHead className="w-[90px]">Year</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((edu, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-xs">
+                      {[edu.course, edu.school].filter(Boolean).join(" - ") || "No details"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {edu.to_year || edu.year_graduated || "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )
       case "training":
         return (
-          <ul className="text-xs list-disc ml-4">
-            {items.map((t, i) => (
-              <li key={i}>
-                {t.title} ({t.hours_no} hrs)
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="text-xs">
+                  <TableHead>Training</TableHead>
+                  <TableHead className="w-[120px]">Date</TableHead>
+                  <TableHead className="w-[90px] text-right">Hours</TableHead>
+                </TableRow>
+              </TableHeader>
+            </Table>
+
+            <div className="max-h-48 overflow-y-auto">
+              <Table>
+                <TableBody>
+                  {items.map((training, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs">
+                        {training.title || "Untitled training"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {training.from_date || training.to_date
+                          ? formatDateRange(training.from_date, training.to_date)
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-xs text-right">
+                        {training.hours_no || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
         )
       case "experience":
-        return (
-          <ul className="text-xs list-disc ml-4">
-            {items.map((exp, i) => (
-              <li key={i}>
-                {exp.position_title} – {exp.company_name}
-              </li>
-            ))}
-          </ul>
-        )
+      return (
+        <div className="rounded-md border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="text-xs">
+                <TableHead>Position and Agency</TableHead>
+                <TableHead className="w-[140px]">Duration</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((experience, i) => (
+                <TableRow key={i}>
+                  <TableCell className="text-xs">
+                    {[experience.position_title, experience.company_name]
+                      .filter(Boolean)
+                      .join(" - ") || "No details"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {experience.from_date || experience.to_date
+                      ? formatDateRange(experience.from_date, experience.to_date)
+                      : "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )
       case "eligibility":
         return (
           <ul className="text-xs list-disc ml-4">
-            {items.map((e, i) => (
+            {items.map((eligibility, i) => (
               <li key={i}>
-                {e.eligibility} ({e.rating || "No rating"})
+                {eligibility.eligibility || "Untitled eligibility"}
+                {` (${eligibility.rating || "No rating"})`}
               </li>
             ))}
           </ul>
@@ -203,45 +274,48 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted">
-              <TableHead className="w-[30%]">Qualification</TableHead>
-              <TableHead className="w-[25%]">From Profile</TableHead>
-              <TableHead className="w-[15%] text-center">Status</TableHead>
-              <TableHead className="w-[30%]">Remarks</TableHead>
+              <TableHead className="w-[20%]">Qualification</TableHead>
+              <TableHead className="w-[50%]">From Profile</TableHead>
+              <TableHead className="w-[10%] text-center">Status</TableHead>
+              <TableHead className="w-[25%]">Remarks</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {qualifications.map((q) => (
-              <TableRow key={`${sectionName}-${q.key}`}>
+            {qualifications.map((qualification) => (
+              <TableRow
+                key={`${sectionName}-${qualification.key}`}
+                className="hover:bg-transparent data-[state=selected]:bg-transparent"
+              >
                 <TableCell className="font-medium align-top pt-3">
-                  <span>{q.label}</span>
+                  <span>{qualification.label}</span>
                   <div className="text-xs mt-1">
-                    {q.required ? (
+                    {qualification.required ? (
                       <div
                         className="prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: q.required }}
+                        dangerouslySetInnerHTML={{ __html: qualification.required }}
                       />
                     ) : (
-                      <span className="text-gray-400 italic">—</span>
+                      <span className="text-gray-400 italic">-</span>
                     )}
                   </div>
                 </TableCell>
 
-                <TableCell className="align-top pt-3">{renderProfileColumn(q.key)}</TableCell>
+                <TableCell className="align-top pt-3">{renderProfileColumn(qualification.key)}</TableCell>
 
                 <TableCell className="text-center align-top pt-3">
                   <Switch
-                    checked={form[sectionName][q.key].status}
-                    onCheckedChange={(val) =>
-                      handleQualificationChange(sectionName, q.key, "status", val)
+                    checked={form[sectionName][qualification.key].status}
+                    onCheckedChange={(value) =>
+                      handleQualificationChange(sectionName, qualification.key, "status", value)
                     }
                   />
                 </TableCell>
 
                 <TableCell className="align-top pt-3">
                   <Textarea
-                    value={form[sectionName][q.key].remarks}
+                    value={form[sectionName][qualification.key].remarks}
                     onChange={(e) =>
-                      handleQualificationChange(sectionName, q.key, "remarks", e.target.value)
+                      handleQualificationChange(sectionName, qualification.key, "remarks", e.target.value)
                     }
                   />
                 </TableCell>
@@ -285,7 +359,7 @@ const AssessApplicantForm = ({ open, onClose, applicant, vacancy }) => {
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-6 pb-4">
+          <form id="assessment-form" onSubmit={handleSubmit} className="flex flex-col gap-6 pb-4">
             {renderQualificationTable(
               "prescribed",
               "CSC-Prescribed Qualifications",

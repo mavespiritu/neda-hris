@@ -10,11 +10,14 @@ import VacancyInfo from "./VacancyInfo/index"
 import Requirements from "./Requirements/index"
 import Applicants from "./Applicants/index"
 import BeiQuestions from "./BeiQuestions/index"
+import Assessment from "./Assessment/index"
 import { store } from "./store"
 import { useToast } from "@/hooks/use-toast"
 
 const ViewVacancy = () => {
-  const { vacancy } = usePage().props
+  const { props, url } = usePage()
+  const { vacancy } = props
+  const initialTab = new URLSearchParams(url.split("?")[1] || "").get("tab")
   const { deleteVacancy } = store()
   const { toast } = useToast()
   const form = useForm()
@@ -37,11 +40,13 @@ const ViewVacancy = () => {
     { key: "Details", label: "Vacancy Details" },
     { key: "Requirements", label: "Requirements" },
     { key: "Applicants", label: "Applicants" },
-    { key: "BEI Questions", label: "BEI Questions" },
     { key: "Assessment", label: "Assessment" },
+    { key: "BEI Questions", label: "BEI Questions" },
   ]
 
-  const [currentTab, setCurrentTab] = useState("Details")
+  const [currentTab, setCurrentTab] = useState(
+    menuItems.some((item) => item.key === initialTab) ? initialTab : "Details"
+  )
 
   return (
     <div className="h-full flex flex-col gap-2">
@@ -149,6 +154,7 @@ const ViewVacancy = () => {
           {currentTab === "Requirements" && <Requirements />}
           {currentTab === "Applicants" && <Applicants />}
           {currentTab === "BEI Questions" && <BeiQuestions />}
+          {currentTab === "Assessment" && <Assessment />}
         </ScrollArea>
       </div>
     </div>

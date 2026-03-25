@@ -36,6 +36,7 @@ class ApplicantsController extends Controller
     public function index($id, Request $request)
     {
         $conn = DB::connection('mysql');
+        $conn2 = DB::connection('mysql2');
 
         $user = auth()->user();
         if (!$user) {
@@ -48,22 +49,43 @@ class ApplicantsController extends Controller
             return response()->json(['message' => 'Forbidden: Only HR roles can access'], 403);
         }
 
+        $publication = $conn2->table('publication_vacancies as pv')
+            ->join('publication as p', 'p.id', '=', 'pv.publication_id')
+            ->where('pv.vacancy_id', $id)
+            ->select('p.date_closed')
+            ->first();
+
+        $editRequestDeadline = $publication?->date_closed
+            ? Carbon::parse($publication->date_closed)->addDays(5)->endOfDay()
+            : null;
+
+        if ($editRequestDeadline && now()->greaterThan($editRequestDeadline)) {
+            $conn->table('app_edit_requests')
+                ->where('vacancy_id', $id)
+                ->where('status', 'Open')
+                ->update([
+                    'status' => 'Expired',
+                    'closed_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        }
+
         $search = $request->input('search', '');
 
         $applicantsQuery = $conn->table('application as a')
             ->join('application_applicant as aa', 'aa.application_id', '=', 'a.id')
             ->select(
                 'a.id',
+                'a.applicant_id',
+                'a.user_id',
                 DB::raw("UPPER(aa.last_name) AS lastname"),
                 DB::raw("UPPER(aa.first_name) AS firstname"),
                 DB::raw("UPPER(LEFT(aa.middle_name, 1)) AS middlename"),
                 DB::raw("
                     CONCAT(
-                        UPPER(LEFT(aa.last_name, 1)),
-                        LOWER(SUBSTRING(aa.last_name, 2)),
+                        aa.last_name,
                         ', ',
-                        UPPER(LEFT(aa.first_name, 1)),
-                        LOWER(SUBSTRING(aa.first_name, 2)),
+                        aa.first_name,
                         IF(
                             aa.middle_name IS NULL OR aa.middle_name = '',
                             '',
@@ -83,7 +105,8 @@ class ApplicantsController extends Controller
             ->where('a.status', 'Submitted')
             ->orderBy('aa.last_name')
             ->orderBy('aa.first_name')
-            ->orderBy('aa.middle_name');
+            ->orderBy('aa.middle_name')
+            ->orderByDesc('a.id');
 
         if (!empty($search)) {
             $search = strtolower($search);
@@ -96,6 +119,86 @@ class ApplicantsController extends Controller
         }
 
         $applicants = $applicantsQuery->get();
+
+        $assessmentStatuses = $conn->table('app_assessments')
+            ->select('application_id', 'stage', 'overall_status', 'assessed_at')
+            ->whereIn('application_id', $applicants->pluck('id'))
+            ->get()
+            ->groupBy('application_id');
+        $examResults = $conn->table('app_exam_results')
+            ->select('application_id', 'test_type', 'status', 'date_conducted', 'score')
+            ->whereIn('application_id', $applicants->pluck('id'))
+            ->get()
+            ->groupBy('application_id');
+        $rankingResults = $conn->table('app_ranking_results')
+            ->select('application_id', 'rank', 'date_ranked')
+            ->whereIn('application_id', $applicants->pluck('id'))
+            ->get()
+            ->keyBy('application_id');
+        $editRequests = $conn->table('app_edit_requests')
+            ->select('application_id', 'status', 'remarks', 'opened_at', 'expires_at', 'closed_at')
+            ->whereIn('application_id', $applicants->pluck('id'))
+            ->orderByDesc('id')
+            ->get()
+            ->unique('application_id')
+            ->keyBy('application_id');
+
+        $applicants = $applicants->map(function ($applicant) use ($assessmentStatuses, $examResults, $rankingResults, $editRequests, $editRequestDeadline) {
+            $statuses = $assessmentStatuses->get($applicant->id, collect())->keyBy('stage');
+            $results = $examResults->get($applicant->id, collect())->keyBy('test_type');
+            $skillTest = $results->get('Skill Test');
+            $dpe = $results->get('DPE');
+            $ranking = $rankingResults->get($applicant->id);
+            $editRequest = $editRequests->get($applicant->id);
+
+            $applicant->secretariat_assessment_status = optional($statuses->get('secretariat'))->overall_status;
+            $applicant->hrmpsb_assessment_status = optional($statuses->get('hrmpsb'))->overall_status;
+            $applicant->secretariat_assessed_at = optional($statuses->get('secretariat'))->assessed_at;
+            $applicant->hrmpsb_assessed_at = optional($statuses->get('hrmpsb'))->assessed_at;
+            $applicant->rank = $ranking->rank ?? null;
+            $applicant->date_ranked = $ranking->date_ranked ?? null;
+            $applicant->skill_test_result = $skillTest->status ?? null;
+            $applicant->skill_test_date_conducted = $skillTest->date_conducted ?? null;
+            $applicant->skill_test_score = $skillTest->score ?? null;
+            $applicant->dpe_result = $dpe->status ?? null;
+            $applicant->dpe_date_conducted = $dpe->date_conducted ?? null;
+            $applicant->dpe_score = $dpe->score ?? null;
+            $applicant->edit_request_status = $editRequest->status ?? null;
+            $applicant->edit_request_remarks = $editRequest->remarks ?? null;
+            $applicant->edit_request_opened_at = $editRequest->opened_at ?? null;
+            $applicant->edit_request_expires_at = $editRequest->expires_at ?? $editRequestDeadline?->toDateTimeString();
+            $applicant->edit_request_closed_at = $editRequest->closed_at ?? null;
+            $applicant->edit_request_deadline = $editRequestDeadline?->toDateTimeString();
+            $applicant->can_open_edit_request = $editRequestDeadline
+                ? now()->lessThanOrEqualTo($editRequestDeadline) && ! empty($applicant->email_address)
+                : false;
+
+            return $applicant;
+        })
+            ->sortByDesc(function ($applicant) {
+                return ($applicant->date_submitted ?? '') . '|' . str_pad((string) $applicant->id, 20, '0', STR_PAD_LEFT);
+            })
+            ->groupBy(function ($applicant) {
+                $normalize = function ($value) {
+                    return strtolower(trim((string) $value));
+                };
+
+                return implode('|', [
+                    $normalize($applicant->lastname ?? ''),
+                    $normalize($applicant->firstname ?? ''),
+                    $normalize($applicant->middlename ?? ''),
+                    $normalize($applicant->user_id ?? ''),
+                ]);
+            })
+            ->map(function ($group) {
+                return $group->first();
+            })
+            ->sortBy([
+                ['lastname', 'asc'],
+                ['firstname', 'asc'],
+                ['middlename', 'asc'],
+            ])
+            ->values();
 
         return response()->json([
             'data' => $applicants
@@ -155,7 +258,7 @@ class ApplicantsController extends Controller
             $application->type
         );
 
-        return $conn2->table('vacancy_requirements')
+        $requirements = $conn2->table('vacancy_requirements')
             ->select([
                 'vacancy_requirements.*',
                 'recruitment_requirements.connected_to'
@@ -207,6 +310,187 @@ class ApplicantsController extends Controller
 
                 return $req;
             });
+
+        return $this->replaceRequirementSubItemsWithSubmittedApplicationData($application, $requirements);
+    }
+
+    private function replaceRequirementSubItemsWithSubmittedApplicationData($application, $requirements)
+    {
+        $conn = DB::connection('mysql');
+        $normalizeText = function ($value) {
+            $text = strtolower(trim((string) $value));
+            return preg_replace('/\s+/', ' ', $text);
+        };
+        $normalizeDate = fn ($value) => trim(substr((string) ($value ?? ''), 0, 10));
+
+        $educationRequirement = collect($requirements)->firstWhere('connected_to', 'Educational Background');
+        $eligibilityRequirement = collect($requirements)->firstWhere('connected_to', 'Civil Service Eligibility');
+        $learningRequirement = collect($requirements)->firstWhere('connected_to', 'Learning and Development');
+        $workRequirement = collect($requirements)->firstWhere('connected_to', 'Work Experience');
+
+        $educationItems = collect($educationRequirement->subItems ?? []);
+        $eligibilityItems = collect($eligibilityRequirement->subItems ?? []);
+        $learningItems = collect($learningRequirement->subItems ?? []);
+
+        $workItems = collect($workRequirement->subItems ?? []);
+
+        $submittedEducations = $conn->table('application_education')
+            ->where('application_id', $application->id)
+            ->whereNotIn('level', ['Elementary', 'Secondary'])
+            ->orderByDesc('to_year')
+            ->get()
+            ->map(function ($item) use ($educationItems, $normalizeText) {
+                $matchedEducation = $educationItems->first(function ($education) use ($item, $normalizeText) {
+                    return $normalizeText($education->level ?? '') === $normalizeText($item->level ?? '')
+                        && $normalizeText($education->school ?? '') === $normalizeText($item->school ?? '')
+                        && $normalizeText($education->course ?? '') === $normalizeText($item->course ?? '')
+                        && trim((string) ($education->year_graduated ?? $education->to_year ?? '')) === trim((string) ($item->year_graduated ?? $item->to_year ?? ''));
+                });
+
+                if (!$matchedEducation) {
+                    $matchedEducation = $educationItems->first(function ($education) use ($item, $normalizeText) {
+                        return $normalizeText($education->school ?? '') === $normalizeText($item->school ?? '')
+                            && $normalizeText($education->course ?? '') === $normalizeText($item->course ?? '');
+                    });
+                }
+
+                $item->files = collect($matchedEducation->files ?? [])->values();
+
+                return $item;
+            })
+            ->values();
+
+        $submittedEligibilities = $conn->table('application_eligibility')
+            ->where('application_id', $application->id)
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($item) use ($eligibilityItems, $normalizeText, $normalizeDate) {
+                $matchedEligibility = $eligibilityItems->first(function ($eligibility) use ($item, $normalizeText, $normalizeDate) {
+                    return $normalizeText($eligibility->eligibility ?? '') === $normalizeText($item->eligibility ?? '')
+                        && $normalizeDate($eligibility->exam_date ?? '') === $normalizeDate($item->exam_date ?? '');
+                });
+
+                if (!$matchedEligibility) {
+                    $matchedEligibility = $eligibilityItems->first(function ($eligibility) use ($item, $normalizeText) {
+                        return $normalizeText($eligibility->eligibility ?? '') === $normalizeText($item->eligibility ?? '');
+                    });
+                }
+
+                $item->files = collect($matchedEligibility->files ?? [])->values();
+
+                return $item;
+            })
+            ->values();
+
+        $submittedLearnings = $conn->table('application_learning')
+            ->where('application_id', $application->id)
+            ->orderByDesc('from_date')
+            ->get()
+            ->map(function ($item) use ($learningItems, $normalizeText, $normalizeDate) {
+                $matchedLearning = $learningItems->first(function ($learning) use ($item, $normalizeText, $normalizeDate) {
+                    return $normalizeText($learning->seminar_title ?? '') === $normalizeText($item->seminar_title ?? '')
+                        && $normalizeDate($learning->from_date ?? '') === $normalizeDate($item->from_date ?? '');
+                });
+
+                if (!$matchedLearning) {
+                    $matchedLearning = $learningItems->first(function ($learning) use ($item, $normalizeText) {
+                        return $normalizeText($learning->seminar_title ?? '') === $normalizeText($item->seminar_title ?? '');
+                    });
+                }
+
+                $item->files = collect($matchedLearning->files ?? [])->values();
+
+                return $item;
+            })
+            ->values();
+
+        $submittedWorks = $conn->table('application_work_experience')
+            ->where('application_id', $application->id)
+            ->orderByDesc('from_date')
+            ->get()
+            ->map(function ($item) use ($workItems) {
+                $normalizeText = function ($value) {
+                    $text = strtolower(trim((string) $value));
+                    return preg_replace('/\s+/', ' ', $text);
+                };
+                $normalizeDate = fn ($value) => trim(substr((string) ($value ?? ''), 0, 10));
+                $normalizeAmount = function ($value) {
+                    if ($value === null || $value === '') {
+                        return '';
+                    }
+
+                    return number_format((float) $value, 2, '.', '');
+                };
+
+                $agency = $normalizeText($item->agency ?? '');
+                $position = $normalizeText($item->position ?? '');
+                $fromDate = $normalizeDate($item->from_date ?? '');
+                $toDate = $normalizeDate($item->to_date ?? '');
+                $salary = $normalizeAmount($item->monthly_salary ?? '');
+
+                $matchedWork = $workItems->first(function ($work) use ($agency, $position, $fromDate, $toDate, $salary, $normalizeText, $normalizeDate, $normalizeAmount) {
+                    return $normalizeText($work->agency ?? '') === $agency
+                        && $normalizeText($work->position ?? '') === $position
+                        && $normalizeDate($work->from_date ?? '') === $fromDate
+                        && $normalizeDate($work->to_date ?? '') === $toDate
+                        && $normalizeAmount($work->monthly_salary ?? '') === $salary;
+                });
+
+                if (!$matchedWork) {
+                    $matchedWork = $workItems->first(function ($work) use ($agency, $position, $fromDate, $salary, $normalizeText, $normalizeDate, $normalizeAmount) {
+                        return $normalizeText($work->agency ?? '') === $agency
+                            && $normalizeText($work->position ?? '') === $position
+                            && $normalizeDate($work->from_date ?? '') === $fromDate
+                            && $normalizeAmount($work->monthly_salary ?? '') === $salary;
+                    });
+                }
+
+                if (!$matchedWork) {
+                    $matchedWork = $workItems->first(function ($work) use ($agency, $position, $toDate, $salary, $normalizeText, $normalizeDate, $normalizeAmount) {
+                        return $normalizeText($work->agency ?? '') === $agency
+                            && $normalizeText($work->position ?? '') === $position
+                            && $normalizeDate($work->to_date ?? '') === $toDate
+                            && $normalizeAmount($work->monthly_salary ?? '') === $salary;
+                    });
+                }
+
+                if (!$matchedWork) {
+                    $matchedWork = $workItems->first(function ($work) use ($agency, $position, $normalizeText) {
+                        return $normalizeText($work->agency ?? '') === $agency
+                            && $normalizeText($work->position ?? '') === $position;
+                    });
+                }
+
+                $item->files = collect($matchedWork->files ?? [])->values();
+
+                return $item;
+            })
+            ->values();
+
+        return collect($requirements)->map(function ($req) use (
+            $submittedEducations,
+            $submittedEligibilities,
+            $submittedLearnings,
+            $submittedWorks
+        ) {
+            if ($req->connected_to === 'Educational Background') {
+                $req->subItems = $submittedEducations;
+            }
+
+            if ($req->connected_to === 'Civil Service Eligibility') {
+                $req->subItems = $submittedEligibilities;
+            }
+
+            if ($req->connected_to === 'Learning and Development') {
+                $req->subItems = $submittedLearnings;
+            }
+
+            if ($req->connected_to === 'Work Experience') {
+                $req->subItems = $submittedWorks;
+            }
+
+            return $req;
+        });
     }
 
     private function normalizeFilenamePart(?string $value): string
@@ -428,27 +712,184 @@ class ApplicantsController extends Controller
             return response()->json(['message' => 'Application not found'], 404);
         }
 
-        $educations = $conn->table('application_education')
+        $requirements = collect($this->buildRequirementsData($application));
+
+        $educationRequirement = $requirements->firstWhere('connected_to', 'Educational Background');
+        $eligibilityRequirement = $requirements->firstWhere('connected_to', 'Civil Service Eligibility');
+        $learningRequirement = $requirements->firstWhere('connected_to', 'Learning and Development');
+        $workRequirement = $requirements->firstWhere('connected_to', 'Work Experience');
+
+        $educations = collect($educationRequirement->subItems ?? [])
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id ?? null,
+                    'level' => $item->level ?? '',
+                    'course' => $item->course ?? '',
+                    'school' => $item->school ?? '',
+                    'highest_attainment' => $item->highest_attainment ?? '',
+                    'from_year' => $item->from_year ?? '',
+                    'to_year' => $item->to_year ?? '',
+                    'year_graduated' => $item->year_graduated ?? '',
+                    'files' => collect($item->files ?? [])->values()->all(),
+                ];
+            })
+            ->values();
+
+        $eligibilities = collect($eligibilityRequirement->subItems ?? [])
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id ?? null,
+                    'eligibility' => $item->eligibility ?? '',
+                    'rating' => $item->rating ?? '',
+                    'exam_date' => $item->exam_date ?? '',
+                    'exam_place' => $item->exam_place ?? '',
+                    'license_no' => $item->license_no ?? '',
+                    'validity_date' => $item->validity_date ?? '',
+                    'files' => collect($item->files ?? [])->values()->all(),
+                ];
+            })
+            ->values();
+
+        $learnings = collect($learningRequirement->subItems ?? [])
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id ?? null,
+                    'title' => $item->seminar_title ?? $item->title ?? '',
+                    'hours_no' => $item->hours ?? $item->hours_ ?? $item->hours_no ?? '',
+                    'from_date' => $item->from_date ?? '',
+                    'to_date' => $item->to_date ?? '',
+                    'participation' => $item->participation ?? '',
+                    'conducted_by' => $item->conducted_by ?? '',
+                    'files' => collect($item->files ?? [])->values()->all(),
+                ];
+            })
+            ->values();
+
+        $workExperiences = collect($workRequirement->subItems ?? [])
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id ?? null,
+                    'position_title' => $item->position ?? $item->position_title ?? '',
+                    'company_name' => $item->agency ?? $item->company_name ?? '',
+                    'monthly_salary' => $item->monthly_salary ?? '',
+                    'appointment' => $item->appointment ?? '',
+                    'from_date' => $item->from_date ?? '',
+                    'to_date' => $item->to_date ?? '',
+                    'is_present' => (bool) ($item->isPresent ?? $item->is_present ?? false),
+                    'files' => collect($item->files ?? [])->values()->all(),
+                ];
+            })
+            ->values();
+
+        $offenseQuestions = $conn->table('application_question')
             ->where('application_id', $application->id)
-            ->whereNotIn('level', ['Elementary', 'Secondary'])
-            ->orderByDesc('to_year')
-            ->get();
+            ->where(function ($query) {
+                $query->where(function ($subQuery) {
+                    $subQuery->where('item_no', '35')
+                        ->whereIn('list', ['A', 'B']);
+                })->orWhere(function ($subQuery) {
+                    $subQuery->where('item_no', '36');
+                });
+            })
+            ->get()
+            ->map(function ($item) {
+                $label = match (true) {
+                    $item->item_no === '35' && $item->list === 'A' => 'Found Guilty with Administrative Offense',
+                    $item->item_no === '35' && $item->list === 'B' => 'Criminally Charged Before Any Court',
+                    $item->item_no === '36' => 'Convicted of Any Crime or Violation',
+                    default => 'Offense Record',
+                };
 
-        $eligibilities = $conn->table('application_eligibility')
+                return [
+                    'id' => $item->id ?? null,
+                    'item_no' => $item->item_no ?? '',
+                    'list' => $item->list ?? '',
+                    'label' => $label,
+                    'answer' => strtolower($item->answer ?? 'no'),
+                    'details' => $item->details ?? '',
+                ];
+            })
+            ->values();
+
+        $specialStatusQuestions = $conn->table('application_question')
             ->where('application_id', $application->id)
-            ->orderByDesc('id')
-            ->get();
+            ->where('item_no', '40')
+            ->whereIn('list', ['A', 'B', 'C'])
+            ->get()
+            ->map(function ($item) {
+                $label = match ($item->list) {
+                    'A' => 'Member of Any Indigenous Group',
+                    'B' => 'Person with Disability',
+                    'C' => 'Solo Parent',
+                    default => 'Special Status',
+                };
 
-        $totalTrainingHours = $conn->table('application_learning')
-        ->where('application_id', $application->id)
-        ->sum('hours_');
+                return [
+                    'id' => $item->id ?? null,
+                    'item_no' => $item->item_no ?? '',
+                    'list' => $item->list ?? '',
+                    'label' => $label,
+                    'answer' => strtolower($item->answer ?? 'no'),
+                    'details' => $item->details ?? '',
+                ];
+            })
+            ->values();
 
-        dd($educations);
+        $requirementsSummary = $requirements->map(function ($requirement) {
+            $requirementFiles = collect($requirement->files ?? []);
+            $hasSubItems = collect($requirement->subItems ?? [])->isNotEmpty();
+            $subItemFiles = collect($requirement->subItems ?? [])
+                ->flatMap(function ($subItem) {
+                    return collect($subItem->files ?? []);
+                });
 
-        $workExperiences = $conn->table('application_work_experience')
-            ->where('application_id', $application->id)
-            ->orderByDesc('from_date')
-            ->get();
+            $allFiles = ($hasSubItems ? $subItemFiles : $requirementFiles)
+                ->filter(fn ($file) => !empty($file->filepath ?? $file->path ?? null))
+                ->unique(function ($file) {
+                    return ($file->filepath ?? $file->path ?? '') . '|' . ($file->filename ?? $file->name ?? '');
+                })
+                ->values();
+
+            $isSubmitted = $allFiles->isNotEmpty();
+
+            return [
+                'id' => $requirement->id ?? null,
+                'requirement' => $requirement->requirement ?? '',
+                'connected_to' => $requirement->connected_to ?? null,
+                'has_sub_items' => $hasSubItems,
+                'is_submitted' => $isSubmitted,
+                'files' => $allFiles->map(function ($file) {
+                    return [
+                        'id' => $file->id ?? null,
+                        'filename' => $file->filename ?? $file->name ?? null,
+                        'filepath' => $file->filepath ?? $file->path ?? null,
+                        'filetype' => $file->filetype ?? $file->type ?? null,
+                        'filesize' => $file->filesize ?? $file->size ?? null,
+                    ];
+                })->all(),
+            ];
+        })->values();
+
+        return response()->json([
+            'educations' => $educations,
+            'eligibilities' => $eligibilities,
+            'learnings' => $learnings,
+            'workExperiences' => $workExperiences,
+            'offenseQuestions' => $offenseQuestions,
+            'specialStatusQuestions' => $specialStatusQuestions,
+            'requirementsSummary' => [
+                'is_complete' => $requirementsSummary->every(fn ($item) => $item['is_submitted']),
+                'submitted_count' => $requirementsSummary->where('is_submitted', true)->count(),
+                'total_count' => $requirementsSummary->count(),
+                'items' => $requirementsSummary->all(),
+                'missing_items' => $requirementsSummary
+                    ->where('is_submitted', false)
+                    ->pluck('requirement')
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ],
+        ]);
     }
 
     public function getPersonalInformation($id)

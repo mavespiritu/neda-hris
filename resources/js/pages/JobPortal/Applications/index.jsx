@@ -115,7 +115,14 @@ const Applications = () => {
                         <span className="text-xs text-gray-500">Created on {formatDate(app.date_created)}</span>
                       </div>
                     ) : (
-                      <span className="capitalize">{app.latest_status}</span>
+                      <div className="flex flex-col">
+                        <span className="capitalize">{app.latest_status}</span>
+                        {app.can_edit_submission && (
+                          <span className="text-xs font-medium text-green-600">
+                            Editable until {formatDate(app.edit_request_expires_at)}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>
@@ -170,9 +177,18 @@ const Applications = () => {
                               </AlertDialog>
                             </>
                           ) : (
-                            <span className="block text-sm text-gray-500 px-3 py-2">
-                              No actions available
-                            </span>
+                            app.can_edit_submission ? (
+                              <button
+                                onClick={() => router.get(route("jobs.apply", { hashedId: app.hashed_id }))}
+                                className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100"
+                              >
+                                Continue Editing
+                              </button>
+                            ) : (
+                              <span className="block text-sm text-gray-500 px-3 py-2">
+                                No actions available
+                              </span>
+                            )
                           )}
                         </PopoverContent>
                       </Popover>

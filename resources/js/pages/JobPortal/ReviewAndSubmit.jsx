@@ -16,10 +16,16 @@ import {
 import { router } from "@inertiajs/react"
 import { useToast } from "@/hooks/use-toast"
 
-const ReviewAndSubmit = ({ job }) => {
+const ReviewAndSubmit = ({ job, isReopenedSubmission = false }) => {
   const { toast } = useToast()
   const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  const submitLabel = isReopenedSubmission ? "Re-submit Application" : "Submit Application"
+  const successTitle = isReopenedSubmission ? "Application Re-submitted" : "Application Submitted"
+  const successDescription = isReopenedSubmission
+    ? "You’ll receive an email confirmation that your updated application was re-submitted."
+    : "You’ll receive an email confirmation shortly."
 
   const handleSubmitApplication = () => {
     setSubmitting(true)
@@ -29,12 +35,10 @@ const ReviewAndSubmit = ({ job }) => {
       {
         onSuccess: () => {
           toast({
-            title: "Application Submitted",
-            description: "You’ll receive an email confirmation shortly.",
+            title: successTitle,
+            description: successDescription,
           })
           setSubmitting(false)
-
-          // next to do: implement notification
         },
         onError: () => setSubmitting(false),
       }
@@ -43,12 +47,25 @@ const ReviewAndSubmit = ({ job }) => {
 
   return (
     <div className="border rounded-lg p-6 flex flex-col gap-8 bg-white">
-      {/* Header */}
       <h3 className="tracking-tight font-semibold text-lg flex items-center text-black">
         <Send className="mr-2 h-4 w-4" />
-        Submit Application
+        {submitLabel}
       </h3>
-      
+
+      {isReopenedSubmission && (
+        <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 flex items-start gap-2 border-l-4 border-amber-400">
+          <CircleAlert className="w-4 h-4 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold">Resubmission Instructions</p>
+            <p>
+              Review your submitted profile snapshot and uploaded documents carefully. When you re-submit,
+              your updated application will replace the previously submitted copy and DEPDev will be notified
+              that you submitted a revised application.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2 border-l-4 border-red-400">
         <CircleAlert className="w-4 h-4 mt-0.5" />
         <p className="font-semibold">
@@ -56,12 +73,20 @@ const ReviewAndSubmit = ({ job }) => {
         </p>
       </div>
 
-      {/* Review Checklist */}
       <div className="space-y-3">
         <h4 className="font-bold text-lg">Before You Submit</h4>
         <p className="text-sm text-muted-foreground">
-          Please make sure all details are correct and all documents are uploaded. Once submitted, you
-          <span className="font-semibold"> won’t be able to make any edits</span>.
+          {isReopenedSubmission ? (
+            <>
+              Please make sure your corrections are final and all revised supporting documents are uploaded.
+              After re-submission, the edit window will close and your updated application will return to review.
+            </>
+          ) : (
+            <>
+              Please make sure all details are correct and all documents are uploaded. Once submitted, you
+              <span className="font-semibold"> won’t be able to make any edits</span>.
+            </>
+          )}
         </p>
 
         <ul className="text-sm space-y-2 pl-6 list-disc">
@@ -69,10 +94,12 @@ const ReviewAndSubmit = ({ job }) => {
           <li>Your supporting documents (eligibility, training, work experience, etc.) are complete.</li>
           <li>Your Personal Data Sheet (PDS) is updated and attached.</li>
           <li>Uploaded files are clear, valid, and readable.</li>
+          {isReopenedSubmission && (
+            <li>The revisions requested by DEPDev have been addressed before re-submitting.</li>
+          )}
         </ul>
       </div>
 
-      {/* Notes and Policies */}
       <div className="space-y-3">
         <h4 className="font-bold text-lg">Important Notes</h4>
         <p className="text-sm">
@@ -92,11 +119,10 @@ const ReviewAndSubmit = ({ job }) => {
         </p>
       </div>
 
-      {/* Terms and Consent */}
       <div className="space-y-2">
         <h4 className="font-bold text-lg">Terms and Conditions</h4>
         <p className="text-sm">
-          By checking the box below and clicking <span className="font-bold">Submit Application</span>, I confirm that:
+          By checking the box below and clicking <span className="font-bold">{submitLabel}</span>, I confirm that:
         </p>
         <ul className="text-sm space-y-1 pl-6 list-disc">
           <li>The information provided is true and correct to the best of my knowledge.</li>
@@ -105,24 +131,32 @@ const ReviewAndSubmit = ({ job }) => {
         </ul>
       </div>
 
-      {/* Agreement Checkbox */}
       <div className="flex items-center gap-2">
         <Checkbox id="agree" checked={agreed} onCheckedChange={(checked) => setAgreed(!!checked)} />
         <label htmlFor="agree" className="text-sm cursor-pointer select-none">
-          I have reviewed my application and agree to the Terms and Conditions.
+          {isReopenedSubmission
+            ? "I have reviewed my revised application and agree to the Terms and Conditions."
+            : "I have reviewed my application and agree to the Terms and Conditions."}
         </label>
       </div>
 
-      {/* After Submission Info */}
       <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 flex items-start gap-2 border-l-4 border-blue-400">
         <CheckCircle2 className="w-4 h-4 mt-0.5" />
         <p>
-          After submitting, you will receive an email confirmation. You can also track your application
-          status anytime under <span className="font-semibold">My Applications</span> in your account.
+          {isReopenedSubmission ? (
+            <>
+              After re-submitting, you will receive an email confirmation that your updated application was received.
+              You can also track your application status anytime under <span className="font-semibold">My Applications</span> in your account.
+            </>
+          ) : (
+            <>
+              After submitting, you will receive an email confirmation. You can also track your application
+              status anytime under <span className="font-semibold">My Applications</span> in your account.
+            </>
+          )}
         </p>
       </div>
 
-      {/* Submit Button + Dialog */}
       <div className="flex">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -132,15 +166,17 @@ const ReviewAndSubmit = ({ job }) => {
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {submitting && <Loader2 className="animate-spin w-4 h-4 mr-2" />}
-              Submit Application
+              {submitLabel}
             </Button>
           </AlertDialogTrigger>
 
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
+              <AlertDialogTitle>{isReopenedSubmission ? "Confirm Re-submission" : "Confirm Submission"}</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to submit your application? You won’t be able to edit it after submission.
+                {isReopenedSubmission
+                  ? "Are you sure you want to re-submit your updated application? The current edit window will close after re-submission."
+                  : "Are you sure you want to submit your application? You won’t be able to edit it after submission."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -149,7 +185,7 @@ const ReviewAndSubmit = ({ job }) => {
                 onClick={handleSubmitApplication}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                Yes, submit now
+                {isReopenedSubmission ? "Yes, re-submit now" : "Yes, submit now"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

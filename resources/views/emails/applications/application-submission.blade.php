@@ -1,9 +1,13 @@
 @component('mail::message')
-# Job Application
+# {{ !empty($isResubmission) ? 'Job Application Re-submission' : 'Job Application' }}
 
 Greetings <b>{{ $applicantName }}</b>,
 
+@if(!empty($isResubmission))
+Your updated application for the position <b>{{ $position }}</b> with Plantilla Item No. <b>{{  $itemNo }}</b> was successfully re-submitted and received by the Human Resource Unit of Department of Economy, Planning, and Development Regional Office 1.
+@else
 Your application for the position <b>{{ $position }}</b> with Plantilla Item No. <b>{{  $itemNo }}</b> was successfully submitted and received by the Human Resource Unit of Department of Economy, Planning, and Development Regional Office 1.
+@endif
 
 
 Your application is now under review. You will be notified via email for any updates regarding your application. 

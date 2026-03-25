@@ -23,7 +23,11 @@ import {
   Banknote,
   Phone,
   Mail,
-  Building
+  Building,
+  Users,
+  FileText,
+  BadgeCheck,
+  CircleCheck
 } from "lucide-react"
 import { TypewriterEffect } from "@/components/TypewriterEffect"
 import { usePage, router, Link } from '@inertiajs/react'
@@ -52,7 +56,7 @@ const words = [
 
 const Home = () => {
   
-  const { data: { jobs } } = usePage().props
+  const { data: { jobs, stats = {} } } = usePage().props
 
   const {
       data,
@@ -125,23 +129,28 @@ const Home = () => {
       ], [])
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="relative flex flex-col min-h-screen overflow-hidden bg-slate-50">
       <Head title="DEPDev RO1 HRIS" />
 
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-28 -left-24 h-80 w-80 rounded-full bg-blue-200/60 blur-3xl" />
+        <div className="absolute top-40 -right-24 h-96 w-96 rounded-full bg-cyan-200/50 blur-3xl" />
+        <div className="absolute bottom-20 left-1/3 h-72 w-72 rounded-full bg-indigo-100/70 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_30%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.07),transparent_28%),linear-gradient(to_bottom,rgba(255,255,255,0.85),rgba(248,250,252,0.96))]" />
+      </div>
+
       {/* Hero Section */}
-    <section
-        className="relative bg-gray-100 bg-cover bg-center bg-no-repeat"
+      <section
+        className="relative bg-cover bg-center bg-no-repeat"
         style={{
-            backgroundImage: "url('/images/rpfp.png')",
+            backgroundImage: "linear-gradient(135deg, rgba(15,23,42,0.05), rgba(59,130,246,0.03)), url('/images/rpfp.png')",
             backgroundPosition: "center center",
             backgroundSize: "60%",
             backgroundRepeat: "no-repeat",
         }}
         >
-        {/* Light gray overlay */}
-        <div className="absolute inset-0 bg-gray-100/40 backdrop-blur-[4px]" />
+        <div className="absolute inset-0 bg-slate-50/55 backdrop-blur-[4px]" />
 
-        {/* Fade to white at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto h-[360px] px-6 md:px-12 lg:px-20 flex justify-center items-center">
@@ -216,6 +225,60 @@ const Home = () => {
           )}
           </Button>
         </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
+          <Card className="border-0 bg-white/80 backdrop-blur-md shadow-[0_10px_30px_-16px_rgba(15,23,42,0.35)]">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-500">Positions posted</p>
+                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">
+                    {Number(stats.positions_posted || 0).toLocaleString("en-US")}
+                  </h3>
+                  <p className="text-xs text-slate-500">Open vacancies currently published</p>
+                </div>
+                <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">
+                  <Briefcase className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 bg-white/80 backdrop-blur-md shadow-[0_10px_30px_-16px_rgba(15,23,42,0.35)]">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-500">Applicants catered</p>
+                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">
+                    {Number(stats.applicants_catered || 0).toLocaleString("en-US")}
+                  </h3>
+                  <p className="text-xs text-slate-500">Distinct applicants who submitted</p>
+                </div>
+                <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 bg-white/80 backdrop-blur-md shadow-[0_10px_30px_-16px_rgba(15,23,42,0.35)]">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-slate-500">Applications submitted</p>
+                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">
+                    {Number(stats.applications_submitted || 0).toLocaleString("en-US")}
+                  </h3>
+                  <p className="text-xs text-slate-500">Total submitted applications on record</p>
+                </div>
+                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
+                  <FileText className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {showFilter && (
             <Card className="p-4 mb-4 animate-fadeIn">
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -289,8 +352,8 @@ const Home = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
           {data.length > 0 ? (
             data.map((job) => (
-              <Card key={job.id} className="flex flex-col">
-                <CardHeader className="border-t-4 border-blue-500 rounded">
+              <Card key={job.id} className="flex flex-col border-0 bg-white/85 backdrop-blur-sm shadow-[0_12px_30px_-18px_rgba(15,23,42,0.45)]">
+                <CardHeader className="border-t-4 border-blue-500 rounded-t-xl bg-white/70">
                   <CardTitle className="leading-tight text-xl flex flex-col gap-2">
                     <JobTypeBadge type={job.appointment_status} />
                     {job.position_description}
@@ -353,7 +416,7 @@ const Home = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#003366] text-white mt-auto">
+      <footer className="bg-[#003366] text-white mt-auto shadow-[0_-12px_30px_-18px_rgba(15,23,42,0.4)]">
         <div
           className="max-w-7xl mx-auto px-6 md:px-12 lg:px-20 py-10 grid gap-8 text-sm text-white/80 
                     grid-cols-1 sm:grid-cols-2 lg:grid-cols-[30%_30%_20%_20%]"

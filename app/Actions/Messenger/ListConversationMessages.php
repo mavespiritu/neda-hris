@@ -3,15 +3,16 @@
 namespace App\Actions\Messenger;
 
 use App\Models\Conversation;
+use App\Traits\BuildsEmployeeNameMap;
+use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
-use App\Traits\BuildsEmployeeNameMap;
 
 class ListConversationMessages
 {
-    use AsAction, BuildsEmployeeNameMap;
+    use AsAction, BuildsEmployeeNameMap, UsesMessengerRedisCache;
 
     public function authorize(ActionRequest $request): bool
     {
@@ -30,50 +31,56 @@ class ListConversationMessages
     public function asController(ActionRequest $request, Conversation $conversation): JsonResponse
     {
         $beforeId = $request->integer('before_id');
-        $limit = $request->integer('limit', 20);
+        $limit = max(1, min($request->integer('limit', 20), 50));
+        $version = $this->currentConversationMessagesVersion((int) $conversation->id);
+        $cacheKey = "messenger:messages:{$conversation->id}:{$version}:{$limit}:" . ($beforeId ?: 'latest');
 
-        $q = $conversation->messages()
-            ->with(['sender:id,name,ipms_id', 'replyTo.sender:id,name,ipms_id'])
-            ->when($beforeId, fn ($qq) => $qq->where('id', '<', $beforeId))
-            ->orderByDesc('id')
-            ->limit($limit + 1);
+        $payload = $this->messengerCache()->remember($cacheKey, now()->addSeconds(15), function () use ($conversation, $beforeId, $limit) {
+            $q = $conversation->messages()
+                ->with(['sender:id,name,ipms_id', 'replyTo.sender:id,name,ipms_id'])
+                ->when($beforeId, fn ($qq) => $qq->where('id', '<', $beforeId))
+                ->orderByDesc('id')
+                ->limit($limit + 1);
 
-        $rows = $q->get();
-        $hasMore = $rows->count() > $limit;
-        $rows = $rows->take($limit)->reverse()->values();
+            $rows = $q->get();
+            $hasMore = $rows->count() > $limit;
+            $rows = $rows->take($limit)->reverse()->values();
 
-        $empIds = $rows
-            ->flatMap(function ($m) {
-                return [
-                    $m->sender?->ipms_id,
-                    $m->replyTo?->sender?->ipms_id,
-                ];
-            })
-            ->filter()
-            ->values();
+            $empIds = $rows
+                ->flatMap(function ($m) {
+                    return [
+                        $m->sender?->ipms_id,
+                        $m->replyTo?->sender?->ipms_id,
+                    ];
+                })
+                ->filter()
+                ->values();
 
-        $employeesById = $this->employeeNamesById($empIds, 'mysql3');
-        $gendersById = $this->employeeGenderById($empIds, 'mysql3');
+            $employeesById = $this->employeeNamesById($empIds, 'mysql3');
+            $gendersById = $this->employeeGenderById($empIds, 'mysql3');
 
-        $data = $rows->map(fn ($m) => [
-            'id' => $m->id,
-            'sender_id' => $m->sender_id,
-            'sender_name' => $this->employeeName($employeesById, $m->sender?->ipms_id),
-            'sender_ipms_id' => $m->sender?->ipms_id,
-            'body' => $m->body,
-            'created_at' => $m->created_at?->toISOString(),
-            'sender_gender' => $gendersById[$m->sender?->ipms_id] ?? null,
-            'reply_to' => $m->replyTo ? [
-                'id' => $m->replyTo->id,
-                'body' => $m->replyTo->body,
-                'sender_name' => $this->employeeName($employeesById, $m->replyTo->sender?->ipms_id) ?? $m->replyTo->sender?->name ?? 'User',
-                'sender_gender' => $gendersById[$m->replyTo->sender?->ipms_id] ?? null,
-            ] : null,
-        ]);
+            $data = $rows->map(fn ($m) => [
+                'id' => $m->id,
+                'sender_id' => $m->sender_id,
+                'sender_name' => $this->employeeName($employeesById, $m->sender?->ipms_id),
+                'sender_ipms_id' => $m->sender?->ipms_id,
+                'body' => $m->body,
+                'created_at' => $m->created_at?->toISOString(),
+                'sender_gender' => $gendersById[$m->sender?->ipms_id] ?? null,
+                'reply_to' => $m->replyTo ? [
+                    'id' => $m->replyTo->id,
+                    'body' => $m->replyTo->body,
+                    'sender_name' => $this->employeeName($employeesById, $m->replyTo->sender?->ipms_id) ?? $m->replyTo->sender?->name ?? 'User',
+                    'sender_gender' => $gendersById[$m->replyTo->sender?->ipms_id] ?? null,
+                ] : null,
+            ]);
 
-        return response()->json([
-            'data' => $data,
-            'has_more' => $hasMore,
-        ]);
+            return [
+                'data' => $data,
+                'has_more' => $hasMore,
+            ];
+        });
+
+        return response()->json($payload);
     }
 }

@@ -7,13 +7,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Reply } from "lucide-react"
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 
 const CLUSTER_SECONDS = 90
 
 export default function Messages({
   me,
   orderedMessages,
+  activeConversationId,
   listRef,
   handleMessageScroll,
   messagesLoading,
@@ -28,8 +29,23 @@ export default function Messages({
   replyTo,
   setReplyTo
 }) {
+  const lastAutoScrollRef = useRef(null)
 
-    const getReplyLabel = (m) => {
+  useLayoutEffect(() => {
+    if (!activeConversationId || messagesLoading || loadingOlder) return
+
+    const key = `${activeConversationId}:${orderedMessages.length}`
+    if (lastAutoScrollRef.current === key) return
+
+    const el = listRef.current
+    if (el) {
+      el.scrollTop = el.scrollHeight
+    }
+
+    lastAutoScrollRef.current = key
+  }, [activeConversationId, orderedMessages.length, messagesLoading, loadingOlder, listRef])
+
+  const getReplyLabel = (m) => {
     if (!m.reply_to) return ""
 
     const meId = Number(me?.id)
@@ -59,7 +75,7 @@ export default function Messages({
         if (senderGender === "male") return `${senderName} replied to himself`
         if (senderGender === "female") return `${senderName} replied to herself`
         return `${senderName} replied to themselves`
-    }
+  }
 
     if (isMine) return `You replied to ${repliedSenderName}`
     if (repliedToMe) return `${senderName} replied to you`

@@ -47,15 +47,20 @@ class NotifyHROfApplicationSubmission extends Notification implements ShouldQueu
         $conn4 = DB::connection('mysql4');
 
         $url = route("vacancies.show", $this->payload['vacancyId']);
+        $isResubmission = (bool) ($this->payload['isResubmission'] ?? false);
+        $subject = $isResubmission
+            ? '(DEPDev RO1 HRIS) APPLICATION UPDATED AND RESUBMITTED '.$this->payload['itemNo']
+            : '(DEPDev RO1 HRIS) APPLICATION '.$this->payload['itemNo'];
 
         try {
             $mail = (new MailMessage)
-                    ->subject('(DEPDev RO1 HRIS) APPLICATION '.$this->payload['itemNo'])
+                    ->subject($subject)
                     ->markdown('emails.applications.application-submission-hr', [
                         'applicantName' => $this->payload['applicantName'],
                         'position' => $this->payload['position'],
                         'itemNo' => $this->payload['itemNo'],
                         'url' => $url,
+                        'isResubmission' => $isResubmission,
                     ]);
                 
             return $mail;

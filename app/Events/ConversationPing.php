@@ -3,13 +3,16 @@
 namespace App\Events;
 
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class ConversationPing implements ShouldBroadcastNow
+class ConversationPing implements ShouldBroadcast
 {
     use Dispatchable, SerializesModels;
+
+    public string $connection = 'redis';
+    public string $queue = 'messenger';
 
     public function __construct(
         public int $recipientUserId,
