@@ -15,8 +15,8 @@ const GuestHeader = () => {
             <div className="flex items-center">
                 <img src="/images/logo.png" alt="DEPDev Logo" className="w-14 h-auto object-contain mr-4" />
                 <Link href="/" className="flex flex-col">
-                    <span className="text-xl font-bold">Job Portal</span>
-                    <span className="text-sm">DEPDev Regional Office 1</span>
+                    <span className="text-normal font-bold">JobPortal</span>
+                    <span className="text-xs">DEPDev Regional Office 1</span>
                 </Link>
             </div>
 

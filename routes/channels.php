@@ -15,5 +15,13 @@ Broadcast::channel('user.{id}', function ($user, $id) {
 
 
 Broadcast::channel('messenger.presence', function ($user) {
-    return ['id' => $user->id, 'name' => $user->name];
+    if (blank($user->ipms_id ?? null)) {
+        return false;
+    }
+
+    return [
+        'id' => $user->id,
+        'name' => $user->name,
+        'ipms_id' => $user->ipms_id,
+    ];
 });

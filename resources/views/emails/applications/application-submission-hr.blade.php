@@ -3,7 +3,11 @@
 
 Greetings <b>HR Unit</b>,
 
+@if(!empty($isResubmission))
+Please be informed that applicant <b>{{ $applicantName }}</b> has updated and re-submitted the application to the position <b>{{ $position }}</b> with Plantilla Item No. <b>{{  $itemNo }}</b>.
+@else
 Please be informed that applicant <b>{{ $applicantName }}</b> has submitted an application to the position <b>{{ $position }}</b> with Plantilla Item No. <b>{{  $itemNo }}</b>.
+@endif
 
 Click the button below to view details.
 

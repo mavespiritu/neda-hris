@@ -12,7 +12,7 @@ use App\Notifications\Issues\NotifyAdminOfIssueReported;
 
 class NotificationController extends Controller
 {
-    public function submitApplication($id)
+    public function submitApplication($id, bool $isResubmission = false)
     {
         $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
@@ -62,6 +62,7 @@ class NotificationController extends Controller
                 'applicantName' => $applicant->name,
                 'position' => $vacancy->position_description,
                 'itemNo' => $vacancy->item_no,
+                'isResubmission' => $isResubmission,
             ];
 
             Notification::send($user, new NotifyApplicantOfApplicationSubmission($payload));
@@ -70,7 +71,7 @@ class NotificationController extends Controller
         }
     }
 
-    public function receiveApplication($id)
+    public function receiveApplication($id, bool $isResubmission = false)
     {
         $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
@@ -120,6 +121,7 @@ class NotificationController extends Controller
                 'position' => $vacancy->position_description,
                 'itemNo' => $vacancy->item_no,
                 'vacancyId' => $vacancy->id,
+                'isResubmission' => $isResubmission,
             ];
 
             Notification::send($hrs, new NotifyHROfApplicationSubmission($payload));

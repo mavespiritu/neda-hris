@@ -47,12 +47,18 @@ class NotifyApplicantOfApplicationSubmission extends Notification implements Sho
         $conn4 = DB::connection('mysql4');
 
         try {
+            $isResubmission = (bool) ($this->payload['isResubmission'] ?? false);
             $mail = (new MailMessage)
-                    ->subject('(DEPDev RO1 HRIS) Your application was successfully submitted')
+                    ->subject(
+                        $isResubmission
+                            ? '(DEPDev RO1 HRIS) Your application was successfully re-submitted'
+                            : '(DEPDev RO1 HRIS) Your application was successfully submitted'
+                    )
                     ->markdown('emails.applications.application-submission', [
                         'applicantName' => $this->payload['applicantName'],
                         'position' => $this->payload['position'],
                         'itemNo' => $this->payload['itemNo'],
+                        'isResubmission' => $isResubmission,
                     ]);
                 
             return $mail;

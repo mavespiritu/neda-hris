@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Traits\BuildsEmployeeNameMap;
+use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use App\Models\User;
@@ -9,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 class HandleInertiaRequests extends Middleware
 {
+    use BuildsEmployeeNameMap, UsesMessengerRedisCache;
+
     /**
      * The root template that is loaded on the first page visit.
      *
@@ -32,6 +36,32 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $authUser = Auth::guard('web')->user() ?? Auth::guard('applicant')->user();
+        $messengerUsers = function () use ($authUser) {
+            if (!$authUser || blank($authUser->ipms_id ?? null)) {
+                return [];
+            }
+
+            $cacheKey = 'messenger:users:' . $authUser->id;
+
+            return $this->messengerCache()->remember($cacheKey, now()->addMinutes(10), function () use ($authUser) {
+                $users = User::query()
+                    ->select(['id', 'ipms_id', 'email'])
+                    ->where('id', '!=', $authUser->id)
+                    ->get();
+
+                $employeesById = $this->employeeNamesById($users->pluck('ipms_id'), 'mysql3');
+
+                return $users
+                    ->map(fn ($u) => [
+                        'id' => (int) $u->id,
+                        'ipms_id' => (string) $u->ipms_id,
+                        'name' => $this->employeeName($employeesById, $u->ipms_id) ?? (string) $u->email,
+                        'email' => (string) ($u->email ?? ''),
+                    ])
+                    ->sortBy('name')
+                    ->values();
+            });
+        };
 
         return [
             ...parent::share($request),
@@ -47,6 +77,7 @@ class HandleInertiaRequests extends Middleware
                     ]
                 ) : null,
             ],
+            'messenger_users' => $messengerUsers,
             'flash' => function () use ($request) {
                 // Get all flashed session data
                 $flashed = $request->session()->get('_flash.old', []);

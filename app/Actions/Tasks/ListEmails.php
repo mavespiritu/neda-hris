@@ -4,6 +4,7 @@ namespace App\Actions\Tasks;
 
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
@@ -14,7 +15,12 @@ class ListEmails
 {
     use AsAction;
 
-    public function asController(Request $request): Response
+    public function authorize(Request $request): bool
+    {
+        return $request->user() instanceof User;
+    }
+
+    public function asController(Request $request): Response|JsonResponse
     {
         $user = $request->user();
 
@@ -22,54 +28,116 @@ class ListEmails
             abort(403, 'Only staff accounts can access Outlook inbox.');
         }
 
+        $token = $this->ensureValidToken($user);
+
+        if ($request->boolean('json')) {
+            if (! $token) {
+                return response()->json([
+                    'messages' => [],
+                    'nextLink' => null,
+                    'error' => 'Microsoft session expired. Please reconnect your account.',
+                ], 401);
+            }
+
+            if ($messageId = $request->input('message_id')) {
+                return response()->json($this->fetchMessageDetail($token, $messageId));
+            }
+
+            return response()->json($this->fetchMessagePage(
+                token: $token,
+                search: (string) $request->input('search', ''),
+                filter: (string) $request->input('filter', ''),
+                cursor: $request->input('cursor')
+            ));
+        }
+
         if (! $user->microsoft_access_token) {
             return Inertia::render('Tasks/Emails/index', [
                 'messages' => [],
+                'nextLink' => null,
                 'needsMicrosoftConnect' => true,
                 'connectUrl' => route('auth.microsoft'),
                 'error' => null,
             ]);
         }
 
-        $token = $this->ensureValidToken($user);
-
         if (! $token) {
             return Inertia::render('Tasks/Emails/index', [
                 'messages' => [],
+                'nextLink' => null,
                 'needsMicrosoftConnect' => true,
                 'connectUrl' => route('auth.microsoft'),
                 'error' => 'Microsoft session expired. Please reconnect your account.',
             ]);
         }
 
-        $response = Http::withToken($token)->get('https://graph.microsoft.com/v1.0/me/messages', [
-            '$top' => 20,
-            '$orderby' => 'receivedDateTime DESC',
-            '$select' => 'id,subject,from,receivedDateTime,isRead,bodyPreview,webLink',
+        $page = $this->fetchMessagePage(
+            token: $token,
+            search: (string) $request->input('search', ''),
+            filter: (string) $request->input('filter', ''),
+        );
+
+        return Inertia::render('Tasks/Emails/index', [
+            'messages' => $page['messages'],
+            'nextLink' => $page['nextLink'],
+            'search' => (string) $request->input('search', ''),
+            'filter' => (string) $request->input('filter', ''),
+            'needsMicrosoftConnect' => false,
+            'connectUrl' => route('auth.microsoft'),
+            'error' => null,
+            'initialSelectedMessageId' => $page['messages'][0]['id'] ?? null,
         ]);
+    }
 
-        if ($response->status() === 401) {
-            $user->forceFill([
-                'microsoft_access_token' => null,
-                'microsoft_refresh_token' => null,
-                'microsoft_token_expires_at' => null,
-            ])->save();
+    private function fetchMessagePage(string $token, string $search = '', string $filter = '', ?string $cursor = null): array
+    {
+        $request = Http::withToken($token);
 
-            return Inertia::render('Tasks/Emails', [
-                'messages' => [],
-                'needsMicrosoftConnect' => true,
-                'connectUrl' => route('auth.microsoft'),
-                'error' => 'Microsoft token is invalid. Please reconnect your account.',
-            ]);
+        if ($cursor) {
+            $response = $request
+                ->withHeaders(['ConsistencyLevel' => 'eventual'])
+                ->get($cursor);
+        } else {
+            $search = preg_replace('/\s+/', ' ', trim($search));
+            $search = str_replace(['"', "\r", "\n"], ['', ' ', ' '], $search);
+
+            $query = [
+                '$top' => 20,
+                '$select' => 'id,subject,from,receivedDateTime,isRead,bodyPreview,webLink,hasAttachments',
+            ];
+
+            if ($search !== '') {
+                $query['$search'] = "\"{$search}\"";
+            } else {
+                $query['$orderby'] = 'receivedDateTime DESC';
+            }
+
+            if ($filter === 'unread') {
+                $query['$filter'] = 'isRead eq false';
+            } elseif ($filter === 'attachments') {
+                $query['$filter'] = 'hasAttachments eq true';
+            }
+
+            $request = $request;
+
+            if ($search !== '' || in_array($filter, ['unread', 'attachments'], true)) {
+                $request = $request->withHeaders(['ConsistencyLevel' => 'eventual']);
+                $query['$count'] = 'true';
+            }
+
+            $response = $request->get('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages', $query);
         }
 
         if (! $response->successful()) {
-            return Inertia::render('Tasks/Emails/index', [
+            $graphError = $response->json('error.message')
+                ?? $response->json('error.innerError.message')
+                ?? null;
+
+            return [
                 'messages' => [],
-                'needsMicrosoftConnect' => false,
-                'connectUrl' => route('auth.microsoft'),
-                'error' => 'Unable to fetch Outlook mail right now.',
-            ]);
+                'nextLink' => null,
+                'error' => $graphError ?: 'Unable to fetch Outlook mail right now.',
+            ];
         }
 
         $messages = collect($response->json('value', []))
@@ -83,16 +151,108 @@ class ListEmails
                     'receivedAt' => $message['receivedDateTime'] ?? null,
                     'isRead' => (bool) ($message['isRead'] ?? false),
                     'webLink' => $message['webLink'] ?? null,
+                    'hasAttachments' => (bool) ($message['hasAttachments'] ?? false),
                 ];
             })
-            ->values();
+            ->values()
+            ->all();
 
-        return Inertia::render('Tasks/Emails/index', [
+        $json = $response->json();
+
+        return [
             'messages' => $messages,
-            'needsMicrosoftConnect' => false,
-            'connectUrl' => route('auth.microsoft'),
+            'nextLink' => $json['@odata.nextLink'] ?? null,
             'error' => null,
+        ];
+    }
+
+    private function fetchMessageDetail(string $token, string $messageId): array
+    {
+        $response = Http::withToken($token)->get("https://graph.microsoft.com/v1.0/me/messages/{$messageId}", [
+            '$select' => 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,isRead,bodyPreview,webLink,body,hasAttachments,importance',
         ]);
+
+        if (! $response->successful()) {
+            return [
+                'message' => null,
+                'error' => 'Unable to open the selected email right now.',
+            ];
+        }
+
+        $message = $response->json();
+        $isRead = (bool) ($message['isRead'] ?? false);
+
+        if (! $isRead) {
+            Http::withToken($token)->patch("https://graph.microsoft.com/v1.0/me/messages/{$messageId}", [
+                'isRead' => true,
+            ]);
+        }
+
+        $attachmentsResponse = Http::withToken($token)->get("https://graph.microsoft.com/v1.0/me/messages/{$messageId}/attachments", [
+            '$select' => 'id,name,contentType,size,isInline,@odata.type',
+        ]);
+
+        $attachments = [];
+
+        if ($attachmentsResponse->successful()) {
+            foreach ($attachmentsResponse->json('value', []) as $attachment) {
+                if (! str_contains($attachment['@odata.type'] ?? '', 'fileAttachment')) {
+                    continue;
+                }
+
+                $attachmentId = $attachment['id'] ?? null;
+
+                if (! $attachmentId) {
+                    continue;
+                }
+
+                $attachmentDetail = Http::withToken($token)->get(
+                    "https://graph.microsoft.com/v1.0/me/messages/{$messageId}/attachments/{$attachmentId}"
+                );
+
+                $attachmentPayload = $attachmentDetail->successful()
+                    ? $attachmentDetail->json()
+                    : $attachment;
+
+                $attachments[] = [
+                    'id' => $attachmentPayload['id'] ?? $attachmentId,
+                    'name' => $attachmentPayload['name'] ?? 'Attachment',
+                    'contentType' => $attachmentPayload['contentType'] ?? 'application/octet-stream',
+                    'size' => (int) ($attachmentPayload['size'] ?? 0),
+                    'isInline' => (bool) ($attachmentPayload['isInline'] ?? false),
+                    'contentBytes' => $attachmentPayload['contentBytes'] ?? null,
+                ];
+            }
+        }
+
+        return [
+            'message' => [
+                'id' => $message['id'] ?? null,
+                'subject' => $message['subject'] ?: '(No subject)',
+                'from' => $message['from']['emailAddress']['address'] ?? null,
+                'senderName' => $message['from']['emailAddress']['name'] ?? null,
+                'toRecipients' => collect($message['toRecipients'] ?? [])
+                    ->map(fn ($recipient) => $recipient['emailAddress']['address'] ?? null)
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'ccRecipients' => collect($message['ccRecipients'] ?? [])
+                    ->map(fn ($recipient) => $recipient['emailAddress']['address'] ?? null)
+                    ->filter()
+                    ->values()
+                    ->all(),
+                'preview' => $message['bodyPreview'] ?? '',
+                'body' => $message['body']['content'] ?? '',
+                'bodyType' => $message['body']['contentType'] ?? 'text',
+                'receivedAt' => $message['receivedDateTime'] ?? null,
+                'isRead' => true,
+                'webLink' => $message['webLink'] ?? null,
+                'importance' => $message['importance'] ?? 'normal',
+                'hasAttachments' => (bool) ($message['hasAttachments'] ?? false),
+                'attachments' => $attachments,
+            ],
+            'error' => null,
+        ];
     }
 
     private function ensureValidToken(User $user): ?string

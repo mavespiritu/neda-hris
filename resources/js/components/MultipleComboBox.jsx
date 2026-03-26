@@ -29,6 +29,8 @@ const MultipleComboBox = ({
   width,
   labelWidth,
   className
+  ,
+  renderLabel,
 }) => {
   const [open, setOpen] = useState(false)
   const [selectedValues, setSelectedValues] = useState(value)
@@ -68,7 +70,7 @@ const MultipleComboBox = ({
     if (selectedValues.length === 1) {
       const selectedItem = items.find((item) => item.value === selectedValues[0])
       return {
-        text: selectedItem ? selectedItem.label : (placeholder || `Choose ${name}...`),
+        text: selectedItem ? (renderLabel ? renderLabel(selectedItem) : selectedItem.label) : (placeholder || `Choose ${name}...`),
         isPlaceholder: !selectedItem
       }
     }
@@ -137,7 +139,7 @@ const MultipleComboBox = ({
                           : "opacity-0"
                       )}
                     />
-                    {item.label}
+                    {renderLabel ? renderLabel(item) : item.label}
                   </CommandItem>
                 ))}
               </CommandGroup>

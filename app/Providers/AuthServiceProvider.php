@@ -13,6 +13,7 @@ use App\Policies\FlexiplaceSchedulePolicy;
 use App\Policies\FlexiplaceDtrPolicy;
 use App\Policies\FlexiplaceReportsPolicy;
 use App\Policies\GapAnalysisPolicy;
+use App\Policies\PerformancePolicy;
 use App\Policies\SettingsPolicy;
 
 class AuthServiceProvider extends ServiceProvider
@@ -39,7 +40,7 @@ class AuthServiceProvider extends ServiceProvider
         Gate::policy('flexiplace.dtr', FlexiplaceDtrPolicy::class);
         Gate::policy('flexiplace.reports', FlexiplaceReportsPolicy::class);
         Gate::policy('gap-analysis', GapAnalysisPolicy::class);
+        Gate::policy('performance', PerformancePolicy::class);
         Gate::policy('settings', SettingsPolicy::class);
     }
 }
-

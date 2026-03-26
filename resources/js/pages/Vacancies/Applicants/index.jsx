@@ -1,19 +1,25 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import axios from "axios"
 import { usePage } from "@inertiajs/react"
-import { Loader2, Mail, Phone, Calendar, Search } from "lucide-react"
+import { Loader2, Mail, Phone, Calendar, Download } from "lucide-react"
 import PageTitle from "@/components/PageTitle"
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { formatDateWithTime, formatFullName } from "@/lib/utils.jsx"
+import { formatDate, formatDateWithTime, formatFullName } from "@/lib/utils.jsx"
 import { store } from "./store"
 import { Button } from "@/components/ui/button"
+import SingleComboBox from "@/components/SingleComboBox"
+import RichTextEditor from "@/components/RichTextEditor"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import Profile from "./Profile"
 import Documents from "./Documents"
-import AssessApplicantForm from "./AssessApplicantForm"
 import ShortlistingResult from "./ShortlistingResult"
-import { router } from "@inertiajs/react"
-import { Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -22,22 +28,20 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/hooks/use-toast"
 
 const Applicants = () => {
   const { vacancy } = usePage().props
   const { applicants, fetchApplicants } = store()
-  const [search, setSearch] = useState("")
-  const [activeApplicantId, setActiveApplicantId] = useState(null)
-  const [loadingApplicantId, setLoadingApplicantId] = useState(null)
+  const { toast } = useToast()
   const [selectedApplicant, setSelectedApplicant] = useState(null)
-  const [isAssessDialogOpen, setIsAssessDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("profile")
   const [isDownloading, setIsDownloading] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
-
-  const handleSearch = () => {
-    fetchApplicants(vacancy.id, { search })
-  }
+  const [showEditRequestDialog, setShowEditRequestDialog] = useState(false)
+  const [editRequestRemarks, setEditRequestRemarks] = useState("")
+  const [isSavingEditRequest, setIsSavingEditRequest] = useState(false)
 
   const handleDownloadDocuments = () => {
     if (!selectedApplicant) return
@@ -59,17 +63,92 @@ const Applicants = () => {
     fetchApplicants(vacancy.id)
   }, [])
 
-  const handleAccordionChange = (val) => {
-    if (val) {
-      const id = parseInt(val.replace("applicant-", ""))
-      setActiveApplicantId(id)
-      setLoadingApplicantId(id)
+  useEffect(() => {
+    const rows = applicants.data?.data || []
 
-      // Automatically clear the loader after a small delay
-      setTimeout(() => setLoadingApplicantId(null), 400)
-    } else {
-      setActiveApplicantId(null)
-      setLoadingApplicantId(null)
+    if (!rows.length) {
+      if (selectedApplicant) {
+        setSelectedApplicant(null)
+      }
+      return
+    }
+
+    const latestSelectedApplicant = selectedApplicant
+      ? rows.find((row) => row.id === selectedApplicant.id)
+      : null
+
+    if (!selectedApplicant || !latestSelectedApplicant) {
+      setSelectedApplicant(rows[0])
+      setActiveTab("profile")
+      return
+    }
+
+    if (latestSelectedApplicant !== selectedApplicant) {
+      setSelectedApplicant(latestSelectedApplicant)
+    }
+  }, [applicants.data, selectedApplicant])
+
+  const applicantOptions = (applicants.data?.data || []).map((applicant) => ({
+    value: applicant.id,
+    label: formatFullName(applicant.name),
+    email_address: applicant.email_address,
+  }))
+
+  useEffect(() => {
+    if (!showEditRequestDialog) return
+
+    setEditRequestRemarks(selectedApplicant?.edit_request_remarks || "")
+  }, [showEditRequestDialog, selectedApplicant?.id, selectedApplicant?.edit_request_remarks])
+
+  const canOpenEditRequest = Boolean(selectedApplicant?.can_open_edit_request)
+  const editRequestDeadlineLabel = selectedApplicant?.edit_request_deadline
+    ? formatDate(selectedApplicant.edit_request_deadline)
+    : null
+  const editRequestStatusLabel = selectedApplicant?.edit_request_status || "Not yet opened"
+  const editRequestStatusClass = useMemo(() => {
+    switch (selectedApplicant?.edit_request_status) {
+      case "Open":
+        return "text-green-600"
+      case "Expired":
+      case "Closed":
+      case "Cancelled":
+        return "text-red-600"
+      default:
+        return "text-muted-foreground"
+    }
+  }, [selectedApplicant?.edit_request_status])
+
+  const handleSaveEditRequest = async () => {
+    if (!selectedApplicant) return
+
+    setIsSavingEditRequest(true)
+
+    try {
+      await axios.post(
+        route("vacancies.applicants.edit-request.store", {
+          vacancy: vacancy.id,
+          application: selectedApplicant.id,
+        }),
+        {
+          remarks: editRequestRemarks,
+        }
+      )
+
+      toast({
+        title: "Success!",
+        description: "Applicant edit request saved and email notification sent.",
+      })
+
+      setShowEditRequestDialog(false)
+      await fetchApplicants(vacancy.id)
+    } catch (error) {
+      toast({
+        title: error.response?.data?.title || "Edit request not saved",
+        description: error.response?.data?.message || "Please check the remarks and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingEditRequest(false)
     }
   }
 
@@ -93,50 +172,82 @@ const Applicants = () => {
         </Button>
       </div> */}
 
-      <div className="flex flex-col md:flex-row w-full gap-4 h-full">
-        {/* 30% column */}
-        <div className="md:w-[30%] w-full">
+      <div className="flex flex-col md:flex-row w-full gap-4 h-full min-h-0">
+        <div className="hidden md:block md:w-[28%] border rounded-lg overflow-hidden">
           {!applicants.data?.data?.length ? (
-            <div className="flex items-center justify-center min-h-full text-sm text-gray-500">
+            <div className="flex items-center justify-center min-h-[220px] text-sm text-gray-500">
               No applicants found.
             </div>
           ) : (
-            <div className="border rounded-lg overflow-hidden">
-
-              {/* Table Header */}
-              <div className="grid grid-cols-[1fr_auto] bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-600">
-                <span>Name</span>
-                <span>Status</span>
+            <div className="flex h-full flex-col min-h-0">
+              <div className="border-b bg-muted/40 px-4 py-3">
+                <h2 className="font-medium">Applicant List</h2>
+                <p className="text-sm text-muted-foreground">
+                  Select an applicant to view profile and documents.
+                </p>
               </div>
 
-              {/* Table Rows */}
-              <div className="divide-y">
-                {applicants.data.data.map((applicant, idx) => (
-                  <div
-                    key={applicant.id}
-                    className={`grid grid-cols-[1fr_auto] px-4 py-3 text-sm cursor-pointer
-                      ${selectedApplicant?.id === applicant.id ? "bg-gray-100" : "hover:bg-gray-50"}
-                    `}
-                    onClick={() => {
-                      setSelectedApplicant(applicant)
-                      setActiveTab("profile")
-                    }}
-                  >
-                    <span className="truncate font-medium">
-                      {idx + 1}. {formatFullName(applicant.name)}
-                    </span>
+              <ScrollArea className="flex-1">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-8 w-[56px] text-xs">#</TableHead>
+                      <TableHead className="h-8 text-xs">Name</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {applicants.data.data.map((applicant, idx) => {
+                      const isActive = selectedApplicant?.id === applicant.id
 
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      For Assessment
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      return (
+                        <TableRow
+                          key={applicant.id}
+                          className={`cursor-pointer ${
+                            isActive
+                              ? "bg-muted hover:bg-muted"
+                              : "hover:bg-muted/40"
+                          }`}
+                          onClick={() => {
+                            setSelectedApplicant(applicant)
+                            setActiveTab("profile")
+                          }}
+                        >
+                          <TableCell className="text-sm text-muted-foreground">
+                            {idx + 1}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="truncate">{formatFullName(applicant.name)}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {applicant.email_address || "No email"}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
             </div>
           )}
         </div>
-        {/* 70% column */}
-        <div className="md:w-[70%] w-full border rounded-lg p-4">
+
+        <div className="md:w-[72%] w-full border rounded-lg p-4">
+          <div className="mb-4 md:hidden">
+            <SingleComboBox
+              items={applicantOptions}
+              name="applicant"
+              placeholder="Select applicant"
+              value={selectedApplicant?.id ?? null}
+              onChange={(value) => {
+                const applicant = (applicants.data?.data || []).find((item) => item.id === value)
+                if (!applicant) return
+
+                setSelectedApplicant(applicant)
+                setActiveTab("profile")
+              }}
+            />
+          </div>
+
           {!selectedApplicant ? <ShortlistingResult /> : (
             <>
               {/* Header */}
@@ -160,7 +271,11 @@ const Applicants = () => {
                     ) : (
                       <>
                         <Download className="h-4 w-4" />
-                        Download Documents
+                        {`Download ${
+                          selectedApplicant?.lastname
+                            ? selectedApplicant.lastname.charAt(0).toUpperCase() + selectedApplicant.lastname.slice(1).toLowerCase()
+                            : "Applicant"
+                        }'s Documents`}
                       </>
                     )}
                   </Button>
@@ -246,18 +361,105 @@ const Applicants = () => {
                 )}
               </div>
 
-              <div className="mt-6">
-                <Button
-                  onClick={() => setIsAssessDialogOpen(true)}
-                >
-                  Assess Applicant
-                </Button>
+              <div className="mt-6 border-t pt-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold">Application Edit Window</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Allow the applicant to revise the submitted application and notify them through email.
+                    </p>
+                    <p className={`text-sm font-medium ${editRequestStatusClass}`}>
+                      Status: {editRequestStatusLabel}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {editRequestDeadlineLabel
+                        ? `Editing may only be opened until ${editRequestDeadlineLabel}.`
+                        : "No publication due date found for this vacancy."}
+                    </p>
+                    {!selectedApplicant?.email_address && (
+                      <p className="text-xs text-red-600">
+                        This applicant cannot be notified because no email address is available.
+                      </p>
+                    )}
+                    {selectedApplicant?.edit_request_expires_at && selectedApplicant?.edit_request_status === "Open" && (
+                      <p className="text-xs text-muted-foreground">
+                        Current window closes on {formatDate(selectedApplicant.edit_request_expires_at)}.
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={() => setShowEditRequestDialog(true)}
+                    disabled={!canOpenEditRequest}
+                  >
+                    Allow Applicant to Edit Submission
+                  </Button>
+                </div>
               </div>
+
             </>
           )}
         </div>
 
       </div>
+
+      <Dialog open={showEditRequestDialog} onOpenChange={setShowEditRequestDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Allow Applicant to Edit Submission</DialogTitle>
+            <DialogDescription>
+              Send remarks and instructions to the applicant. The edit window will close automatically
+              {editRequestDeadlineLabel ? ` after ${editRequestDeadlineLabel}.` : "."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+              <p>
+                Applicant: <span className="font-medium">{formatFullName(selectedApplicant?.name) || "Applicant"}</span>
+              </p>
+              <p>
+                Email: <span className="font-medium">{selectedApplicant?.email_address || "No email"}</span>
+              </p>
+              {editRequestDeadlineLabel && (
+                <p>
+                  Edit request deadline: <span className="font-medium">{editRequestDeadlineLabel}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Remarks</Label>
+              <RichTextEditor
+                value={editRequestRemarks}
+                onChange={setEditRequestRemarks}
+                minHeight="180px"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowEditRequestDialog(false)}
+              disabled={isSavingEditRequest}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveEditRequest}
+              disabled={isSavingEditRequest}
+              className="gap-2"
+            >
+              {isSavingEditRequest && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send Edit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* <div className="flex flex-1 flex-col min-h-0">
         {applicants.isLoading && (
@@ -348,13 +550,6 @@ const Applicants = () => {
           </Accordion>
         )}
       </div> */}
-
-      <AssessApplicantForm
-        open={isAssessDialogOpen}
-        onClose={() => setIsAssessDialogOpen(false)}
-        applicant={selectedApplicant}
-        vacancy={vacancy}
-      />
     </div>
   )
 }
