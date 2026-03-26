@@ -39,6 +39,7 @@ import {
   const Header = () => {
 
     const { user, isApplicant } = useUser() 
+
     const { post } =  useForm()
 
     const handleLogout = (e) => {
