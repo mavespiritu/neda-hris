@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'guest.any' => \App\Http\Middleware\GuestAny::class,
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            'messenger.staff' => \App\Http\Middleware\EnsureMessengerAccess::class,
             //'access.control' => \App\Http\Middleware\AccessControl::class,
         ]);
 

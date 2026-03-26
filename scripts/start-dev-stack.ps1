@@ -15,6 +15,52 @@ function Resolve-CommandPath {
     return $null
 }
 
+function Resolve-RedisServerPath {
+    $redisCmd = Get-Command redis-server -ErrorAction SilentlyContinue
+    if ($redisCmd -and $redisCmd.Source -and (Test-Path $redisCmd.Source)) {
+        return $redisCmd.Source
+    }
+
+    $knownPaths = @(
+        'C:\laragon\bin\redis\redis-x64-5.0.14.1\redis-server.exe',
+        'C:\laragon\bin\redis\redis-x64-5.0.14.0\redis-server.exe',
+        'C:\laragon\bin\redis\redis-x64-5.0.14\redis-server.exe',
+        'C:\Program Files\Redis\redis-server.exe',
+        'C:\Program Files\Redis\redis-server'
+    )
+
+    $resolved = Resolve-CommandPath $knownPaths
+    if ($resolved) {
+        return $resolved
+    }
+
+    $laragonRedisRoot = 'C:\laragon\bin\redis'
+    if (Test-Path $laragonRedisRoot) {
+        $found = Get-ChildItem -Path $laragonRedisRoot -Recurse -Filter redis-server.exe -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+
+        if ($found) {
+            return $found
+        }
+    }
+
+    return $null
+}
+
+function Test-RedisAlreadyRunning {
+    $redisProcess = Get-Process redis-server -ErrorAction SilentlyContinue
+    if ($redisProcess) {
+        return $true
+    }
+
+    try {
+        $connection = Get-NetTCPConnection -LocalPort 6379 -State Listen -ErrorAction Stop
+        return [bool] $connection
+    } catch {
+        return $false
+    }
+}
+
 function Start-CommandWindow {
     param(
         [string]$Title,
@@ -29,15 +75,12 @@ function Start-CommandWindow {
     ) -WindowStyle Normal | Out-Null
 }
 
-$redisCmd = Get-Command redis-server -ErrorAction SilentlyContinue
-$redisServer = Resolve-CommandPath @(
-    $(if ($redisCmd) { $redisCmd.Source } else { $null }),
-    'C:\laragon\bin\redis\redis-x64-5.0.14\redis-server.exe',
-    'C:\Program Files\Redis\redis-server.exe',
-    'C:\Program Files\Redis\redis-server'
-)
+$redisServer = Resolve-RedisServerPath
+$redisRunning = Test-RedisAlreadyRunning
 
-if ($redisServer) {
+if ($redisRunning) {
+    Write-Host 'Redis is already running. Skipping Redis startup.' -ForegroundColor Green
+} elseif ($redisServer) {
     Start-CommandWindow -Title 'Redis' -Command "`"$redisServer`""
 } else {
     Write-Host 'Redis server not found. Install Redis or add redis-server.exe to PATH before starting Messenger.' -ForegroundColor Yellow

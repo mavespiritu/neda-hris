@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Check, Search, X } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useMessengerShared } from "@/providers/MessengerSharedProvider"
 
 export default function RecipientComposer({
   me,
   safeUsers,
   selectedUserIds,
   setSelectedUserIds,
-  startConversation,
   onPreviewConversation,
   resolveDirectConversationId,
   onlineUserIds,
   avatarUrl,
   autoOpen = false,
 }) {
+  const { onlineUserIds: sharedOnlineUserIds } = useMessengerShared()
+  const resolvedOnlineUserIds = onlineUserIds ?? sharedOnlineUserIds
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
@@ -32,22 +34,18 @@ export default function RecipientComposer({
     [selectedUserIds, recipientMap]
   )
 
+  const isUserOnline = (userId) => resolvedOnlineUserIds?.has(Number(userId))
+
   const finalizeSelection = async () => {
     if (selectedUsers.length === 1) {
       const directConversationId = resolveDirectConversationId?.(selectedUsers[0].id)
       if (directConversationId) {
         onPreviewConversation?.(directConversationId)
-        setQuery("")
-        setOpen(true)
-        return
       }
     }
 
-    const started = await startConversation?.()
-    if (started) {
-      setQuery("")
-      setOpen(false)
-    }
+    setQuery("")
+    setOpen(false)
   }
 
   useEffect(() => {
@@ -115,8 +113,10 @@ export default function RecipientComposer({
     setQuery("")
     if (shouldPreviewDirect) {
       onPreviewConversation?.(shouldPreviewDirect)
+      return
     }
-    setOpen(true)
+
+    setOpen(false)
   }
 
   const removeRecipient = (userId) => {
@@ -148,20 +148,24 @@ export default function RecipientComposer({
             {selectedUsers.length > 0 && (
               <div className="flex items-center">
                 {selectedUsers.slice(0, 2).map((user, index) => (
-                  <Avatar
-                    key={user.id}
-                    className={`h-7 w-7 border-2 border-background ${index > 0 ? "-ml-3" : ""}`}
-                  >
-                    <AvatarImage src={avatarUrl(user.ipms_id)} alt={user.name} loading="lazy" />
-                    <AvatarFallback>
-                      {(user.name || "U")
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div key={user.id} className={`relative ${index > 0 ? "-ml-3" : ""}`}>
+                    <Avatar className="h-7 w-7 border-2 border-background">
+                      <AvatarImage src={avatarUrl(user.ipms_id)} alt={user.name} loading="lazy" />
+                      <AvatarFallback>
+                        {(user.name || "U")
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${
+                        isUserOnline(user.id) ? "bg-green-500" : "bg-red-500"
+                      }`}
+                    />
+                  </div>
                 ))}
 
                 {selectedUsers.length > 2 && (
@@ -186,17 +190,24 @@ export default function RecipientComposer({
                     key={user.id}
                     className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"
                   >
-                    <Avatar className="h-5 w-5">
-                      <AvatarImage src={avatarUrl(user.ipms_id)} alt={user.name} loading="lazy" />
-                      <AvatarFallback>
-                        {(user.name || "U")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <span className="relative shrink-0">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage src={avatarUrl(user.ipms_id)} alt={user.name} loading="lazy" />
+                        <AvatarFallback>
+                          {(user.name || "U")
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white ${
+                          isUserOnline(user.id) ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      />
+                    </span>
                     <span className="max-w-[140px] truncate">{user.name}</span>
                     <button
                       type="button"
@@ -236,7 +247,7 @@ export default function RecipientComposer({
                     <div className="text-xs font-medium text-muted-foreground">Your contacts</div>
                     <button
                       type="button"
-                      onClick={() => void finalizeSelection()}
+                      onClick={() => setOpen(false)}
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                       aria-label="Close recipient list"
                       title="Close"

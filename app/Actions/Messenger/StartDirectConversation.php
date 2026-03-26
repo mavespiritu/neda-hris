@@ -3,6 +3,7 @@
 namespace App\Actions\Messenger;
 
 use App\Models\Conversation;
+use App\Support\MessengerConversationToken;
 use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -52,6 +53,9 @@ class StartDirectConversation
         $this->bumpConversationListVersion($me);
         $this->bumpConversationListVersion($other);
 
-        return response()->json(['id' => $conversation->id]);
+        return response()->json([
+            'id' => $conversation->id,
+            'conversation_token' => MessengerConversationToken::encode((int) $conversation->id),
+        ]);
     }
 }

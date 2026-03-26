@@ -9,7 +9,17 @@ class Message extends Model
     protected $connection = 'mysql4';
     protected $table = 'messages';
 
-    protected $fillable = ['conversation_id', 'sender_id', 'body', 'read_at', 'reply_to_id'];
+    protected $fillable = [
+        'conversation_id',
+        'sender_id',
+        'body',
+        'attachment_path',
+        'attachment_name',
+        'attachment_type',
+        'attachment_size',
+        'read_at',
+        'reply_to_id',
+    ];
     
     protected $casts = [
         'body' => 'encrypted',

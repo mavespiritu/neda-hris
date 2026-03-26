@@ -3,6 +3,7 @@
 namespace App\Actions\Messenger;
 
 use App\Models\User;
+use App\Support\MessengerConversationToken;
 use App\Traits\BuildsEmployeeNameMap;
 use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\Request;
@@ -17,6 +18,14 @@ class ShowMessengerPage
     public function asController(Request $request): Response
     {
         $me = $request->user();
+        $initialConversationId = MessengerConversationToken::decode(
+            $request->route('conversationToken') ? (string) $request->route('conversationToken') : null
+        );
+
+        if (!$me || blank($me->ipms_id ?? null)) {
+            abort(403, 'Messenger is only available for staff accounts.');
+        }
+
         $cacheKey = 'messenger:users:' . ($me?->id ?? 'guest');
 
         $payload = $this->messengerCache()->remember($cacheKey, now()->addMinutes(10), function () use ($me) {
@@ -40,6 +49,7 @@ class ShowMessengerPage
 
         return Inertia::render('Messenger/index', [
             'users' => $payload,
+            'initialConversationId' => $initialConversationId,
         ]);
     }
 }

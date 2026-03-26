@@ -4,18 +4,35 @@ import { Head, usePage } from "@inertiajs/react"
 import Conversations from "./Conversations"
 import SelectedConversation from "./SelectedConversation"
 import Messages from "./Messages"
+import {
+  isConversationListNearBottom,
+  mergeConversationPages,
+  resolveConversationHasMore,
+  sortConversationsByRecent,
+} from "@/lib/messengerConversationPagination"
+import { useConversationReadSync, useMessengerShared } from "@/providers/MessengerSharedProvider"
 
 const CONVO_LIMIT = 20
 const MSG_LIMIT = 20
 
+const readConversationTokenFromLocation = () => {
+  if (typeof window === "undefined") return null
+
+  const segments = window.location.pathname.split("/").filter(Boolean)
+  if (segments[0] !== "messenger" || segments[1] !== "conversation" || !segments[2]) {
+    return null
+  }
+
+  return decodeURIComponent(segments[2])
+}
+
 export default function Index() {
-  const { auth, users = [] } = usePage().props
+  const { auth, users = [], initialConversationId = null } = usePage().props
   const me = auth?.user
 
   const [conversations, setConversations] = useState([])
   const [selectedUserIds, setSelectedUserIds] = useState([])
   const [activeId, setActiveId] = useState(null)
-  const [onlineUserIds, setOnlineUserIds] = useState(new Set())
 
   const [messages, setMessages] = useState([])
   const [body, setBody] = useState("")
@@ -23,12 +40,15 @@ export default function Index() {
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [isCreatingConversation, setIsCreatingConversation] = useState(false)
+  const [conversationReadReceiptsById, setConversationReadReceiptsById] = useState({})
 
   const [conversationsLoading, setConversationsLoading] = useState(false)
   const [loadingMoreConversations, setLoadingMoreConversations] = useState(false)
   const [convoHasMore, setConvoHasMore] = useState(true)
   const [typingUser, setTypingUser] = useState(null)
   const [replyTo, setReplyTo] = useState(null)
+  const { onlineUserIds, markConversationRead } = useMessengerShared()
+  useConversationReadSync(setConversations)
 
   const typingTimeoutRef = useRef(null)
   const lastTypingRef = useRef(0)
@@ -77,31 +97,6 @@ export default function Index() {
     })
   }
 
-  useEffect(() => {
-    if (!window.Echo) {
-      return undefined
-    }
-
-    window.Echo.join("messenger.presence")
-      .here((presenceUsers) => {
-        setOnlineUserIds(new Set(presenceUsers.map((u) => Number(u.id))))
-      })
-      .joining((user) => {
-        setOnlineUserIds((prev) => new Set([...prev, Number(user.id)]))
-      })
-      .leaving((user) => {
-        setOnlineUserIds((prev) => {
-          const next = new Set(prev)
-          next.delete(Number(user.id))
-          return next
-        })
-      })
-
-    return () => {
-      window.Echo.leave("messenger.presence")
-    }
-  }, [])
-
   const safeUsers = useMemo(() => {
     const map = new Map()
 
@@ -124,9 +119,17 @@ export default function Index() {
     return [...map.values()]
   }, [conversations])
 
+  const findConversationByToken = (token) =>
+    safeConversations.find((conversation) => conversation?.conversation_token === token) || null
+
   const activeConversation = useMemo(
     () => safeConversations.find((c) => Number(c.id) === Number(activeId)) || null,
     [safeConversations, activeId]
+  )
+
+  const activeConversationReadReceipts = useMemo(
+    () => conversationReadReceiptsById[Number(activeId)] || [],
+    [activeId, conversationReadReceiptsById]
   )
 
   const selectedUsers = useMemo(() => {
@@ -156,6 +159,16 @@ export default function Index() {
     return messagesByConversationRef.current.get(Number(conversationId)) || null
   }
 
+  const buildPreviewFromMessage = (message = {}) => ({
+    last_message: message?.body ?? "",
+    last_message_at: message?.created_at ?? null,
+    last_message_sender_name: message?.sender_name ?? null,
+    last_message_attachment_path: message?.attachment_path ?? null,
+    last_message_attachment_url: message?.attachment_url ?? null,
+    last_message_attachment_type: message?.attachment_type ?? null,
+    last_message_attachment_name: message?.attachment_name ?? null,
+  })
+
   const fetchConversationMessages = async (conversationId, { beforeId = null, limit = MSG_LIMIT } = {}) => {
     const params = { limit }
     if (beforeId) params.before_id = beforeId
@@ -163,10 +176,11 @@ export default function Index() {
     const res = await axios.get(route("messenger.messages", conversationId), { params })
     const chunk = res.data?.data || []
     const nextHasMore = Boolean(res.data?.has_more)
+    const readReceipts = Array.isArray(res.data?.read_receipts) ? res.data.read_receipts : []
 
     cacheConversationMessages(conversationId, chunk, nextHasMore)
 
-    return { chunk, hasMore: nextHasMore }
+    return { chunk, hasMore: nextHasMore, readReceipts }
   }
 
   const prefetchConversationMessages = async (conversationIds = []) => {
@@ -186,21 +200,22 @@ export default function Index() {
     )
   }
 
-  const updateConversationPreview = (conversationId, lastMessage, lastAt) => {
+  const updateConversationPreview = (conversationId, messageLike = {}) => {
+    const preview = buildPreviewFromMessage(messageLike)
+
     setConversations((prev) => {
       const idx = prev.findIndex((c) => Number(c.id) === Number(conversationId))
       if (idx === -1) return prev
 
       const updated = {
         ...prev[idx],
-        last_message: lastMessage,
-        last_message_at: lastAt,
+        ...preview,
       }
 
       const next = [...prev]
       next.splice(idx, 1)
       next.unshift(updated)
-      return next
+      return sortConversationsByRecent(next)
     })
   }
 
@@ -263,7 +278,7 @@ export default function Index() {
         const next = [...prev]
         next.splice(idx, 1)
         next.unshift(found)
-        return next
+        return sortConversationsByRecent(next)
       }
 
       const created = {
@@ -289,7 +304,7 @@ export default function Index() {
       }
 
       const next = [created, ...prev]
-      return next
+      return sortConversationsByRecent(next)
     })
   }
 
@@ -307,21 +322,14 @@ export default function Index() {
       const chunk = res.data?.data || []
       const hasMoreFromApi = res.data?.has_more
 
-      setConvoHasMore(
-        typeof hasMoreFromApi === "boolean" ? hasMoreFromApi : chunk.length === CONVO_LIMIT
-      )
+      setConvoHasMore(resolveConversationHasMore(hasMoreFromApi, chunk.length, CONVO_LIMIT))
 
       if (append) {
-        setConversations((prev) => {
-          const merged = [...prev, ...chunk]
-          const uniq = new Map()
-          for (const c of merged) uniq.set(c.id, c)
-          return [...uniq.values()]
-        })
+        setConversations((prev) => mergeConversationPages(prev, chunk))
       } else {
-        setConversations(chunk)
+        setConversations(sortConversationsByRecent(chunk))
 
-        if (!activeId && chunk.length) {
+        if (!activeId && chunk.length && !initialConversationId) {
           setActiveId(chunk[0].id)
         }
 
@@ -352,7 +360,7 @@ export default function Index() {
 
     try {
       const convoId = Number(conversationId)
-      const { chunk, hasMore: nextHasMore } = await fetchConversationMessages(convoId, {
+      const { chunk, hasMore: nextHasMore, readReceipts } = await fetchConversationMessages(convoId, {
         beforeId,
         limit: MSG_LIMIT,
       })
@@ -362,6 +370,10 @@ export default function Index() {
       }
 
       setHasMore(nextHasMore)
+      setConversationReadReceiptsById((prev) => ({
+        ...prev,
+        [convoId]: readReceipts,
+      }))
 
       if (prepend) {
         setMessages((prev) => {
@@ -392,18 +404,20 @@ export default function Index() {
     }
   }
 
-  const startConversation = async () => {
+  const startConversation = async (recipientIds = selectedUserIds) => {
     try {
-      if (!selectedUserIds.length) return
+      if (!recipientIds.length) return
 
-      const selectedRecipients = selectedUsers
+      const selectedRecipients = recipientIds
+        .map((id) => safeUsers.find((user) => Number(user.id) === Number(id)))
+        .filter(Boolean)
       const isGroup = selectedRecipients.length > 1
       const displayName = isGroup
         ? buildGroupTitle(selectedRecipients.map((user) => user.name))
         : (selectedRecipients[0]?.name || "Conversation")
 
       const res = await axios.post(route("messenger.start-conversation"), {
-        user_ids: selectedUserIds.map((id) => Number(id)),
+        user_ids: recipientIds.map((id) => Number(id)),
       })
 
       const conversationId = res.data?.id
@@ -421,11 +435,19 @@ export default function Index() {
       setActiveId(conversationId)
       setSelectedUserIds([])
       setIsCreatingConversation(false)
-      return true
+      return conversationId
     } catch (error) {
       console.log("startConversation error:", error.response?.data || error)
       return false
     }
+  }
+
+  const ensureConversationForDraft = async (recipientIds = selectedUserIds) => {
+    if (activeId) return activeId
+    if (!recipientIds.length) return null
+
+    const conversationId = await startConversation(recipientIds)
+    return conversationId || null
   }
 
   const handleNewMessage = () => {
@@ -447,12 +469,67 @@ export default function Index() {
     setBody("")
   }
 
+  const handleDeleteConversation = async (conversationId) => {
+    if (!conversationId) return
+
+    try {
+      await axios.delete(route("messenger.destroy", conversationId))
+
+      messagesByConversationRef.current.delete(Number(conversationId))
+      setConversations((prev) => prev.filter((c) => Number(c.id) !== Number(conversationId)))
+
+      if (Number(activeId) === Number(conversationId)) {
+        setActiveId(null)
+        setMessages([])
+        setHasMore(true)
+        setBody("")
+        setReplyTo(null)
+        setTypingUser(null)
+        setIsCreatingConversation(false)
+        setSelectedUserIds([])
+      }
+    } catch (error) {
+      console.log("messenger.destroy error:", error.response?.data || error)
+    }
+  }
+
+  const handleRenameConversation = async (conversationId, title) => {
+    if (!conversationId) return
+
+    const nextTitle = String(title || "").trim()
+    if (!nextTitle) return
+
+    try {
+      const res = await axios.patch(route("messenger.update-title", conversationId), {
+        title: nextTitle,
+      })
+
+      setConversations((prev) =>
+        prev.map((conversation) => {
+          if (Number(conversation.id) !== Number(conversationId)) return conversation
+
+          return {
+            ...conversation,
+            type: "group",
+            title: res.data?.title || nextTitle,
+            name: res.data?.name || res.data?.title || nextTitle,
+          }
+        })
+      )
+
+      void fetchConversations({ silent: true })
+    } catch (error) {
+      console.log("messenger.update-title error:", error.response?.data || error)
+    }
+  }
+
   const handlePreviewConversation = (conversationId) => {
     setActiveId(conversationId)
-    setIsCreatingConversation(true)
+    setIsCreatingConversation(false)
     setBody("")
     setReplyTo(null)
     setTypingUser(null)
+    setSelectedUserIds([])
   }
 
   const resolveDirectConversationId = (userId) => {
@@ -467,6 +544,71 @@ export default function Index() {
   useEffect(() => {
     fetchConversations()
   }, [])
+
+  useEffect(() => {
+    if (!initialConversationId) return
+
+    const found = safeConversations.find((conversation) => Number(conversation.id) === Number(initialConversationId))
+    if (found) {
+      setActiveId((current) => {
+        if (Number(current) === Number(found.id)) return current
+        return found.id
+      })
+    }
+  }, [initialConversationId, safeConversations])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined
+
+    const syncFromHash = () => {
+      const conversationToken = readConversationTokenFromLocation()
+      if (conversationToken) {
+        const found = findConversationByToken(conversationToken)
+        if (found) {
+          setActiveId((current) => {
+            if (Number(current) === Number(found.id)) return current
+            return found.id
+          })
+        }
+        return
+      }
+
+      const rootPath = new URL(route("messenger.index"), window.location.origin).pathname.replace(/\/+$/, "")
+      if (window.location.pathname.replace(/\/+$/, "") === rootPath) {
+        setActiveId((current) => current ?? safeConversations[0]?.id ?? null)
+      }
+    }
+
+    syncFromHash()
+    window.addEventListener("popstate", syncFromHash)
+
+    return () => {
+      window.removeEventListener("popstate", syncFromHash)
+    }
+  }, [safeConversations])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    if (!activeId) {
+      const nextUrl = new URL(route("messenger.index"), window.location.origin)
+      if (window.location.pathname !== nextUrl.pathname) {
+        window.history.replaceState(null, "", nextUrl.toString())
+      }
+      return
+    }
+
+    const activeConversation = safeConversations.find((conversation) => Number(conversation.id) === Number(activeId)) || null
+    const conversationToken = activeConversation?.conversation_token
+    if (!conversationToken) return
+
+    const nextUrl = new URL(route("messenger.conversation", conversationToken), window.location.origin)
+    if (`${window.location.pathname}${window.location.search}` === `${nextUrl.pathname}${nextUrl.search}`) {
+      return
+    }
+
+    window.history.replaceState(null, "", nextUrl.toString())
+  }, [activeId, safeConversations])
 
   useEffect(() => {
     if (!activeId) return
@@ -504,7 +646,7 @@ export default function Index() {
         return next
       })
 
-      updateConversationPreview(e.conversation_id ?? activeId, e.body, e.created_at)
+      updateConversationPreview(e.conversation_id ?? activeId, e)
       setTypingUser(null)
 
       if (typingTimeoutRef.current) {
@@ -515,6 +657,38 @@ export default function Index() {
         if (!listRef.current) return
         listRef.current.scrollTop = listRef.current.scrollHeight
       })
+    })
+
+    channel.listen(".conversation.read", (e) => {
+      const conversationId = Number(e.conversation_id ?? activeId)
+      if (!conversationId) return
+
+      setConversationReadReceiptsById((prev) => {
+        const current = Array.isArray(prev[conversationId]) ? prev[conversationId] : []
+        const next = current.filter((receipt) => Number(receipt?.user_id) !== Number(e.user_id))
+        next.push({
+          user_id: Number(e.user_id),
+          last_read_message_id: e.last_read_message_id != null ? Number(e.last_read_message_id) : null,
+          last_read_at: e.last_read_at ?? null,
+          reader_name: e.reader_name ?? null,
+          reader_ipms_id: e.reader_ipms_id ?? null,
+        })
+
+        return {
+          ...prev,
+          [conversationId]: next,
+        }
+      })
+
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          Number(conversation.id) === Number(conversationId)
+            ? { ...conversation, unread_count: 0 }
+            : conversation
+        )
+      )
+
+      markConversationRead(conversationId)
     })
 
     channel.listenForWhisper("typing", (payload) => {
@@ -549,36 +723,74 @@ export default function Index() {
     if (!window.Echo) return
 
     window.Echo.private(`user.${me.id}`).listen(".messenger.conversation.ping", (e) => {
-      setConversations((prev) => {
-        const idx = prev.findIndex((c) => Number(c.id) === Number(e.conversation_id))
+        setConversations((prev) => {
+          const idx = prev.findIndex((c) => Number(c.id) === Number(e.conversation_id))
 
-        if (idx >= 0) {
-          const updated = {
-            ...prev[idx],
-            last_message: e.last_message,
-            last_message_at: e.last_message_at,
-          }
-          const next = [...prev]
-          next.splice(idx, 1)
-          next.unshift(updated)
-          return next
+          if (idx >= 0) {
+            const updated = {
+              ...prev[idx],
+              last_message: e.last_message,
+              last_message_at: e.last_message_at,
+              last_message_sender_name: e.sender_name ?? prev[idx].last_message_sender_name ?? null,
+              last_message_attachment_path: e.last_message_attachment_path ?? null,
+              last_message_attachment_url: e.last_message_attachment_url ?? null,
+              last_message_attachment_name: e.last_message_attachment_name ?? null,
+              last_message_attachment_type: e.last_message_attachment_type ?? null,
+              type: e.conversation_type || prev[idx].type,
+              title: e.conversation_title ?? prev[idx].title ?? null,
+              conversation_token: e.conversation_token ?? prev[idx].conversation_token ?? null,
+              name: e.conversation_type === "group"
+                ? (e.conversation_title || prev[idx].name || "Conversation")
+                : (prev[idx].name || e.sender_name || "Conversation"),
+              participants: e.participants ?? prev[idx].participants ?? [],
+            }
+            const next = [...prev]
+            next.splice(idx, 1)
+            next.unshift(updated)
+            return sortConversationsByRecent(next)
         }
 
         const next = [
           {
-            id: Number(e.conversation_id),
-            type: "direct",
-            name: e.sender_name || "Conversation",
-            title: null,
-            other_user_id: Number(e.sender_id),
-            other_user_ipms_id: e.sender_ipms_id ?? null,
-            last_message: e.last_message,
+              id: Number(e.conversation_id),
+              type: e.conversation_type || "direct",
+              name: e.conversation_type === "group"
+                ? (e.conversation_title || "Conversation")
+                : (e.sender_name || "Conversation"),
+              title: e.conversation_title || null,
+              conversation_token: e.conversation_token ?? null,
+              other_user_id: e.conversation_type === "direct" ? Number(e.sender_id) : null,
+              other_user_ipms_id: e.conversation_type === "direct" ? (e.sender_ipms_id ?? null) : null,
+              participants: e.participants ?? [],
+              last_message: e.last_message,
+              last_message_sender_name: e.sender_name ?? null,
+              last_message_attachment_path: e.last_message_attachment_path ?? null,
+              last_message_attachment_url: e.last_message_attachment_url ?? null,
+              last_message_attachment_name: e.last_message_attachment_name ?? null,
+            last_message_attachment_type: e.last_message_attachment_type ?? null,
             last_message_at: e.last_message_at,
           },
           ...prev,
         ]
-        return next
+        return sortConversationsByRecent(next)
       })
+    })
+
+    window.Echo.private(`user.${me.id}`).listen(".messenger.conversation.renamed", (e) => {
+      if (!e?.conversation_id) return
+
+      setConversations((prev) =>
+        prev.map((conversation) => {
+          if (Number(conversation.id) !== Number(e.conversation_id)) return conversation
+
+          return {
+            ...conversation,
+            type: "group",
+            title: e.title ?? conversation.title ?? null,
+            name: e.name ?? e.title ?? conversation.name ?? "Conversation",
+          }
+        })
+      )
     })
 
     return () => {
@@ -590,8 +802,7 @@ export default function Index() {
     const el = convoListRef.current
     if (!el || conversationsLoading || loadingMoreConversations || !convoHasMore) return
 
-    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20
-    if (!nearBottom) return
+    if (!isConversationListNearBottom(el)) return
 
     const lastId = safeConversations[safeConversations.length - 1]?.id
     if (lastId) fetchConversations({ beforeId: lastId, append: true })
@@ -607,12 +818,20 @@ export default function Index() {
     }
   }
 
-  const send = async (e) => {
-    e.preventDefault()
-    if (!body.trim() || !activeId) return
+  const sendMessage = async (payload = {}) => {
+    const draft = typeof payload === "string"
+      ? payload
+      : String(payload?.body ?? "").trim()
+    const attachment = typeof payload === "object" && payload !== null ? payload.attachment ?? null : null
+    const replyTarget = typeof payload === "object" && payload !== null ? payload.replyTo ?? replyTo : replyTo
 
-    const draft = body
+    if (!draft && !attachment) return false
+
+    const targetConversationId = await ensureConversationForDraft()
+    if (!targetConversationId) return false
+
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const attachmentPreviewUrl = attachment ? URL.createObjectURL(attachment) : null
     const optimisticMessage = {
       id: tempId,
       sender_id: me?.id,
@@ -620,14 +839,24 @@ export default function Index() {
       sender_ipms_id: me?.ipms_id ?? null,
       sender_gender: null,
       body: draft,
+      attachment_path: attachmentPreviewUrl,
+      attachment_url: attachmentPreviewUrl,
+      attachment_name: attachment?.name ?? null,
+      attachment_type: attachment?.type ?? null,
+      attachment_size: attachment?.size ?? null,
       created_at: new Date().toISOString(),
-      reply_to: replyTo
+      reply_to: replyTarget
         ? {
-            id: replyTo.id,
-            sender_id: replyTo.sender_id,
-            sender_name: replyTo.sender_name,
-            sender_gender: replyTo.sender_gender ?? null,
-            body: replyTo.body,
+            id: replyTarget.id,
+            sender_id: replyTarget.sender_id,
+            sender_name: replyTarget.sender_name,
+            sender_gender: replyTarget.sender_gender ?? null,
+            body: replyTarget.body,
+            attachment_path: replyTarget.attachment_path ?? null,
+            attachment_url: replyTarget.attachment_url ?? null,
+            attachment_name: replyTarget.attachment_name ?? null,
+            attachment_type: replyTarget.attachment_type ?? null,
+            attachment_size: replyTarget.attachment_size ?? null,
           }
         : null,
     }
@@ -637,42 +866,103 @@ export default function Index() {
 
     setMessages((prev) => {
       const next = [...prev, optimisticMessage]
-      cacheConversationMessages(activeId, next, hasMore)
+      cacheConversationMessages(targetConversationId, next, hasMore)
       return next
     })
 
-    updateConversationPreview(activeId, draft, optimisticMessage.created_at)
+    updateConversationPreview(targetConversationId, optimisticMessage)
 
     try {
-      const res = await axios.post(route("messenger.send", activeId), {
-        body: draft,
-        reply_to_id: replyTo?.id ?? null,
+      const formData = new FormData()
+      formData.append("body", draft)
+      if (attachment) {
+        formData.append("attachment", attachment)
+      }
+      if (replyTarget?.id) {
+        formData.append("reply_to_id", replyTarget.id)
+      }
+
+      const res = await axios.post(route("messenger.send", targetConversationId), formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       })
       const msg = res.data?.data
 
-      if (msg) {
-        setMessages((prev) => {
-          const replaced = prev.map((m) => (m.id === tempId ? msg : m))
-          const uniq = new Map()
-          for (const m of replaced) uniq.set(m.id, m)
-          const next = [...uniq.values()].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
-          cacheConversationMessages(activeId, next, hasMore)
-          return next
-        })
+        if (msg) {
+          setMessages((prev) => {
+            const replaced = prev.map((m) => (m.id === tempId ? msg : m))
+            const uniq = new Map()
+            for (const m of replaced) uniq.set(m.id, m)
+            const next = [...uniq.values()].sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
+            cacheConversationMessages(targetConversationId, next, hasMore)
+            return next
+          })
 
-        updateConversationPreview(activeId, msg.body, msg.created_at)
-        setTypingUser(null)
+          updateConversationPreview(targetConversationId, msg)
+          void fetchConversations({ silent: true })
+          setTypingUser(null)
 
         requestAnimationFrame(() => {
           if (!listRef.current) return
           listRef.current.scrollTop = listRef.current.scrollHeight
         })
       }
+      return true
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId))
       setBody(draft)
-      setReplyTo(replyTo)
+      setReplyTo(replyTarget)
       console.log("messenger.send error:", error.response?.data || error)
+      return false
+    } finally {
+      if (attachmentPreviewUrl) {
+        URL.revokeObjectURL(attachmentPreviewUrl)
+      }
+    }
+  }
+
+  const send = async (payload) => {
+    if (payload && typeof payload === "object" && !payload.preventDefault) {
+      return sendMessage(payload)
+    }
+
+    if (payload?.preventDefault) {
+      payload.preventDefault()
+      return false
+    }
+
+    return sendMessage({ body })
+  }
+
+  const sendQuickLike = async () => {
+    await sendMessage({ body: "__sticker__:like" })
+  }
+
+  const sendSticker = async (stickerBody) => {
+    await sendMessage({ body: stickerBody })
+  }
+
+  const forwardMessage = async (sourceMessage, targetConversationId) => {
+    if (!sourceMessage?.id || !targetConversationId) return false
+
+    try {
+      const res = await axios.post(route("messenger.forward", targetConversationId), {
+        message_id: sourceMessage.id,
+      })
+
+      const msg = res.data?.data
+      if (msg) {
+        updateConversationPreview(targetConversationId, msg)
+      }
+
+      void fetchConversations({ silent: true })
+      setActiveId(targetConversationId)
+
+      return true
+    } catch (error) {
+      console.log("messenger.forward error:", error.response?.data || error)
+      return false
     }
   }
 
@@ -682,11 +972,15 @@ export default function Index() {
 
       <div className="h-[calc(100vh-140px)] min-h-0 grid grid-cols-[clamp(240px,28vw,340px)_minmax(0,1fr)] gap-4">
         <Conversations
+          meId={me?.id}
           onlineUserIds={onlineUserIds}
+          safeUsers={safeUsers}
           safeConversations={safeConversations}
           activeId={activeId}
           onNewMessage={handleNewMessage}
           onSelectConversation={handleSelectConversation}
+          onDeleteConversation={handleDeleteConversation}
+          onRenameConversation={handleRenameConversation}
           conversationsLoading={conversationsLoading}
           loadingMoreConversations={loadingMoreConversations}
           convoListRef={convoListRef}
@@ -698,22 +992,28 @@ export default function Index() {
           <SelectedConversation
             me={me}
             safeUsers={safeUsers}
-            activeConversation={activeConversation}
-            selectedUserIds={selectedUserIds}
-            setSelectedUserIds={setSelectedUserIds}
-            isComposing={isCreatingConversation || selectedUserIds.length > 0}
+          activeConversation={activeConversation}
+          conversationReadReceipts={activeConversationReadReceipts}
+          selectedUserIds={selectedUserIds}
+          setSelectedUserIds={setSelectedUserIds}
+          isComposing={isCreatingConversation || selectedUserIds.length > 0}
             onlineUserIds={onlineUserIds}
             avatarUrl={avatarUrl}
             typingUser={typingUser}
             startConversation={startConversation}
             onPreviewConversation={handlePreviewConversation}
             resolveDirectConversationId={resolveDirectConversationId}
+            onDeleteConversation={handleDeleteConversation}
+            onRenameConversation={handleRenameConversation}
           />
 
           <Messages
             me={me}
             orderedMessages={orderedMessages}
             activeConversationId={activeId}
+            conversations={safeConversations}
+            safeUsers={safeUsers}
+            conversationReadReceipts={activeConversationReadReceipts}
             listRef={listRef}
             handleMessageScroll={handleMessageScroll}
             messagesLoading={messagesLoading}
@@ -730,6 +1030,10 @@ export default function Index() {
             typingUser={typingUser}
             replyTo={replyTo}
             setReplyTo={setReplyTo}
+            sendQuickLike={sendQuickLike}
+            sendSticker={sendSticker}
+            onForwardMessage={forwardMessage}
+            onOpenConversation={handleSelectConversation}
           />
         </div>
       </div>

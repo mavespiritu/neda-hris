@@ -1,23 +1,22 @@
 import {
-    CircleUser,
-    Package2,
-    ChevronDown
-  } from "lucide-react"
-  import { Button } from "../components/ui/button"
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-  } from "../components/ui/dropdown-menu"
-  import { Input } from "../components/ui/input"
-  import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet"
-  import { SidebarTrigger } from "@/components/ui/sidebar"
-  import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-  import { useForm, usePage, Link } from '@inertiajs/react'
-  import { useUser } from "@/providers/UserProvider"
+  Package2,
+  ChevronDown
+} from "lucide-react"
+import { Button } from "../components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useForm } from '@inertiajs/react'
+import { useUser } from "@/providers/UserProvider"
+import MessengerMiniInbox from "@/components/MessengerMiniInbox"
+import { useMessengerShared } from "@/providers/MessengerSharedProvider"
 
   const Logo = ({ hidden = false }) => {
 
@@ -36,16 +35,25 @@ import {
     );
   }
   
-  const Header = () => {
+  const Header = ({
+    isMessengerPage,
+    users = [],
+    messengerUsers = [],
+    onOpenMessengerConversation,
+    onComposeMessengerConversation,
+  }) => {
 
-    const { user, isApplicant } = useUser() 
-    const { post } =  useForm()
+  const { user, isApplicant } = useUser() 
+  const { post } =  useForm()
+  const { onlineUserIds } = useMessengerShared()
 
     const handleLogout = (e) => {
       post(route('logout'))
 
       return to_route('login')
     }
+
+    const isOnline = user?.id ? onlineUserIds.has(Number(user.id)) : false
 
     return (
       <header
@@ -61,6 +69,16 @@ import {
           DRO1 HRIS
         </span>}
         <div className="flex flex-end items-center gap-2">
+          {user?.ipms_id ? (
+            <MessengerMiniInbox
+              userId={user?.id}
+              meId={user?.id}
+              users={[...messengerUsers, ...users]}
+              onOpenConversation={onOpenMessengerConversation}
+              onComposeNewMessage={onComposeMessengerConversation}
+              isMessengerPage={isMessengerPage}
+            />
+          ) : null}
           <div className="flex-col hidden md:flex">
             <span className="text-sm font-semibold">
                 {(!isApplicant && `${user?.first_name} ${user?.last_name}`) 
@@ -71,10 +89,19 @@ import {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="p-2 flex items-center gap-2">
-                <Avatar>
+                <div className="relative">
+                  <Avatar>
                     <AvatarImage src={user?.ipms_id ? `/employees/image/${user?.ipms_id}` : `https://www.gravatar.com/avatar/?d=mp&s=200`} loading="lazy" />
                     <AvatarFallback>{`first_name last_name`}</AvatarFallback>
-                </Avatar>
+                  </Avatar>
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white shadow-sm ${
+                      isOnline ? "bg-emerald-500" : "bg-slate-400"
+                    }`}
+                    title={isOnline ? "Online" : "Offline"}
+                    aria-label={isOnline ? "Online" : "Offline"}
+                  />
+                </div>
                 <ChevronDown className="size-4"/>
                 <span className="sr-only">Toggle user menu</span>
               </Button>

@@ -4,10 +4,12 @@ namespace App\Actions\Messenger;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Support\MessengerConversationToken;
 use App\Traits\BuildsEmployeeNameMap;
 use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ListConversations
@@ -23,10 +25,46 @@ class ListConversations
         $cacheKey = "messenger:conversations:{$userId}:{$version}:{$limit}:" . ($beforeId ?: 'latest');
 
         $payload = $this->messengerCache()->remember($cacheKey, now()->addSeconds(20), function () use ($userId, $limit, $beforeId) {
+            $latestMessageSub = Message::query()
+                ->selectRaw('conversation_id, max(created_at) as last_message_at')
+                ->groupBy('conversation_id');
+
+            $deletedStateSub = DB::connection('mysql4')->table('conversation_hidden_users')
+                ->select(['conversation_id', 'deleted_after_message_id', 'created_at'])
+                ->where('user_id', $userId);
+            $hiddenStates = DB::connection('mysql4')->table('conversation_hidden_users')
+                ->where('user_id', $userId)
+                ->get()
+                ->keyBy('conversation_id');
+            $readStates = DB::connection('mysql4')->table('conversation_reads')
+                ->select(['conversation_id', 'last_read_message_id'])
+                ->where('user_id', $userId)
+                ->get()
+                ->keyBy('conversation_id');
+
             $query = Conversation::query()
                 ->whereHas('participants', fn ($q) => $q->where('users.id', $userId))
+                ->leftJoinSub($latestMessageSub, 'lm', fn ($join) => $join->on('lm.conversation_id', '=', 'conversations.id'))
+                ->leftJoinSub($deletedStateSub, 'chs', fn ($join) => $join->on('chs.conversation_id', '=', 'conversations.id'))
+                ->where(function ($q) {
+                    $q->whereNull('chs.conversation_id')
+                        ->orWhere(function ($qq) {
+                            $qq->whereNotNull('chs.deleted_after_message_id')
+                                ->whereRaw(
+                                    '(select coalesce(max(id), 0) from messages where messages.conversation_id = conversations.id) > chs.deleted_after_message_id'
+                                );
+                        })
+                        ->orWhere(function ($qq) {
+                            $qq->whereNull('chs.deleted_after_message_id')
+                                ->whereRaw(
+                                    '(select coalesce(max(created_at), "1970-01-01 00:00:00") from messages where messages.conversation_id = conversations.id) > chs.created_at'
+                                );
+                        });
+                })
+                ->select('conversations.*')
                 ->with(['participants:id,ipms_id,name'])
                 ->when($beforeId, fn ($q) => $q->where('conversations.id', '<', $beforeId))
+                ->orderByRaw('coalesce(lm.last_message_at, conversations.created_at) desc')
                 ->orderByDesc('conversations.id')
                 ->limit($limit + 1);
 
@@ -37,7 +75,8 @@ class ListConversations
             $conversationIds = $rows->pluck('id')->map(fn ($v) => (int) $v)->values();
 
             $latestMessagesByConversation = Message::query()
-                ->select(['id', 'conversation_id', 'body', 'created_at'])
+                ->select(['id', 'conversation_id', 'sender_id', 'body', 'attachment_path', 'attachment_type', 'attachment_name', 'created_at'])
+                ->with('sender:id,name,ipms_id')
                 ->whereIn('conversation_id', $conversationIds)
                 ->orderByDesc('id')
                 ->get()
@@ -51,7 +90,7 @@ class ListConversations
 
             $employeesById = $this->employeeNamesById($empIds, 'mysql3');
 
-            $data = $rows->map(function ($c) use ($userId, $employeesById, $latestMessagesByConversation) {
+            $data = $rows->map(function ($c) use ($userId, $employeesById, $latestMessagesByConversation, $hiddenStates, $readStates) {
                 $other = $c->participants->firstWhere('id', '!=', $userId);
                 $groupParticipants = $c->type === 'group'
                     ? $c->participants
@@ -65,9 +104,35 @@ class ListConversations
                     : 'Direct Message';
 
                 $latest = $latestMessagesByConversation->get((int) $c->id);
+                $latestSenderName = $latest
+                    ? ($this->employeeName($employeesById, $latest->sender?->ipms_id) ?? $latest->sender?->name ?? 'Someone')
+                    : null;
+
+                $hiddenState = $hiddenStates->get((int) $c->id);
+                $readState = $readStates->get((int) $c->id);
+                $lastReadMessageId = (int) ($readState?->last_read_message_id ?? 0);
+                $deletedAfterMessageId = (int) ($hiddenState?->deleted_after_message_id ?? 0);
+                $deletedAt = $hiddenState?->created_at;
+
+                $unreadQuery = Message::query()
+                    ->where('conversation_id', (int) $c->id)
+                    ->where('sender_id', '!=', $userId);
+
+                if ($deletedAfterMessageId > 0) {
+                    $unreadQuery->where('id', '>', max($deletedAfterMessageId, $lastReadMessageId));
+                } elseif ($deletedAt) {
+                    $unreadQuery->where('created_at', '>', $deletedAt);
+
+                    if ($lastReadMessageId > 0) {
+                        $unreadQuery->where('id', '>', $lastReadMessageId);
+                    }
+                } elseif ($lastReadMessageId > 0) {
+                    $unreadQuery->where('id', '>', $lastReadMessageId);
+                }
 
                 return [
                     'id' => (int) $c->id,
+                    'conversation_token' => MessengerConversationToken::encode((int) $c->id),
                     'type' => (string) $c->type,
                     'name' => $c->type === 'direct' ? $directName : ((string) ($c->title ?: 'Conversation')),
                     'title' => $c->title,
@@ -89,7 +154,12 @@ class ListConversations
                         ];
                     })->values(),
                     'last_message' => $latest?->body,
+                    'last_message_sender_name' => $latestSenderName,
+                    'last_message_attachment_path' => $latest?->attachment_path,
+                    'last_message_attachment_type' => $latest?->attachment_type,
+                    'last_message_attachment_name' => $latest?->attachment_name,
                     'last_message_at' => $latest?->created_at,
+                    'unread_count' => (int) $unreadQuery->count(),
                 ];
             })->values();
 

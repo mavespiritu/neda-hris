@@ -2,8 +2,10 @@
 
 namespace App\Actions\Messenger;
 
+use App\Events\ConversationPing;
 use App\Models\Conversation;
 use App\Models\User;
+use App\Support\MessengerConversationToken;
 use App\Traits\BuildsEmployeeNameMap;
 use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +74,10 @@ class StartConversation
         $this->bumpConversationListVersion($me);
         $this->bumpConversationListVersion($other);
 
-        return response()->json(['id' => $conversation->id]);
+        return response()->json([
+            'id' => $conversation->id,
+            'conversation_token' => MessengerConversationToken::encode((int) $conversation->id),
+        ]);
     }
 
     protected function createGroupConversation(int $me, Collection $userIds, string $title = ''): JsonResponse
@@ -111,7 +116,43 @@ class StartConversation
             $this->bumpConversationListVersion((int) $userId);
         }
 
-        return response()->json(['id' => $conversation->id]);
+        $participantSnapshots = User::query()
+            ->select(['id', 'ipms_id', 'name'])
+            ->whereIn('id', $participantIds->all())
+            ->get()
+            ->map(fn ($participant) => [
+                'id' => (int) $participant->id,
+                'ipms_id' => (string) ($participant->ipms_id ?? ''),
+                'name' => (string) ($participant->name ?? 'Member'),
+                'avatar' => !empty($participant->ipms_id)
+                    ? "/employees/image/{$participant->ipms_id}"
+                    : 'https://www.gravatar.com/avatar/?d=mp&s=200',
+            ])
+            ->values()
+            ->all();
+
+        foreach ($allUserIds as $userId) {
+            broadcast(new ConversationPing(
+                recipientUserId: (int) $userId,
+                conversationId: (int) $conversation->id,
+                conversationToken: MessengerConversationToken::encode((int) $conversation->id),
+                conversationType: 'group',
+                conversationTitle: $conversation->title ? (string) $conversation->title : null,
+                participants: collect($participantSnapshots)
+                    ->filter(fn ($participant) => (int) $participant['id'] !== (int) $userId)
+                    ->values()
+                    ->all(),
+                senderId: $me,
+                senderName: (string) ($request->user()->name ?? 'You'),
+                message: '',
+                createdAt: now()->toISOString()
+            ));
+        }
+
+        return response()->json([
+            'id' => $conversation->id,
+            'conversation_token' => MessengerConversationToken::encode((int) $conversation->id),
+        ]);
     }
 
     protected function buildGroupTitle(Collection $names): string
