@@ -31,7 +31,7 @@ class StoreApplicantExamResult
             'test_type' => ['required', Rule::in(['Skill Test', 'DPE'])],
             'date_conducted' => ['required', 'date'],
             'status' => ['required', 'string', 'max:100'],
-            'score' => ['nullable', 'string', 'max:255'],
+            'score' => ['nullable', 'string', 'max:100'],
         ]);
 
         $ipmsId = $request->user()?->ipms_id;
