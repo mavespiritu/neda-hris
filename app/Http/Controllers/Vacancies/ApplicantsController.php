@@ -56,7 +56,7 @@ class ApplicantsController extends Controller
             ->first();
 
         $editRequestDeadline = $publication?->date_closed
-            ? Carbon::parse($publication->date_closed)->addDays(5)->endOfDay()
+            ? $this->addBusinessDays(Carbon::parse($publication->date_closed), 5)
             : null;
 
         if ($editRequestDeadline && now()->greaterThan($editRequestDeadline)) {
@@ -203,6 +203,24 @@ class ApplicantsController extends Controller
         return response()->json([
             'data' => $applicants
         ]);
+    }
+
+    private function addBusinessDays(Carbon $date, int $days): Carbon
+    {
+        $current = $date->copy()->startOfDay();
+        $addedDays = 0;
+
+        while ($addedDays < $days) {
+            $current->addDay();
+
+            if ($current->isWeekend()) {
+                continue;
+            }
+
+            $addedDays++;
+        }
+
+        return $current->endOfDay();
     }
 
     private function buildRequirementsData($application)

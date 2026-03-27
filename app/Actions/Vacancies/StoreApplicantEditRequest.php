@@ -90,7 +90,7 @@ class StoreApplicantEditRequest
             ], 422);
         }
 
-        $expiresAt = Carbon::parse($publication->date_closed)->addDays(5)->endOfDay();
+        $expiresAt = $this->addBusinessDays(Carbon::parse($publication->date_closed), 5);
 
         if (now()->greaterThan($expiresAt)) {
             AppEditRequest::query()
@@ -106,7 +106,7 @@ class StoreApplicantEditRequest
 
             return response()->json([
                 'title' => 'Edit request not allowed',
-                'message' => 'The edit window already closed 5 days after the publication due date.',
+                'message' => 'The edit window already closed after 5 business days from the publication due date.',
             ], 422);
         }
 
@@ -196,4 +196,23 @@ class StoreApplicantEditRequest
             ],
         ]);
     }
+
+    private function addBusinessDays(Carbon $date, int $days): Carbon
+    {
+        $current = $date->copy()->startOfDay();
+        $addedDays = 0;
+
+        while ($addedDays < $days) {
+            $current->addDay();
+
+            if ($current->isWeekend()) {
+                continue;
+            }
+
+            $addedDays++;
+        }
+
+        return $current->endOfDay();
+    }
+
 }
