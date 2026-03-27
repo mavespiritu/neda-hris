@@ -43,15 +43,9 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
     onComposeMessengerConversation,
   }) => {
 
-<<<<<<< HEAD
-    const { user, isApplicant } = useUser() 
-
-    const { post } =  useForm()
-=======
   const { user, isApplicant } = useUser() 
   const { post } =  useForm()
   const { onlineUserIds } = useMessengerShared()
->>>>>>> 9d7eb2788d45bf90b8b08aac4ee6c44ed42d9ce1
 
     const handleLogout = (e) => {
       post(route('logout'))

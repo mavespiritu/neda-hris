@@ -4,7 +4,8 @@
     "scripts":  {
                     "dev":  "vite",
                     "build":  "tsc \u0026\u0026 vite build",
-                    "dev:all":  "powershell -ExecutionPolicy Bypass -File ./scripts/start-dev-stack.ps1"
+                    "dev:all":  "powershell -ExecutionPolicy Bypass -File ./scripts/start-dev-stack.ps1",
+                    "prod:all":  "powershell -ExecutionPolicy Bypass -File ./scripts/start-production-stack.ps1"
                 },
     "devDependencies":  {
                             "@headlessui/react":  "^2.0.0",

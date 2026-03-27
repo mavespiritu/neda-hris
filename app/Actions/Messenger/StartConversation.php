@@ -36,6 +36,7 @@ class StartConversation
     public function asController(ActionRequest $request): JsonResponse
     {
         $me = (int) $request->user()->id;
+        $senderName = (string) ($request->user()->name ?? 'You');
         $userIds = collect($request->validated('user_ids', []))
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $id !== $me)
@@ -48,7 +49,7 @@ class StartConversation
             return $this->createDirectConversation($me, (int) $userIds->first());
         }
 
-        return $this->createGroupConversation($me, $userIds, (string) $request->input('title', ''));
+        return $this->createGroupConversation($me, $userIds, $senderName, (string) $request->input('title', ''));
     }
 
     protected function createDirectConversation(int $me, int $other): JsonResponse
@@ -80,7 +81,7 @@ class StartConversation
         ]);
     }
 
-    protected function createGroupConversation(int $me, Collection $userIds, string $title = ''): JsonResponse
+    protected function createGroupConversation(int $me, Collection $userIds, string $senderName, string $title = ''): JsonResponse
     {
         $participantIds = $userIds->push($me)->unique()->values();
         $resolvedTitle = trim($title);
@@ -143,7 +144,7 @@ class StartConversation
                     ->values()
                     ->all(),
                 senderId: $me,
-                senderName: (string) ($request->user()->name ?? 'You'),
+                senderName: $senderName,
                 message: '',
                 createdAt: now()->toISOString()
             ));
@@ -174,3 +175,5 @@ class StartConversation
         return $clean->take(2)->implode(', ') . ' + ' . ($clean->count() - 2) . ' others';
     }
 }
+
+
