@@ -1872,7 +1872,7 @@ export default function Assessment() {
           </Link>
           <Button
             type="submit"
-            disabled={isSubmitting || prescribedStatus !== "Passed"}
+            disabled={isSubmitting}
             form="assessment-form"
             className="gap-2"
           >

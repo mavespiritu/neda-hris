@@ -23,6 +23,5 @@ class AppExamResult extends Model
 
     protected $casts = [
         'date_conducted' => 'date',
-        'score' => 'decimal:2',
     ];
 }

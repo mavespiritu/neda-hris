@@ -257,7 +257,7 @@ const ProfileChangesPanel = ({ submittedReview, liveReview, isLoading }) => {
           <div className="space-y-2">
             {changes.personalChanges.map((change) => (
               <div key={change.label} className="text-xs">
-                <span className="font-semibold">{change.label}:</span> {change.submitted} &gt {change.current}
+                <span className="font-semibold">{change.label}:</span> {change.submitted} &gt; {change.current}
               </div>
             ))}
           </div>
