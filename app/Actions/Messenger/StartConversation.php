@@ -49,11 +49,7 @@ class StartConversation
             return $this->createDirectConversation($me, (int) $userIds->first());
         }
 
-<<<<<<< HEAD
         return $this->createGroupConversation($me, $senderName, $userIds, (string) $request->input('title', ''));
-=======
-        return $this->createGroupConversation($me, $userIds, $senderName, (string) $request->input('title', ''));
->>>>>>> 3c28f27c9e4042d710b2847af921db549c17b125
     }
 
     protected function createDirectConversation(int $me, int $other): JsonResponse
@@ -85,11 +81,7 @@ class StartConversation
         ]);
     }
 
-<<<<<<< HEAD
     protected function createGroupConversation(int $me, string $senderName, Collection $userIds, string $title = ''): JsonResponse
-=======
-    protected function createGroupConversation(int $me, Collection $userIds, string $senderName, string $title = ''): JsonResponse
->>>>>>> 3c28f27c9e4042d710b2847af921db549c17b125
     {
         $participantIds = $userIds->push($me)->unique()->values();
         $resolvedTitle = trim($title);
@@ -155,10 +147,7 @@ class StartConversation
                     ->all(),
                 senderId: $me,
                 senderName: $senderName,
-<<<<<<< HEAD
                 senderIpmsId: (string) ($conversation->participants()->where('users.id', $me)->first()?->ipms_id ?? ''),
-=======
->>>>>>> 3c28f27c9e4042d710b2847af921db549c17b125
                 message: '',
                 createdAt: now()->toISOString()
             ));
