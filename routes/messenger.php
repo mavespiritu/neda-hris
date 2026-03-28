@@ -6,6 +6,7 @@ use App\Actions\Messenger\ListConversationMessages;
 use App\Actions\Messenger\ListConversations;
 use App\Actions\Messenger\DeleteConversation;
 use App\Actions\Messenger\ForwardConversationMessage;
+use App\Actions\Messenger\ManageConversationMembers;
 use App\Actions\Messenger\SendConversationMessage;
 use App\Actions\Messenger\ShowMessengerPage;
 use App\Actions\Messenger\StartConversation;
@@ -22,6 +23,7 @@ Route::middleware(['web', 'auth.any', 'verified'])
         Route::get('/conversations/{conversation}/messages', ListConversationMessages::class)->name('messages');
         Route::post('/conversations/{conversation}/messages', SendConversationMessage::class)->name('send');
         Route::post('/conversations/{conversation}/forward', ForwardConversationMessage::class)->name('forward');
+        Route::post('/conversations/{conversation}/members', ManageConversationMembers::class)->name('members');
         Route::delete('/conversations/{conversation}', DeleteConversation::class)->name('destroy');
         Route::patch('/conversations/{conversation}', UpdateConversationTitle::class)->name('update-title');
         Route::post('/start-conversation', StartConversation::class)->name('start-conversation');

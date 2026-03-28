@@ -8,6 +8,7 @@ const defaultAvatarUrl = (ipmsId) =>
 
 export const MessengerConversationAvatar = ({
   conversation,
+  me = null,
   safeUsers = [],
   meId = null,
   avatarUrl = defaultAvatarUrl,
@@ -15,12 +16,28 @@ export const MessengerConversationAvatar = ({
   directStatusSize = "h-3 w-3",
 }) => {
   const participants = conversation?.participants || []
+  const recentSenders = Array.isArray(conversation?.recent_senders) ? conversation.recent_senders : []
+  const selfUser = me || (meId != null ? safeUsers.find((user) => Number(user?.id) === Number(meId)) || null : null)
+  const resolvedSelfAvatar = selfUser
+    ? {
+        id: Number(selfUser.id),
+        ipms_id: selfUser.ipms_id ?? null,
+        name: selfUser.name || "You",
+        avatar: selfUser.avatar || (selfUser.ipms_id ? avatarUrl(selfUser.ipms_id) : null),
+      }
+    : null
+  const smallGroupAvatars = participants.length === 1 && resolvedSelfAvatar
+    ? [resolvedSelfAvatar, ...participants]
+    : participants
+  const groupAvatars = participants.length <= 2
+    ? smallGroupAvatars
+    : (recentSenders.length ? recentSenders : participants)
   const directOtherUserId = Number(conversation?.other_user_id ?? 0)
   const canShowDirectStatus = Number.isFinite(directOtherUserId) && directOtherUserId > 0
   const directAvatar = resolveConversationAvatar(conversation, safeUsers, meId, avatarUrl)
 
-  if (conversation?.type === "group" && participants.length) {
-    const preview = participants.slice(0, 2)
+  if (conversation?.type === "group" && groupAvatars.length) {
+    const preview = groupAvatars.slice(0, 2)
 
     return (
       <div className="relative h-9 w-9 shrink-0">
@@ -45,11 +62,6 @@ export const MessengerConversationAvatar = ({
           </Avatar>
         ))}
 
-        {participants.length > 2 && (
-          <div className="absolute -right-1 -bottom-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-200 px-1 text-[9px] font-semibold text-slate-700">
-            +{participants.length - 2}
-          </div>
-        )}
       </div>
     )
   }
@@ -81,6 +93,7 @@ export const MessengerConversationAvatar = ({
 
 export const MessengerConversationRow = ({
   conversation,
+  me = null,
   safeUsers = [],
   meId = null,
   avatarUrl = defaultAvatarUrl,
@@ -102,6 +115,7 @@ export const MessengerConversationRow = ({
     <>
       <MessengerConversationAvatar
         conversation={conversation}
+        me={me}
         safeUsers={safeUsers}
         meId={meId}
         avatarUrl={avatarUrl}

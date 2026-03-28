@@ -1,7 +1,11 @@
 export const sortConversationsByRecent = (items = []) => {
   return [...items].sort((a, b) => {
-    const aTime = a?.last_message_at ? new Date(a.last_message_at).getTime() : 0
-    const bTime = b?.last_message_at ? new Date(b.last_message_at).getTime() : 0
+    const aTime = a?.last_message_at
+      ? new Date(a.last_message_at).getTime()
+      : (a?.updated_at ? new Date(a.updated_at).getTime() : 0)
+    const bTime = b?.last_message_at
+      ? new Date(b.last_message_at).getTime()
+      : (b?.updated_at ? new Date(b.updated_at).getTime() : 0)
 
     if (bTime !== aTime) return bTime - aTime
 

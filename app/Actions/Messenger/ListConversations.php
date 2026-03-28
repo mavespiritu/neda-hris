@@ -16,6 +16,25 @@ class ListConversations
 {
     use AsAction, BuildsEmployeeNameMap, UsesMessengerRedisCache;
 
+    protected function buildGroupTitle(iterable $names): string
+    {
+        $clean = collect($names)
+            ->filter()
+            ->map(fn ($name) => trim((string) $name))
+            ->filter()
+            ->values();
+
+        if ($clean->isEmpty()) {
+            return 'Group Chat';
+        }
+
+        if ($clean->count() <= 3) {
+            return $clean->implode(', ');
+        }
+
+        return $clean->take(2)->implode(', ') . ' + ' . ($clean->count() - 2) . ' others';
+    }
+
     public function asController(Request $request): JsonResponse
     {
         $userId = (int) $request->user()->id;
@@ -134,7 +153,9 @@ class ListConversations
                     'id' => (int) $c->id,
                     'conversation_token' => MessengerConversationToken::encode((int) $c->id),
                     'type' => (string) $c->type,
-                    'name' => $c->type === 'direct' ? $directName : ((string) ($c->title ?: 'Conversation')),
+                    'name' => $c->type === 'direct'
+                        ? $directName
+                        : (string) ($c->title ?: $this->buildGroupTitle($groupParticipants->pluck('name'))),
                     'title' => $c->title,
                     'other_user_id' => $c->type === 'direct' ? (int) ($other?->id ?? 0) : null,
                     'other_user_ipms_id' => $c->type === 'direct' ? (string) ($other?->ipms_id ?? '') : null,

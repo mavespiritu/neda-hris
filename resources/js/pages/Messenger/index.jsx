@@ -10,6 +10,7 @@ import {
   resolveConversationHasMore,
   sortConversationsByRecent,
 } from "@/lib/messengerConversationPagination"
+import { applyConversationMembershipUpdate, pushConversationRecentSender } from "@/lib/messengerConversationMembership"
 import { useConversationReadSync, useMessengerShared } from "@/providers/MessengerSharedProvider"
 
 const CONVO_LIMIT = 20
@@ -202,6 +203,12 @@ export default function Index() {
 
   const updateConversationPreview = (conversationId, messageLike = {}) => {
     const preview = buildPreviewFromMessage(messageLike)
+    const senderSnapshot = buildRecentSenderSnapshot({
+      id: messageLike?.sender_id,
+      ipms_id: messageLike?.sender_ipms_id,
+      name: messageLike?.sender_name,
+      avatar: messageLike?.sender_avatar,
+    })
 
     setConversations((prev) => {
       const idx = prev.findIndex((c) => Number(c.id) === Number(conversationId))
@@ -215,7 +222,7 @@ export default function Index() {
       const next = [...prev]
       next.splice(idx, 1)
       next.unshift(updated)
-      return sortConversationsByRecent(next)
+      return pushConversationRecentSender(sortConversationsByRecent(next), conversationId, senderSnapshot)
     })
   }
 
@@ -235,6 +242,23 @@ export default function Index() {
     name: user?.name ?? "Member",
     avatar: user?.avatar || (user?.ipms_id ? `/employees/image/${user.ipms_id}` : null),
   })
+
+  const buildRecentSenderSnapshot = (sender = {}) => ({
+    id: Number(sender?.id || 0),
+    ipms_id: sender?.ipms_id ?? null,
+    name: sender?.name ?? "Member",
+    avatar: sender?.avatar || (sender?.ipms_id ? `/employees/image/${sender.ipms_id}` : null),
+  })
+
+  const emitConversationSync = (conversationId) => {
+    if (typeof window === "undefined") return
+
+    window.dispatchEvent(
+      new CustomEvent("messenger:conversation-sync", {
+        detail: { conversationId: Number(conversationId) || null },
+      })
+    )
+  }
 
   const upsertConversationToTop = (
     conversationId,
@@ -257,6 +281,7 @@ export default function Index() {
         const found = {
           ...prev[idx],
           type,
+          conversation_token: options.conversationToken ?? prev[idx].conversation_token ?? null,
           name: resolvedName,
           title: type === "group" ? fallbackName : null,
           other_user_id: type === "direct"
@@ -284,6 +309,7 @@ export default function Index() {
       const created = {
         id: Number(conversationId),
         type,
+        conversation_token: options.conversationToken ?? null,
         name: resolvedName,
         title: type === "group" ? fallbackName : null,
         other_user_id: type === "direct"
@@ -421,6 +447,7 @@ export default function Index() {
       })
 
       const conversationId = res.data?.id
+      const conversationToken = res.data?.conversation_token ?? null
       if (!conversationId) return
 
       const shouldSkipInitialFetch = true
@@ -430,11 +457,12 @@ export default function Index() {
         displayName,
         isGroup ? "group" : "direct",
         selectedRecipients.map((user) => buildParticipantSnapshot(user)),
-        { skipInitialFetch: shouldSkipInitialFetch }
+        { skipInitialFetch: shouldSkipInitialFetch, conversationToken }
       )
       setActiveId(conversationId)
       setSelectedUserIds([])
       setIsCreatingConversation(false)
+      emitConversationSync(conversationId)
       return conversationId
     } catch (error) {
       console.log("startConversation error:", error.response?.data || error)
@@ -443,7 +471,6 @@ export default function Index() {
   }
 
   const ensureConversationForDraft = async (recipientIds = selectedUserIds) => {
-    if (activeId) return activeId
     if (!recipientIds.length) return null
 
     const conversationId = await startConversation(recipientIds)
@@ -518,18 +545,55 @@ export default function Index() {
       )
 
       void fetchConversations({ silent: true })
+      emitConversationSync(conversationId)
     } catch (error) {
       console.log("messenger.update-title error:", error.response?.data || error)
     }
   }
 
-  const handlePreviewConversation = (conversationId) => {
+  const updateConversationMembers = async (conversationId, action, userIds = []) => {
+    if (!conversationId || !action) return false
+
+    try {
+      const res = await axios.post(route("messenger.members", conversationId), {
+        action,
+        user_ids: userIds.map((id) => Number(id)),
+      })
+
+      if (res.data) {
+        setConversations((prev) => applyConversationMembershipUpdate(prev, res.data, me?.id).conversations)
+        void fetchConversations({ silent: true })
+        emitConversationSync(conversationId)
+      }
+
+      return res.data || true
+    } catch (error) {
+      console.log("messenger.members error:", error.response?.data || error)
+      return false
+    }
+  }
+
+  const handleAddConversationMembers = async (conversationId, userIds = []) => {
+    return updateConversationMembers(conversationId, "add", userIds)
+  }
+
+  const handleRemoveConversationMember = async (conversationId, userId) => {
+    return updateConversationMembers(conversationId, "remove", [userId])
+  }
+
+  const handleLeaveConversationGroup = async (conversationId) => {
+    return updateConversationMembers(conversationId, "leave")
+  }
+
+  const handlePreviewConversation = (conversationId, options = {}) => {
     setActiveId(conversationId)
-    setIsCreatingConversation(false)
+    setIsCreatingConversation(Boolean(options?.draft) || !conversationId)
     setBody("")
     setReplyTo(null)
     setTypingUser(null)
-    setSelectedUserIds([])
+    if (!options?.preserveSelection) {
+      setSelectedUserIds([])
+    }
   }
 
   const resolveDirectConversationId = (userId) => {
@@ -540,6 +604,59 @@ export default function Index() {
 
     return match?.id ?? null
   }
+
+  const resolveConversationIdForRecipientIds = (recipientIds = []) => {
+    const normalizedRecipientIds = [...new Set(recipientIds.map((id) => Number(id)).filter(Boolean))]
+    if (!normalizedRecipientIds.length) return null
+
+    if (normalizedRecipientIds.length === 1) {
+      return resolveDirectConversationId(normalizedRecipientIds[0])
+    }
+
+    const selectedSet = new Set(normalizedRecipientIds)
+
+    const matchesParticipants = (conversation = {}) => {
+      const participantIds = Array.isArray(conversation?.participants)
+        ? conversation.participants
+            .map((participant) => Number(participant?.id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        : []
+
+      const candidateSets = [
+        participantIds,
+        me?.id ? participantIds.filter((id) => Number(id) !== Number(me.id)) : participantIds,
+      ]
+
+      return candidateSets.some((candidate) => {
+        if (candidate.length !== selectedSet.size) return false
+        return candidate.every((id) => selectedSet.has(Number(id)))
+      })
+    }
+
+    const match = safeConversations.find((conversation) => {
+      if (conversation?.type !== "group") return false
+      return matchesParticipants(conversation)
+    })
+
+    return match?.id ?? null
+  }
+
+  useEffect(() => {
+    if (!selectedUserIds.length) return
+
+    const matchedConversationId = resolveConversationIdForRecipientIds(selectedUserIds)
+
+    if (matchedConversationId) {
+      if (Number(activeId) !== Number(matchedConversationId)) {
+        setActiveId(matchedConversationId)
+      }
+      return
+    }
+
+    if (activeId !== null) {
+      setActiveId(null)
+    }
+  }, [activeId, resolveConversationIdForRecipientIds, selectedUserIds])
 
   useEffect(() => {
     fetchConversations()
@@ -575,7 +692,11 @@ export default function Index() {
 
       const rootPath = new URL(route("messenger.index"), window.location.origin).pathname.replace(/\/+$/, "")
       if (window.location.pathname.replace(/\/+$/, "") === rootPath) {
-        setActiveId((current) => current ?? safeConversations[0]?.id ?? null)
+        setActiveId((current) => {
+          if (current != null) return current
+          if (isCreatingConversation || selectedUserIds.length > 0) return null
+          return safeConversations[0]?.id ?? null
+        })
       }
     }
 
@@ -585,7 +706,7 @@ export default function Index() {
     return () => {
       window.removeEventListener("popstate", syncFromHash)
     }
-  }, [safeConversations])
+  }, [safeConversations, isCreatingConversation, selectedUserIds.length])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -723,56 +844,62 @@ export default function Index() {
     if (!window.Echo) return
 
     window.Echo.private(`user.${me.id}`).listen(".messenger.conversation.ping", (e) => {
-        setConversations((prev) => {
-          const idx = prev.findIndex((c) => Number(c.id) === Number(e.conversation_id))
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => Number(c.id) === Number(e.conversation_id))
+        const senderSnapshot = buildRecentSenderSnapshot({
+          id: e.sender_id,
+          ipms_id: e.sender_ipms_id,
+          name: e.sender_name,
+          avatar: e.sender_avatar,
+        })
 
-          if (idx >= 0) {
-            const updated = {
-              ...prev[idx],
-              last_message: e.last_message,
-              last_message_at: e.last_message_at,
-              last_message_sender_name: e.sender_name ?? prev[idx].last_message_sender_name ?? null,
-              last_message_attachment_path: e.last_message_attachment_path ?? null,
-              last_message_attachment_url: e.last_message_attachment_url ?? null,
-              last_message_attachment_name: e.last_message_attachment_name ?? null,
-              last_message_attachment_type: e.last_message_attachment_type ?? null,
-              type: e.conversation_type || prev[idx].type,
-              title: e.conversation_title ?? prev[idx].title ?? null,
-              conversation_token: e.conversation_token ?? prev[idx].conversation_token ?? null,
-              name: e.conversation_type === "group"
-                ? (e.conversation_title || prev[idx].name || "Conversation")
-                : (prev[idx].name || e.sender_name || "Conversation"),
-              participants: e.participants ?? prev[idx].participants ?? [],
-            }
-            const next = [...prev]
-            next.splice(idx, 1)
-            next.unshift(updated)
-            return sortConversationsByRecent(next)
+        if (idx >= 0) {
+          const updated = {
+            ...prev[idx],
+            last_message: e.last_message,
+            last_message_at: e.last_message_at,
+            last_message_sender_name: e.sender_name ?? prev[idx].last_message_sender_name ?? null,
+            last_message_attachment_path: e.last_message_attachment_path ?? null,
+            last_message_attachment_url: e.last_message_attachment_url ?? null,
+            last_message_attachment_name: e.last_message_attachment_name ?? null,
+            last_message_attachment_type: e.last_message_attachment_type ?? null,
+            type: e.conversation_type || prev[idx].type,
+            title: e.conversation_title ?? prev[idx].title ?? null,
+            conversation_token: e.conversation_token ?? prev[idx].conversation_token ?? null,
+            name: e.conversation_type === "group"
+              ? (e.conversation_title || prev[idx].name || "Conversation")
+              : (prev[idx].name || e.sender_name || "Conversation"),
+            participants: e.participants ?? prev[idx].participants ?? [],
+          }
+          const next = [...prev]
+          next.splice(idx, 1)
+          next.unshift(updated)
+          return pushConversationRecentSender(sortConversationsByRecent(next), e.conversation_id, senderSnapshot)
         }
 
         const next = [
           {
-              id: Number(e.conversation_id),
-              type: e.conversation_type || "direct",
-              name: e.conversation_type === "group"
-                ? (e.conversation_title || "Conversation")
-                : (e.sender_name || "Conversation"),
-              title: e.conversation_title || null,
-              conversation_token: e.conversation_token ?? null,
-              other_user_id: e.conversation_type === "direct" ? Number(e.sender_id) : null,
-              other_user_ipms_id: e.conversation_type === "direct" ? (e.sender_ipms_id ?? null) : null,
-              participants: e.participants ?? [],
-              last_message: e.last_message,
-              last_message_sender_name: e.sender_name ?? null,
-              last_message_attachment_path: e.last_message_attachment_path ?? null,
-              last_message_attachment_url: e.last_message_attachment_url ?? null,
-              last_message_attachment_name: e.last_message_attachment_name ?? null,
+            id: Number(e.conversation_id),
+            type: e.conversation_type || "direct",
+            name: e.conversation_type === "group"
+              ? (e.conversation_title || "Conversation")
+              : (e.sender_name || "Conversation"),
+            title: e.conversation_title || null,
+            conversation_token: e.conversation_token ?? null,
+            other_user_id: e.conversation_type === "direct" ? Number(e.sender_id) : null,
+            other_user_ipms_id: e.conversation_type === "direct" ? (e.sender_ipms_id ?? null) : null,
+            participants: e.participants ?? [],
+            last_message: e.last_message,
+            last_message_sender_name: e.sender_name ?? null,
+            last_message_attachment_path: e.last_message_attachment_path ?? null,
+            last_message_attachment_url: e.last_message_attachment_url ?? null,
+            last_message_attachment_name: e.last_message_attachment_name ?? null,
             last_message_attachment_type: e.last_message_attachment_type ?? null,
             last_message_at: e.last_message_at,
           },
           ...prev,
         ]
-        return sortConversationsByRecent(next)
+        return pushConversationRecentSender(sortConversationsByRecent(next), e.conversation_id, senderSnapshot)
       })
     })
 
@@ -791,6 +918,33 @@ export default function Index() {
           }
         })
       )
+    })
+
+    window.Echo.private(`user.${me.id}`).listen(".messenger.conversation.members-updated", (e) => {
+      if (!e?.conversation_id) return
+
+      const removedUserIds = Array.isArray(e.removed_user_ids) ? e.removed_user_ids.map((id) => Number(id)) : []
+      const removedForMe = Number(me?.id) > 0 && removedUserIds.includes(Number(me?.id))
+      const deleted = Boolean(e.deleted)
+
+      setConversations((prev) => applyConversationMembershipUpdate(prev, e, me?.id).conversations)
+
+      if (removedForMe || deleted) {
+        setActiveId((current) => {
+          if (Number(current) === Number(e.conversation_id)) {
+            setMessages([])
+            setHasMore(true)
+            setBody("")
+            setReplyTo(null)
+            setTypingUser(null)
+            setIsCreatingConversation(false)
+            setSelectedUserIds([])
+            return null
+          }
+
+          return current
+        })
+      }
     })
 
     return () => {
@@ -829,6 +983,8 @@ export default function Index() {
 
     const targetConversationId = await ensureConversationForDraft()
     if (!targetConversationId) return false
+
+    handleSelectConversation(targetConversationId)
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const attachmentPreviewUrl = attachment ? URL.createObjectURL(attachment) : null
@@ -871,6 +1027,7 @@ export default function Index() {
     })
 
     updateConversationPreview(targetConversationId, optimisticMessage)
+    emitConversationSync(targetConversationId)
 
     try {
       const formData = new FormData()
@@ -901,6 +1058,7 @@ export default function Index() {
 
           updateConversationPreview(targetConversationId, msg)
           void fetchConversations({ silent: true })
+          emitConversationSync(targetConversationId)
           setTypingUser(null)
 
         requestAnimationFrame(() => {
@@ -957,7 +1115,7 @@ export default function Index() {
       }
 
       void fetchConversations({ silent: true })
-      setActiveId(targetConversationId)
+      emitConversationSync(targetConversationId)
 
       return true
     } catch (error) {
@@ -972,6 +1130,7 @@ export default function Index() {
 
       <div className="h-[calc(100vh-140px)] min-h-0 grid grid-cols-[clamp(240px,28vw,340px)_minmax(0,1fr)] gap-4">
         <Conversations
+          me={me}
           meId={me?.id}
           onlineUserIds={onlineUserIds}
           safeUsers={safeUsers}
@@ -981,6 +1140,7 @@ export default function Index() {
           onSelectConversation={handleSelectConversation}
           onDeleteConversation={handleDeleteConversation}
           onRenameConversation={handleRenameConversation}
+          onLeaveConversationGroup={handleLeaveConversationGroup}
           conversationsLoading={conversationsLoading}
           loadingMoreConversations={loadingMoreConversations}
           convoListRef={convoListRef}
@@ -992,19 +1152,23 @@ export default function Index() {
           <SelectedConversation
             me={me}
             safeUsers={safeUsers}
-          activeConversation={activeConversation}
-          conversationReadReceipts={activeConversationReadReceipts}
-          selectedUserIds={selectedUserIds}
-          setSelectedUserIds={setSelectedUserIds}
-          isComposing={isCreatingConversation || selectedUserIds.length > 0}
+            activeConversation={activeConversation}
+            conversationReadReceipts={activeConversationReadReceipts}
+            selectedUserIds={selectedUserIds}
+            setSelectedUserIds={setSelectedUserIds}
+            isComposing={isCreatingConversation || selectedUserIds.length > 0}
             onlineUserIds={onlineUserIds}
             avatarUrl={avatarUrl}
             typingUser={typingUser}
             startConversation={startConversation}
             onPreviewConversation={handlePreviewConversation}
             resolveDirectConversationId={resolveDirectConversationId}
+            resolveConversationIdForRecipientIds={resolveConversationIdForRecipientIds}
             onDeleteConversation={handleDeleteConversation}
             onRenameConversation={handleRenameConversation}
+            onAddConversationMembers={handleAddConversationMembers}
+            onRemoveConversationMember={handleRemoveConversationMember}
+            onLeaveConversationGroup={handleLeaveConversationGroup}
           />
 
           <Messages

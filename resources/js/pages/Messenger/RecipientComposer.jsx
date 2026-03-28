@@ -10,9 +10,15 @@ export default function RecipientComposer({
   setSelectedUserIds,
   onPreviewConversation,
   resolveDirectConversationId,
+  resolveConversationIdForRecipientIds,
   onlineUserIds,
   avatarUrl,
+  excludeUserIds = [],
   autoOpen = false,
+  keepOpenOnSelect = false,
+  draftOnMissingConversation = false,
+  compact = false,
+  floatingDropdown = false,
 }) {
   const { onlineUserIds: sharedOnlineUserIds } = useMessengerShared()
   const resolvedOnlineUserIds = onlineUserIds ?? sharedOnlineUserIds
@@ -22,12 +28,13 @@ export default function RecipientComposer({
 
   const recipientMap = useMemo(() => {
     const map = new Map()
+    const excluded = new Set([Number(me?.id), ...excludeUserIds.map((id) => Number(id))].filter((id) => Number.isFinite(id) && id > 0))
     for (const user of safeUsers || []) {
-      if (user?.id == null || Number(user.id) === Number(me?.id)) continue
+      if (user?.id == null || excluded.has(Number(user.id))) continue
       map.set(Number(user.id), user)
     }
     return map
-  }, [safeUsers, me?.id])
+  }, [safeUsers, me?.id, excludeUserIds])
 
   const selectedUsers = useMemo(
     () => selectedUserIds.map((id) => recipientMap.get(Number(id))).filter(Boolean),
@@ -37,27 +44,20 @@ export default function RecipientComposer({
   const isUserOnline = (userId) => resolvedOnlineUserIds?.has(Number(userId))
 
   const finalizeSelection = async () => {
-    if (selectedUsers.length === 1) {
-      const directConversationId = resolveDirectConversationId?.(selectedUsers[0].id)
-      if (directConversationId) {
-        onPreviewConversation?.(directConversationId)
-      }
-    }
-
     setQuery("")
     setOpen(false)
   }
 
   useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (!containerRef.current?.contains(event.target)) {
-        if (selectedUsers.length) {
-          void finalizeSelection()
-        } else {
-          setOpen(false)
+      const handlePointerDown = (event) => {
+        if (!containerRef.current?.contains(event.target)) {
+          if (selectedUsers.length) {
+            void finalizeSelection()
+          } else {
+            setOpen(false)
+          }
         }
       }
-    }
 
     document.addEventListener("mousedown", handlePointerDown)
     return () => document.removeEventListener("mousedown", handlePointerDown)
@@ -101,22 +101,31 @@ export default function RecipientComposer({
     const id = Number(userId)
     if (!id) return
 
-    const shouldPreviewDirect = selectedUserIds.length === 0
-      ? resolveDirectConversationId?.(id)
-      : null
+    const alreadySelected = selectedUserIds.map(Number).includes(id)
+    const nextSelectedIds = alreadySelected ? selectedUserIds : [...selectedUserIds, id]
 
     setSelectedUserIds((prev) => {
-      if (prev.map(Number).includes(id)) return prev
-      const next = [...prev, id]
-      return next
+      if (prev.map(Number).includes(id)) {
+        return prev
+      }
+
+      return [...prev, id]
     })
+
     setQuery("")
-    if (shouldPreviewDirect) {
-      onPreviewConversation?.(shouldPreviewDirect)
-      return
+    const candidateConversationId =
+      resolveConversationIdForRecipientIds?.(nextSelectedIds)
+      ?? (selectedUserIds.length === 0 ? resolveDirectConversationId?.(id) : null)
+
+    if (candidateConversationId) {
+      onPreviewConversation?.(candidateConversationId, { preserveSelection: true })
+    } else if (draftOnMissingConversation) {
+      onPreviewConversation?.(null, { preserveSelection: true, draft: true })
     }
 
-    setOpen(false)
+    if (!keepOpenOnSelect) {
+      setOpen(false)
+    }
   }
 
   const removeRecipient = (userId) => {
@@ -142,49 +151,20 @@ export default function RecipientComposer({
 
   return (
     <div ref={containerRef} className="rounded-lg bg-background">
-      <div className="px-3 py-1.5">
+      <div className={`px-3 py-1.5 ${compact ? "pb-0" : ""}`}>
         <div className="flex items-center gap-2">
-          <div className="flex shrink-0 items-center gap-1.5">
-            {selectedUsers.length > 0 && (
-              <div className="flex items-center">
-                {selectedUsers.slice(0, 2).map((user, index) => (
-                  <div key={user.id} className={`relative ${index > 0 ? "-ml-3" : ""}`}>
-                    <Avatar className="h-7 w-7 border-2 border-background">
-                      <AvatarImage src={avatarUrl(user.ipms_id)} alt={user.name} loading="lazy" />
-                      <AvatarFallback>
-                        {(user.name || "U")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span
-                      className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${
-                        isUserOnline(user.id) ? "bg-green-500" : "bg-red-500"
-                      }`}
-                    />
-                  </div>
-                ))}
-
-                {selectedUsers.length > 2 && (
-                  <div className="-ml-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-slate-200 text-[10px] font-semibold text-slate-700">
-                    +{selectedUsers.length - 2}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="text-xs font-medium leading-none text-muted-foreground">To:</div>
-          </div>
+          <div className="text-xs font-medium leading-none text-muted-foreground">To:</div>
 
           <div className="relative min-w-0 flex-1">
             <div
               className="rounded-md border border-transparent bg-background px-2 py-1.5 transition focus-within:border-transparent focus-within:ring-0"
               onClick={() => setOpen(true)}
             >
-              <div className="flex flex-wrap items-start gap-1.5">
+              <div
+                className={`flex flex-wrap items-start gap-1.5 ${
+                  compact ? "max-h-28 overflow-y-auto pr-1" : ""
+                }`}
+              >
                 {selectedUsers.map((user) => (
                   <span
                     key={user.id}
@@ -241,8 +221,14 @@ export default function RecipientComposer({
             </div>
 
             {open && (
-              <div className="relative">
-                <div className="absolute left-0 right-0 top-2 z-20 overflow-hidden rounded-md border bg-background shadow-lg">
+              <div className={compact ? "relative" : "relative"}>
+                <div
+                  className={`z-50 overflow-hidden rounded-md border bg-background shadow-2xl ${
+                    floatingDropdown || compact
+                      ? "absolute left-0 right-0 top-full mt-2"
+                      : "absolute left-0 right-0 top-2"
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2 px-3 py-2">
                     <div className="text-xs font-medium text-muted-foreground">Your contacts</div>
                     <button
@@ -284,7 +270,7 @@ export default function RecipientComposer({
                               </Avatar>
                               <span
                                 className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border border-white ${
-                                  onlineUserIds.has(Number(user.id)) ? "bg-green-500" : "bg-red-500"
+                                  resolvedOnlineUserIds?.has(Number(user.id)) ? "bg-green-500" : "bg-red-500"
                                 }`}
                               />
                             </div>

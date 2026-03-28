@@ -40,6 +40,7 @@ class UpdateConversationTitle
     {
         $conversation->forceFill([
             'title' => trim($title),
+            'is_title_custom' => true,
         ])->save();
 
         $latestMessage = $conversation->messages()
@@ -86,6 +87,7 @@ class UpdateConversationTitle
                     : null,
                 senderId: (int) ($latestMessage?->sender_id ?? 0),
                 senderName: (string) ($latestMessage?->sender?->name ?? 'System'),
+                senderIpmsId: (string) ($latestMessage?->sender?->ipms_id ?? ''),
                 message: (string) ($latestMessage?->body ?? ''),
                 attachmentPath: $latestMessage?->attachment_path,
                 attachmentUrl: $latestMessage?->attachment_path

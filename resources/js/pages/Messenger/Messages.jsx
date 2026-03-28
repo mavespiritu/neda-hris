@@ -118,11 +118,26 @@ const MessageThreadSkeleton = () => (
   </div>
 )
 
-const ForwardConversationAvatar = ({ conversation, avatarUrl }) => {
+const ForwardConversationAvatar = ({ conversation, avatarUrl, meId = null, safeUsers = [] }) => {
   const participants = conversation?.participants || []
+  const recentSenders = Array.isArray(conversation?.recent_senders) ? conversation.recent_senders : []
+  const selfUser = meId != null
+    ? safeUsers.find((user) => Number(user?.id) === Number(meId)) || null
+    : null
+  const smallGroupAvatars = participants.length === 1 && selfUser
+    ? [{
+        id: Number(selfUser.id),
+        ipms_id: selfUser.ipms_id ?? null,
+        name: selfUser.name || "You",
+        avatar: selfUser.avatar || (selfUser.ipms_id ? avatarUrl(selfUser.ipms_id) : null),
+      }, ...participants]
+    : participants
+  const groupAvatars = participants.length <= 2
+    ? smallGroupAvatars
+    : (recentSenders.length ? recentSenders : participants)
 
-  if (conversation?.type === "group" && participants.length) {
-    const preview = participants.slice(0, 2)
+  if (conversation?.type === "group" && groupAvatars.length) {
+    const preview = groupAvatars.slice(0, 2)
 
     return (
       <div className="relative h-8 w-8 shrink-0">
@@ -143,11 +158,6 @@ const ForwardConversationAvatar = ({ conversation, avatarUrl }) => {
           </Avatar>
         ))}
 
-        {participants.length > 2 && (
-          <div className="absolute -right-1 -bottom-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-200 px-1 text-[9px] font-semibold text-slate-700">
-            +{participants.length - 2}
-          </div>
-        )}
       </div>
     )
   }
@@ -1232,7 +1242,12 @@ export default function Messages({
                               setForwardTargetUserId(null)
                             }}
                           >
-                            <ForwardConversationAvatar conversation={conversation} avatarUrl={avatarUrl} />
+                            <ForwardConversationAvatar
+                              conversation={conversation}
+                              avatarUrl={avatarUrl}
+                              meId={me?.id}
+                              safeUsers={safeUsers}
+                            />
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-sm font-medium text-slate-900">{conversation.name}</div>
                               <div className="truncate text-xs text-slate-500">

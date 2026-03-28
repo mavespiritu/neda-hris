@@ -36,6 +36,7 @@ class StartConversation
     public function asController(ActionRequest $request): JsonResponse
     {
         $me = (int) $request->user()->id;
+        $senderName = (string) ($request->user()->name ?? 'You');
         $userIds = collect($request->validated('user_ids', []))
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $id !== $me)
@@ -48,7 +49,7 @@ class StartConversation
             return $this->createDirectConversation($me, (int) $userIds->first());
         }
 
-        return $this->createGroupConversation($me, $userIds, (string) $request->input('title', ''));
+        return $this->createGroupConversation($me, $senderName, $userIds, (string) $request->input('title', ''));
     }
 
     protected function createDirectConversation(int $me, int $other): JsonResponse
@@ -80,12 +81,13 @@ class StartConversation
         ]);
     }
 
-    protected function createGroupConversation(int $me, Collection $userIds, string $title = ''): JsonResponse
+    protected function createGroupConversation(int $me, string $senderName, Collection $userIds, string $title = ''): JsonResponse
     {
         $participantIds = $userIds->push($me)->unique()->values();
         $resolvedTitle = trim($title);
+        $isCustomTitle = $resolvedTitle !== '';
 
-        if ($resolvedTitle === '') {
+        if (! $isCustomTitle) {
             $users = User::query()
                 ->select(['id', 'ipms_id', 'email'])
                 ->whereIn('id', $participantIds->all())
@@ -100,10 +102,11 @@ class StartConversation
             $resolvedTitle = $this->buildGroupTitle($names);
         }
 
-        $conversation = DB::transaction(function () use ($participantIds, $resolvedTitle) {
+        $conversation = DB::transaction(function () use ($participantIds, $resolvedTitle, $isCustomTitle) {
             $c = Conversation::create([
                 'type' => 'group',
                 'title' => $resolvedTitle !== '' ? $resolvedTitle : null,
+                'is_title_custom' => $isCustomTitle,
             ]);
 
             $c->participants()->sync($participantIds->all());
@@ -143,7 +146,8 @@ class StartConversation
                     ->values()
                     ->all(),
                 senderId: $me,
-                senderName: (string) ($request->user()->name ?? 'You'),
+                senderName: $senderName,
+                senderIpmsId: (string) ($conversation->participants()->where('users.id', $me)->first()?->ipms_id ?? ''),
                 message: '',
                 createdAt: now()->toISOString()
             ));

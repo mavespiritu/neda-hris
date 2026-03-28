@@ -23,7 +23,7 @@ class ShowMessengerPage
         );
 
         if (!$me || blank($me->ipms_id ?? null)) {
-            abort(403, 'Messenger is only available for staff accounts.');
+            abort(404, 'Page not found');
         }
 
         $cacheKey = 'messenger:users:' . ($me?->id ?? 'guest');

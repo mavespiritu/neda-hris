@@ -10,7 +10,7 @@ class Conversation extends Model
     protected $connection = 'mysql4';
     protected $table = 'conversations';
 
-    protected $fillable = ['type', 'title'];
+    protected $fillable = ['type', 'title', 'is_title_custom'];
 
     public function participants(): BelongsToMany
     {

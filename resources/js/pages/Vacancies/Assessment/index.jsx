@@ -254,12 +254,12 @@ const AssessmentTab = () => {
           <TableHeader>
             <TableRow className="bg-muted">
               <TableHead className="w-[4%]">#</TableHead>
-              <TableHead className="w-[8%]">Rank</TableHead>
               <TableHead className="w-[20%]">Applicant</TableHead>
               <TableHead className="w-[13%]">Secretariat Assessment</TableHead>
               <TableHead className="w-[13%]">HRMPSB Assessment</TableHead>
               <TableHead className="w-[14%]">Skill Test Result</TableHead>
               <TableHead className="w-[14%]">DPE Result</TableHead>
+              <TableHead className="w-[8%]">Rank</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -276,19 +276,6 @@ const AssessmentTab = () => {
               rows.map((applicant, index) => (
                 <TableRow key={applicant.id} className="hover:bg-transparent">
                   <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="inline-flex rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
-                      onClick={() => openRankDialog(applicant)}
-                    >
-                      <div className="flex flex-col">
-                        <span className={applicant.rank ? "text-foreground" : "text-muted-foreground"}>
-                          {applicant.rank || "Not Set"}
-                        </span>
-                      </div>
-                    </button>
-                  </TableCell>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
                       <span>{formatFullName(applicant.name)}</span>
@@ -389,6 +376,19 @@ const AssessmentTab = () => {
                             {formatDate(applicant.dpe_date_conducted)}
                           </span>
                         )}
+                      </div>
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="inline-flex rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
+                      onClick={() => openRankDialog(applicant)}
+                    >
+                      <div className="flex flex-col">
+                        <span className={applicant.rank ? "text-foreground" : "text-muted-foreground"}>
+                          {applicant.rank || "Not Set"}
+                        </span>
                       </div>
                     </button>
                   </TableCell>

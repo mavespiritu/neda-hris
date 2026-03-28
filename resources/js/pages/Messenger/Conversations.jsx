@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Loader2, MessageSquarePlus, MoreHorizontal, Trash2, PencilLine } from "lucide-react"
+import { Loader2, LogOut, MessageSquarePlus, MoreHorizontal, PencilLine, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -81,6 +81,7 @@ const stickerEmojiFromPreview = (value) => {
 }
 
 export default function Conversations({
+  me,
   meId,
   onlineUserIds,
   safeUsers = [],
@@ -95,6 +96,7 @@ export default function Conversations({
   avatarUrl,
   onDeleteConversation,
   onRenameConversation,
+  onLeaveConversationGroup,
 }) {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [actionTargetId, setActionTargetId] = useState(null)
@@ -177,6 +179,7 @@ export default function Conversations({
                 <div key={`conversation-${c.id}`} className="group relative">
                   <MessengerConversationRow
                     conversation={c}
+                    me={me}
                     safeUsers={safeUsers}
                     meId={meId}
                     avatarUrl={avatarUrl}
@@ -226,6 +229,19 @@ export default function Conversations({
                         >
                           <PencilLine className="mr-2 h-4 w-4" />
                           Change chat name
+                        </button>
+                      )}
+                      {c.type === "group" && (
+                        <button
+                          type="button"
+                          className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-amber-600"
+                          onClick={() => {
+                            setActionTargetId(null)
+                            onLeaveConversationGroup?.(c.id)
+                          }}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Leave group
                         </button>
                       )}
                       <button

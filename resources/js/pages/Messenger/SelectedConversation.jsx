@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { MoreHorizontal, PencilLine, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { LogOut, MoreHorizontal, PencilLine, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -24,6 +24,7 @@ import {
 import RecipientComposer from "./RecipientComposer"
 import { MessengerConversationAvatar } from "@/components/MessengerConversationRow"
 import { useMessengerShared } from "@/providers/MessengerSharedProvider"
+import MessengerGroupMembersDialog from "@/components/MessengerGroupMembersDialog"
 
 export default function SelectedConversation({
   me,
@@ -38,17 +39,28 @@ export default function SelectedConversation({
   startConversation,
   onPreviewConversation,
   resolveDirectConversationId,
+  resolveConversationIdForRecipientIds,
   onDeleteConversation,
   onRenameConversation,
+  onAddConversationMembers,
+  onRemoveConversationMember,
+  onLeaveConversationGroup,
 }) {
   const { onlineUserIds: sharedOnlineUserIds } = useMessengerShared()
   const resolvedOnlineUserIds = onlineUserIds ?? sharedOnlineUserIds
   const [actionOpen, setActionOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
   const [renameValue, setRenameValue] = useState("")
   const directOtherUserId = Number(activeConversation?.other_user_id ?? 0)
   const canShowDirectStatus = Number.isFinite(directOtherUserId) && directOtherUserId > 0
+
+  useEffect(() => {
+    setMembersOpen(false)
+    setRenameOpen(false)
+    setActionOpen(false)
+  }, [activeConversation?.id])
 
   const openRename = () => {
     if (!activeConversation?.id) return
@@ -72,6 +84,13 @@ export default function SelectedConversation({
     onDeleteConversation?.(activeConversation.id)
   }
 
+  const openMembersDialog = () => {
+    if (!activeConversation?.id || activeConversation.type !== "group") return
+
+    setActionOpen(false)
+    setMembersOpen(true)
+  }
+
   return (
     <div className="shrink-0 border-b pb-2 mb-2">
       {isComposing ? (
@@ -83,15 +102,19 @@ export default function SelectedConversation({
           startConversation={startConversation}
           onPreviewConversation={onPreviewConversation}
           resolveDirectConversationId={resolveDirectConversationId}
+          resolveConversationIdForRecipientIds={resolveConversationIdForRecipientIds}
           onlineUserIds={resolvedOnlineUserIds}
           avatarUrl={avatarUrl}
           autoOpen={isComposing}
+          keepOpenOnSelect
+          draftOnMissingConversation
         />
       ) : activeConversation ? (
         <div className="group relative space-y-2 pr-12">
           <div className="flex items-center gap-3">
             <MessengerConversationAvatar
               conversation={activeConversation}
+              me={me}
               safeUsers={safeUsers}
               meId={me?.id}
               avatarUrl={avatarUrl}
@@ -136,10 +159,33 @@ export default function SelectedConversation({
                 <button
                   type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                  onClick={openMembersDialog}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage members
+                </button>
+              )}
+              {activeConversation.type === "group" && (
+                <button
+                  type="button"
+                  className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                   onClick={openRename}
                 >
                   <PencilLine className="mr-2 h-4 w-4" />
                   Change chat name
+                </button>
+              )}
+              {activeConversation.type === "group" && (
+                <button
+                  type="button"
+                  className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-amber-600"
+                  onClick={() => {
+                    setActionOpen(false)
+                    onLeaveConversationGroup?.(activeConversation.id)
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Leave group
                 </button>
               )}
               <button
@@ -159,6 +205,19 @@ export default function SelectedConversation({
       ) : (
         <div className="text-sm text-slate-500">Select a conversation</div>
       )}
+
+      <MessengerGroupMembersDialog
+        open={membersOpen}
+        onOpenChange={setMembersOpen}
+        conversation={activeConversation}
+        me={me}
+        safeUsers={safeUsers}
+        meId={me?.id}
+        avatarUrl={avatarUrl}
+        onAddMembers={async (userIds) => onAddConversationMembers?.(activeConversation?.id, userIds)}
+        onRemoveMember={async (userId) => onRemoveConversationMember?.(activeConversation?.id, userId)}
+        onLeaveGroup={async () => onLeaveConversationGroup?.(activeConversation?.id)}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={(open) => !open && setDeleteOpen(false)}>
         <AlertDialogContent>

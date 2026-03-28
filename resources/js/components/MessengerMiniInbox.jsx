@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios"
 import { Link } from "@inertiajs/react"
-import { MessageSquareMore, ChevronRight, MessageSquarePlus } from "lucide-react"
+import { ChevronRight, MessageSquareMore, MessageSquarePlus, MoreHorizontal, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -9,12 +9,14 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useConversationReadSync, useMessengerShared } from "@/providers/MessengerSharedProvider"
 import { MessengerConversationRow } from "@/components/MessengerConversationRow"
+import MessengerGroupMembersDialog from "@/components/MessengerGroupMembersDialog"
 import {
   isConversationListNearBottom,
   mergeConversationPages,
   resolveConversationHasMore,
   sortConversationsByRecent,
 } from "@/lib/messengerConversationPagination"
+import { applyConversationMembershipUpdate, pushConversationRecentSender } from "@/lib/messengerConversationMembership"
 
 const CONVO_LIMIT = 10
 
@@ -57,6 +59,7 @@ const formatPreview = (conversation) => {
 export default function MessengerMiniInbox({
   userId,
   meId = null,
+  me = null,
   users = [],
   onOpenConversation,
   onComposeNewMessage,
@@ -67,6 +70,8 @@ export default function MessengerMiniInbox({
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const [actionConversationId, setActionConversationId] = useState(null)
+  const [membersConversation, setMembersConversation] = useState(null)
   const listRef = useRef(null)
   const { onlineUserIds, markConversationRead } = useMessengerShared()
   useConversationReadSync(setConversations)
@@ -80,6 +85,28 @@ export default function MessengerMiniInbox({
 
     return [...map.values()]
   }, [users])
+
+  const buildRecentSenderSnapshot = (sender = {}) => ({
+    id: Number(sender?.id || 0),
+    ipms_id: sender?.ipms_id ?? null,
+    name: sender?.name ?? "Member",
+    avatar: sender?.avatar || (sender?.ipms_id ? `/employees/image/${sender.ipms_id}` : null),
+  })
+
+  const buildSelfAvatar = () => {
+    const selfUser = meId != null
+      ? safeUsers.find((user) => Number(user?.id) === Number(meId)) || null
+      : null
+
+    return selfUser
+      ? {
+          id: Number(selfUser.id),
+          ipms_id: selfUser.ipms_id ?? null,
+          name: selfUser.name || "You",
+          avatar: selfUser.avatar || (selfUser.ipms_id ? `/employees/image/${selfUser.ipms_id}` : null),
+        }
+      : null
+  }
 
   const fetchConversations = async ({ beforeId = null, append = false, silent = false } = {}) => {
     if (!userId) return
@@ -116,13 +143,27 @@ export default function MessengerMiniInbox({
 
   useEffect(() => {
     void fetchConversations()
-  }, [userId])
+  }, [userId, meId])
 
   useEffect(() => {
     if (open && userId && conversations.length === 0) {
       void fetchConversations()
     }
   }, [open, userId, conversations.length])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined
+
+    const handleConversationSync = (event) => {
+      const conversationId = Number(event?.detail?.conversationId || 0)
+      if (conversationId) {
+        void fetchConversations({ silent: true })
+      }
+    }
+
+    window.addEventListener("messenger:conversation-sync", handleConversationSync)
+    return () => window.removeEventListener("messenger:conversation-sync", handleConversationSync)
+  }, [userId, open, conversations.length])
 
   useEffect(() => {
     if (!open || !userId) return undefined
@@ -164,9 +205,17 @@ export default function MessengerMiniInbox({
       setConversations((prev) => {
         const idx = prev.findIndex((conversation) => Number(conversation.id) === Number(e.conversation_id))
         const unreadDelta = Number(e.sender_id) === Number(userId) ? 0 : 1
+        const senderSnapshot = buildRecentSenderSnapshot({
+          id: e.sender_id,
+          ipms_id: e.sender_ipms_id,
+          name: e.sender_name,
+          avatar: e.sender_avatar,
+        })
 
         if (idx >= 0) {
           const current = prev[idx]
+          const selfAvatar = buildSelfAvatar()
+          const participants = Array.isArray(e.participants) ? e.participants : current.participants ?? []
           const updated = {
             ...current,
             last_message: e.last_message ?? current.last_message ?? null,
@@ -181,7 +230,10 @@ export default function MessengerMiniInbox({
             name: e.conversation_type === "group"
               ? (e.conversation_title || current.name || "Conversation")
               : (current.name || e.sender_name || "Conversation"),
-            participants: e.participants ?? current.participants ?? [],
+            participants,
+            recent_senders: participants.length === 1 && selfAvatar
+              ? [selfAvatar, ...participants]
+              : participants,
             unread_count: Math.max(0, Number(current.unread_count || 0) + unreadDelta),
             type: e.conversation_type || current.type,
           }
@@ -189,10 +241,10 @@ export default function MessengerMiniInbox({
           const next = [...prev]
           next.splice(idx, 1)
           next.unshift(updated)
-          return next
+          return pushConversationRecentSender(sortConversationsByRecent(next), e.conversation_id, senderSnapshot)
         }
 
-        return [
+        const next = [
           {
             id: Number(e.conversation_id),
             type: e.conversation_type || "direct",
@@ -206,7 +258,7 @@ export default function MessengerMiniInbox({
             other_user_avatar: e.conversation_type === "direct" && e.sender_ipms_id
               ? `/employees/image/${e.sender_ipms_id}`
               : "https://www.gravatar.com/avatar/?d=mp&s=200",
-            participants: e.participants ?? [],
+            participants: Array.isArray(e.participants) ? e.participants : [],
             last_message: e.last_message,
             last_message_sender_name: e.sender_name ?? null,
             last_message_attachment_path: e.last_message_attachment_path ?? null,
@@ -215,9 +267,11 @@ export default function MessengerMiniInbox({
             last_message_attachment_type: e.last_message_attachment_type ?? null,
             last_message_at: e.last_message_at,
             unread_count: unreadDelta,
+            recent_senders: [],
           },
           ...prev,
         ]
+        return pushConversationRecentSender(sortConversationsByRecent(next), e.conversation_id, senderSnapshot)
       })
     })
 
@@ -238,10 +292,39 @@ export default function MessengerMiniInbox({
       )
     })
 
+    channel.listen(".messenger.conversation.members-updated", (e) => {
+      if (!e?.conversation_id) return
+
+      const removedUserIds = Array.isArray(e.removed_user_ids) ? e.removed_user_ids.map((id) => Number(id)) : []
+      const removedForMe = Number(meId) > 0 && removedUserIds.includes(Number(meId))
+      const deleted = Boolean(e.deleted)
+
+      setConversations((prev) => applyConversationMembershipUpdate(prev, e, meId).conversations)
+
+      if (removedForMe || deleted) {
+        setActionConversationId((current) => (Number(current) === Number(e.conversation_id) ? null : current))
+        setMembersConversation((current) =>
+          Number(current?.id) === Number(e.conversation_id) ? null : current
+        )
+      }
+    })
+
     return () => {
       window.Echo.leave(`private-user.${userId}`)
     }
   }, [userId])
+
+  useEffect(() => {
+    if (!membersConversation?.id) return
+
+    const latestConversation = conversations.find(
+      (conversation) => Number(conversation.id) === Number(membersConversation.id)
+    )
+
+    if (latestConversation && latestConversation !== membersConversation) {
+      setMembersConversation(latestConversation)
+    }
+  }, [conversations, membersConversation?.id])
 
   const unreadCount = useMemo(
     () => conversations.reduce((sum, conversation) => sum + Number(conversation.unread_count || 0), 0),
@@ -315,6 +398,7 @@ export default function MessengerMiniInbox({
                 <MessengerConversationRow
                   key={conversation.id}
                   conversation={conversation}
+                  me={me}
                   safeUsers={safeUsers}
                   meId={meId}
                   onlineUserIds={onlineUserIds}
@@ -322,7 +406,52 @@ export default function MessengerMiniInbox({
                   timeLabel={formatRelativeTime(conversation.last_message_at)}
                   unreadCount={conversation.unread_count}
                   showUnreadBadge={true}
-                  trailing={<ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />}
+                  trailing={
+                    conversation.type === "group" ? (
+                      <Popover
+                        open={actionConversationId === conversation.id}
+                        onOpenChange={(open) => setActionConversationId(open ? conversation.id : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setActionConversationId((current) =>
+                                Number(current) === Number(conversation.id) ? null : conversation.id
+                              )
+                            }}
+                            aria-label="Conversation actions"
+                            title="Conversation actions"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" sideOffset={8} className="w-44 p-1">
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Chat actions
+                          </div>
+                          <button
+                            type="button"
+                            className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                            onClick={() => {
+                              setActionConversationId(null)
+                              setMembersConversation(conversation)
+                              setOpen(true)
+                            }}
+                          >
+                            <Users className="mr-2 h-4 w-4" />
+                            Manage members
+                          </button>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                    )
+                  }
                   onClick={() => {
                     markConversationRead(conversation.id)
                     setOpen(false)
@@ -369,6 +498,78 @@ export default function MessengerMiniInbox({
             </div>
           </>
         ) : null}
+
+              <MessengerGroupMembersDialog
+          open={Boolean(membersConversation)}
+          onOpenChange={(open) => {
+            if (!open) setMembersConversation(null)
+          }}
+          conversation={membersConversation}
+          me={me}
+          safeUsers={safeUsers}
+          meId={meId}
+          onAddMembers={async (conversationUserIds) => {
+            if (!membersConversation?.id) return false
+
+            try {
+              const res = await axios.post(route("messenger.members", membersConversation.id), {
+                action: "add",
+                user_ids: conversationUserIds.map((id) => Number(id)),
+              })
+
+              if (res.data) {
+                setConversations((prev) => applyConversationMembershipUpdate(prev, res.data, meId).conversations)
+                void fetchConversations({ silent: true })
+              }
+
+              return res.data || true
+            } catch (error) {
+              console.log("messenger.members add error:", error.response?.data || error)
+              return false
+            }
+          }}
+          onRemoveMember={async (userId) => {
+            if (!membersConversation?.id) return false
+
+            try {
+              const res = await axios.post(route("messenger.members", membersConversation.id), {
+                action: "remove",
+                user_ids: [Number(userId)],
+              })
+
+              if (res.data) {
+                setConversations((prev) => applyConversationMembershipUpdate(prev, res.data, meId).conversations)
+                void fetchConversations({ silent: true })
+              }
+
+              return res.data || true
+            } catch (error) {
+              console.log("messenger.members remove error:", error.response?.data || error)
+              return false
+            }
+          }}
+          onLeaveGroup={async () => {
+            if (!membersConversation?.id) return false
+
+            try {
+              const res = await axios.post(route("messenger.members", membersConversation.id), {
+                action: "leave",
+              })
+
+              if (res.data) {
+                setConversations((prev) => applyConversationMembershipUpdate(prev, res.data, meId).conversations)
+                void fetchConversations({ silent: true })
+              }
+
+              setMembersConversation(null)
+              setOpen(false)
+              return res.data || true
+            } catch (error) {
+              console.log("messenger.members leave error:", error.response?.data || error)
+              return false
+            }
+          }}
+        />
       </PopoverContent>
     </Popover>
   )

@@ -202,6 +202,7 @@ export default function MessengerQuickPanel({
 
     let cancelled = false
     activeMessagesRequestRef.current += 1
+    const echo = window.Echo
 
     setMessages([])
     setHasMore(true)
@@ -213,9 +214,9 @@ export default function MessengerQuickPanel({
 
     void fetchRecentConversations()
 
-    if (!window.Echo) return undefined
+    if (!echo) return undefined
 
-    const channel = window.Echo.private(`conversation.${activeConversation.id}`)
+    const channel = echo.private(`conversation.${activeConversation.id}`)
 
     channel.listen(".message.sent", (e) => {
       setMessages((prev) => {
@@ -281,7 +282,7 @@ export default function MessengerQuickPanel({
     })
 
     if (me?.id) {
-      window.Echo.private(`user.${me.id}`).listen(".messenger.conversation.renamed", (e) => {
+      echo.private(`user.${me.id}`).listen(".messenger.conversation.renamed", (e) => {
         if (Number(e.conversation_id) !== Number(activeConversation.id)) return
 
         setActiveConversation((prev) => ({
@@ -330,9 +331,9 @@ export default function MessengerQuickPanel({
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }
-      if (window.Echo) {
-        window.Echo.leave(`private-conversation.${activeConversation.id}`)
-        window.Echo.leave(`private-user.${me.id}`)
+      if (echo) {
+        echo.leave(`private-conversation.${activeConversation.id}`)
+        echo.leave(`private-user.${me.id}`)
       }
     }
   }, [activeConversation?.id, me?.id, open])
@@ -583,6 +584,13 @@ export default function MessengerQuickPanel({
     avatar: user?.avatar || (user?.ipms_id ? `/employees/image/${user.ipms_id}` : null),
   })
 
+  const buildSelfSnapshot = () => ({
+    id: Number(me?.id || 0),
+    ipms_id: me?.ipms_id ?? null,
+    name: me?.name || "You",
+    avatar: me?.avatar || (me?.ipms_id ? `/employees/image/${me.ipms_id}` : null),
+  })
+
   const startConversationWithRecipientIds = async (recipientIds = selectedUserIds) => {
     const normalizedRecipientIds = [...new Set(recipientIds.map((id) => Number(id)).filter(Boolean))]
     if (!normalizedRecipientIds.length) return false
@@ -615,7 +623,9 @@ export default function MessengerQuickPanel({
           : (selectedRecipients[0]?.avatar
             || (selectedRecipients[0]?.ipms_id ? `/employees/image/${selectedRecipients[0].ipms_id}` : null)
             || "https://www.gravatar.com/avatar/?d=mp&s=200"),
-        participants: selectedRecipients.map((user) => buildParticipantSnapshot(user)),
+        participants: isGroup
+          ? [buildSelfSnapshot(), ...selectedRecipients.map((user) => buildParticipantSnapshot(user))]
+          : selectedRecipients.map((user) => buildParticipantSnapshot(user)),
         last_message: null,
         last_message_at: null,
       }

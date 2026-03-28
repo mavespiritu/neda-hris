@@ -55,4 +55,34 @@ class ConversationPolicy
             ? Response::allow()
             : Response::deny('Not allowed.');
     }
+
+    public function manageMembers(User $user, Conversation $conversation): Response
+    {
+        if ($conversation->type !== 'group') {
+            return Response::deny('Only group chats can be managed.');
+        }
+
+        $allowed = $conversation->participants()
+            ->where('users.id', $user->id)
+            ->exists();
+
+        return $allowed
+            ? Response::allow()
+            : Response::deny('Not allowed.');
+    }
+
+    public function leave(User $user, Conversation $conversation): Response
+    {
+        if ($conversation->type !== 'group') {
+            return Response::deny('Only group chats can be left.');
+        }
+
+        $allowed = $conversation->participants()
+            ->where('users.id', $user->id)
+            ->exists();
+
+        return $allowed
+            ? Response::allow()
+            : Response::deny('Not allowed.');
+    }
 }

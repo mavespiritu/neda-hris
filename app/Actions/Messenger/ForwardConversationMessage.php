@@ -112,6 +112,7 @@ class ForwardConversationMessage
                 participants: $participantSnapshots,
                 senderId: (int) $forwardedMessage->sender_id,
                 senderName: (string) $senderName,
+                senderIpmsId: (string) ($forwardedMessage->sender?->ipms_id ?? ''),
                 message: (string) $forwardedMessage->body,
                 attachmentPath: $forwardedMessage->attachment_path,
                 attachmentName: $forwardedMessage->attachment_name,

@@ -135,6 +135,7 @@ class SendConversationMessage
                 participants: $participantSnapshots,
                 senderId: (int) $message->sender_id,
                 senderName: (string) $senderName,
+                senderIpmsId: (string) ($message->sender?->ipms_id ?? ''),
                 message: (string) $message->body,
                 attachmentPath: $message->attachment_path,
                 attachmentName: $message->attachment_name,

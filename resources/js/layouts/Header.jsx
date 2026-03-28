@@ -73,6 +73,7 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
             <MessengerMiniInbox
               userId={user?.id}
               meId={user?.id}
+              me={user}
               users={[...messengerUsers, ...users]}
               onOpenConversation={onOpenMessengerConversation}
               onComposeNewMessage={onComposeMessengerConversation}
