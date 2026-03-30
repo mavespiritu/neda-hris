@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import RichTextEditor from "@/components/RichTextEditor"
 import { formatDateRange } from "@/lib/utils.jsx"
 import { format } from "date-fns"
-import Filter from "./Filter"
+import Filter from './Filter'
 import { travelRequestActionMap as actionMap } from "./actions"
 
 const breadcrumbItems = [
