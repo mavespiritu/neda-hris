@@ -27,8 +27,8 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatDateWithTime, formatTime12 } from "@/lib/utils.jsx"
 import { CalendarDays } from "lucide-react"
 import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
@@ -52,9 +52,12 @@ const Rto = () => {
 
     const { toast } = useToast()
 
-    const { auth: { user }, data: { targets, employees, dates, statuses, filters: serverFilters } } = usePage().props
+    const { auth: { user }, data: { targets, employees, divisions, statuses, filters: serverFilters } } = usePage().props
 
-    const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
+    const canUseOwnershipTabs = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"])
+    const canFilterByStaff = canUseOwnershipTabs
+    const canFilterByDivision = useHasRole(["HRIS_HR", "HRIS_RD", "HRIS_ARD"])
+    const canModifyRow = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
@@ -252,7 +255,79 @@ const Rto = () => {
         }
     ], [])
 
-    const [filters, setFilters] = useState(serverFilters || {})
+    const [filters, setFilters] = useState(() => ({
+        ...(serverFilters || {}),
+        scope: serverFilters?.scope || (canUseOwnershipTabs ? "my" : ""),
+    }))
+
+    const activeScope = canUseOwnershipTabs ? (filters.scope || "my") : null
+
+    const divisionLabelMap = useMemo(
+        () => Object.fromEntries((divisions || []).map((division) => [String(division.value), division.label])),
+        [divisions]
+    )
+    const employeeLabelMap = useMemo(
+        () => Object.fromEntries((employees || []).map((employee) => [String(employee.value), employee.label])),
+        [employees]
+    )
+    const statusLabelMap = useMemo(
+        () => Object.fromEntries((statuses || []).map((status) => [String(status.value), status.label])),
+        [statuses]
+    )
+
+    const activeFilterChips = useMemo(() => {
+        const chips = []
+
+        if (filters.emp_id) {
+            chips.push({
+                key: "emp_id",
+                label: `Staff: ${employeeLabelMap[String(filters.emp_id)] || filters.emp_id}`,
+            })
+        }
+
+        if (filters.division_id) {
+            chips.push({
+                key: "division_id",
+                label: `Division: ${divisionLabelMap[String(filters.division_id)] || filters.division_id}`,
+            })
+        }
+
+        if (filters.date) {
+            chips.push({
+                key: "date",
+                label: `Date: ${format(new Date(filters.date), "MMM d, yyyy")}`,
+            })
+        }
+
+        if (filters.status) {
+            chips.push({
+                key: "status",
+                label: `Status: ${statusLabelMap[String(filters.status)] || filters.status}`,
+            })
+        }
+
+        return chips
+    }, [divisionLabelMap, employeeLabelMap, filters.date, filters.division_id, filters.emp_id, filters.status, statusLabelMap])
+
+    const updateFilters = (updater) => {
+        setFilters((prev) => {
+            const next = typeof updater === "function" ? updater(prev) : updater
+            return next
+        })
+        setPageIndex(0)
+    }
+
+    const handleStatusChange = (status) => {
+        updateFilters((prev) => ({ ...prev, status }))
+    }
+
+    const clearFilter = (key) => {
+        updateFilters((prev) => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+        })
+    }
 
     const { 
         TableView,
@@ -263,6 +338,7 @@ const Rto = () => {
         selectedItem,
         handleCloseForm,
         handleCloseFilter,
+        setPageIndex,
         } = useCrudTable({
         columns,
         routeName: route('rto.index'),
@@ -277,9 +353,9 @@ const Rto = () => {
             enableBulkDelete: true,
             enableSearching: true,
             enableFiltering: true,
-            enableRowSelection: row => !row.original.isLocked || canSelectStaff,
+            enableRowSelection: row => !row.original.isLocked || canModifyRow,
             enableGenerateReport: true,
-            canModify: canSelectStaff
+            canModify: canModifyRow
         },
         endpoints: {
             //editEndpoint: (id) => route('rto.edit', id),
@@ -291,6 +367,8 @@ const Rto = () => {
             bulkApproveEndpoint: route('rto.bulk-approve'),
             bulkDisapproveEndpoint: route('rto.bulk-disapprove'), */
         },
+        filterChips: activeFilterChips,
+        onClearFilter: clearFilter,
     })
 
     return (
@@ -301,32 +379,50 @@ const Rto = () => {
                 description="Record your itemized target outputs here if you are under flexiplace arrangement"
                 breadcrumbItems={breadcrumbItems}
             />
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
-                <Button
-                    variant={!filters.status ? "default" : "outline"}
-                    size="sm"
-                    type="button"
-                    className="h-7 rounded-full px-3 text-xs"
-                    onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}
-                >
-                    All
-                </Button>
-                {statuses.map((statusOption) => (
-                    <Button
-                        key={statusOption.value}
-                        variant={filters.status === statusOption.value ? "default" : "outline"}
-                        size="sm"
-                        type="button"
-                        className="h-7 rounded-full px-3 text-xs"
-                        onClick={() => setFilters((prev) => ({ ...prev, status: statusOption.value }))}
+            <div className="space-y-4">
+                {canUseOwnershipTabs && (
+                    <Tabs
+                        value={activeScope || "my"}
+                        onValueChange={(value) => updateFilters((prev) => ({ ...prev, scope: value }))}
+                        className="w-full"
                     >
-                        {statusOption.label}
-                    </Button>
-                ))}
+                        <TabsList className="grid w-full max-w-md grid-cols-2">
+                            <TabsTrigger value="my">My RTO</TabsTrigger>
+                            <TabsTrigger value="others">Staff RTO</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                )}
+
+                <div className="rounded-xl border border-border/70 bg-background p-3 sm:p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
+                        <Button
+                            variant={!filters.status ? "default" : "outline"}
+                            size="sm"
+                            type="button"
+                            className="h-7 rounded-full px-3 text-xs"
+                            onClick={() => handleStatusChange("")}
+                        >
+                            All
+                        </Button>
+                        {statuses.map((statusOption) => (
+                            <Button
+                                key={statusOption.value}
+                                variant={filters.status === statusOption.value ? "default" : "outline"}
+                                size="sm"
+                                type="button"
+                                className="h-7 rounded-full px-3 text-xs"
+                                onClick={() => handleStatusChange(statusOption.value)}
+                            >
+                                {statusOption.label}
+                            </Button>
+                        ))}
+                    </div>
+
+                    <TableView />
+                </div>
             </div>
 
-            <TableView />
             {isFormOpen && (
                 <Form
                     open={isFormOpen}
@@ -334,17 +430,24 @@ const Rto = () => {
                     data={selectedItem}
                     onClose={handleCloseForm}
                     employees={employees}
-                    dates={dates}
                 />
             )}
             {isFilterOpen && (
                 <Filter
                     open={isFilterOpen}
                     onClose={handleCloseFilter}
-                    onApply={(appliedFilters) => setFilters(appliedFilters)}
+                    onApply={(appliedFilters) => {
+                        updateFilters((prev) => ({
+                            ...appliedFilters,
+                            scope: prev.scope || (canUseOwnershipTabs ? "my" : ""),
+                        }))
+                    }}
                     initialValues={filters}
                     employees={employees}
+                    divisions={divisions}
                     statuses={statuses}
+                    showStaffFilter={canFilterByStaff}
+                    showDivisionFilter={canFilterByDivision}
                 />
             )}
 
@@ -399,11 +502,3 @@ const Rto = () => {
 }
 
 export default Rto
-
-
-
-
-
-
-
-

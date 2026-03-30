@@ -40,6 +40,7 @@ class TimeRecordsExport implements FromCollection, WithHeadings, WithEvents
             'PM Time In',
             'PM Time Out',
             'Total Hours',
+            'Schedule',
             'RTO Submitted',
             'RTO Approved',
             'RAA Submitted',

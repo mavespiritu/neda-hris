@@ -588,6 +588,11 @@ export default function Index() {
   const handlePreviewConversation = (conversationId, options = {}) => {
     setActiveId(conversationId)
     setIsCreatingConversation(Boolean(options?.draft) || !conversationId)
+    if (!conversationId) {
+      setMessages([])
+      setHasMore(true)
+      setConversationReadReceiptsById({})
+    }
     setBody("")
     setReplyTo(null)
     setTypingUser(null)
@@ -655,6 +660,12 @@ export default function Index() {
 
     if (activeId !== null) {
       setActiveId(null)
+      setMessages([])
+      setHasMore(true)
+      setConversationReadReceiptsById({})
+      setBody("")
+      setReplyTo(null)
+      setTypingUser(null)
     }
   }, [activeId, resolveConversationIdForRecipientIds, selectedUserIds])
 
@@ -1204,4 +1215,3 @@ export default function Index() {
     </>
   )
 }
-

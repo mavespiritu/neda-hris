@@ -13,24 +13,31 @@ trait FetchFlexiplaceRecords
 
         $date = $date ? Carbon::parse($date)->format('Y-m-d') : Carbon::today()->format('Y-m-d');
 
-        $rtoSubmissions = $conn2->table('flexi_rto as frt')
+        $approvedRtos = $conn2->table('flexi_rto as frt')
             ->join('submission_history as sh', function ($j) {
                 $j->on('sh.model_id', '=', 'frt.id')
                   ->where('sh.model', '=', 'RTO');
             })
             ->whereDate('frt.date', '=', $date)
             ->whereIn('sh.status', ['Submitted', 'Approved'])
-            ->select('frt.emp_id', 'sh.status', 'sh.date_acted')
+            ->select('frt.emp_id', 'frt.type', 'frt.other_type', 'sh.status', 'sh.date_acted')
             ->orderByDesc('sh.id')
             ->get()
             ->groupBy('emp_id')
             ->map(function ($rows) {
                 $submitted = $rows->firstWhere('status', 'Submitted');
                 $approved = $rows->firstWhere('status', 'Approved');
+                $row = $approved ?: $submitted ?: $rows->first();
+                $schedule = $row->type ?? null;
+
+                if ($schedule === 'Other') {
+                    $schedule = $row->other_type ?: $schedule;
+                }
 
                 return [
                     'rto_date_submitted' => $submitted->date_acted ?? null,
                     'rto_date_approved'  => $approved->date_acted ?? null,
+                    'approved_schedule' => $schedule,
                 ];
             });
 
@@ -38,9 +45,9 @@ trait FetchFlexiplaceRecords
             ->join('flexi_rto as frt', 'fr.rto_id', '=', 'frt.id')
             ->join('submission_history as sh', function ($j) {
                 $j->on('sh.model_id', '=', 'fr.id')
-                ->where('sh.model', '=', 'RAA');
+                  ->where('sh.model', '=', 'RAA');
             })
-            ->whereDate('frt.date', '=', $date) 
+            ->whereDate('frt.date', '=', $date)
             ->select('frt.emp_id', 'sh.status', 'sh.date_acted')
             ->orderByDesc('sh.id')
             ->get()
@@ -54,6 +61,20 @@ trait FetchFlexiplaceRecords
                     'raa_date_approved'  => $approved->date_acted ?? null,
                 ];
             });
+
+        $records = $conn2->table('flexi_rto as frt')
+            ->join('submission_history as sh', function ($j) {
+                $j->on('sh.model_id', '=', 'frt.id')
+                  ->where('sh.model', '=', 'RTO');
+            })
+            ->whereDate('frt.date', '=', $date)
+            ->where('sh.status', 'Approved')
+            ->select('frt.emp_id')
+            ->orderByDesc('sh.id')
+            ->get()
+            ->pluck('emp_id')
+            ->unique()
+            ->values();
 
         $records = $conn3->table('tblemployee as e')
             ->select(
@@ -83,6 +104,7 @@ trait FetchFlexiplaceRecords
                     ) AS total_hours
                 ")
             )
+            ->whereIn('e.emp_id', $records->all())
             ->leftJoinSub(function ($query) use ($date) {
                 $query->from('tblactual_dtr')
                     ->select('emp_id', 'time_in', 'time_out')
@@ -99,22 +121,17 @@ trait FetchFlexiplaceRecords
             }, 'pm', function ($join) {
                 $join->on('pm.emp_id', '=', 'e.emp_id');
             })
-            ->leftJoin('tblemp_dtr_type as dtr_type', function ($join) use ($date) {
-                $join->on('dtr_type.emp_id', '=', 'e.emp_id')
-                    ->whereDate('dtr_type.date', '=', $date)
-                    ->whereIn('dtr_type.dtr_id', ['FWA', 'FLEXIPLACE']);
-            })
-            ->whereNotNull('dtr_type.dtr_id')
             ->orderBy('e.division_id')
             ->orderBy('e.lname')
             ->orderBy('e.fname')
             ->orderBy('e.mname')
             ->get();
         
-        $records = $records->map(function ($record) use ($raaSubmissions, $rtoSubmissions) {
-            $rto = $rtoSubmissions->get($record->emp_id, [
+        $records = $records->map(function ($record) use ($approvedRtos, $raaSubmissions) {
+            $rto = $approvedRtos->get($record->emp_id, [
                 'rto_date_submitted' => null,
                 'rto_date_approved'  => null,
+                'approved_schedule'  => null,
             ]);
 
             $raa = $raaSubmissions->get($record->emp_id, [
@@ -137,7 +154,7 @@ trait FetchFlexiplaceRecords
                     ->format('g:i:s A');
             }
 
-            return (object) array_merge((array) $record, $raa, $rto, [
+            return (object) array_merge((array) $record, $rto, $raa, [
                 'recommended_pm_time_out' => $recommendedPmTimeOut,
             ]);
         });

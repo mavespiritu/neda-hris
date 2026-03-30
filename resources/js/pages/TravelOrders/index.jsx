@@ -40,6 +40,54 @@ const TravelOrders = () => {
     travel_category_id: "",
     })
 
+    const employeeLabelMap = useMemo(() => {
+        const items = Array.isArray(filterOptions?.employees)
+            ? filterOptions.employees
+            : Object.values(filterOptions?.employees ?? {})
+
+        return Object.fromEntries(
+            items.map((employee) => [
+                String(employee.value ?? employee.emp_id ?? employee.id ?? "").trim(),
+                employee.label ?? employee.name ?? "",
+            ])
+        )
+    }, [filterOptions?.employees])
+
+    const travelTypeLabelMap = useMemo(() => {
+        const items = Array.isArray(filterOptions?.travel_types)
+            ? filterOptions.travel_types
+            : Object.values(filterOptions?.travel_types ?? {})
+
+        return Object.fromEntries(
+            items.map((item) => [
+                String(item.value ?? item.id ?? item.travel_type ?? "").trim(),
+                item.label ?? item.name ?? "",
+            ])
+        )
+    }, [filterOptions?.travel_types])
+
+    const travelCategoryLabelMap = useMemo(() => {
+        const items = Array.isArray(filterOptions?.travel_categories)
+            ? filterOptions.travel_categories
+            : Object.values(filterOptions?.travel_categories ?? {})
+
+        return Object.fromEntries(
+            items.map((item) => [
+                String(item.value ?? item.id ?? item.travel_category_id ?? "").trim(),
+                item.label ?? item.name ?? "",
+            ])
+        )
+    }, [filterOptions?.travel_categories])
+
+    const clearFilter = (key) => {
+        setFilters((prev) => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+        })
+        setPageIndex(0)
+    }
+
     const [confirmAction, setConfirmAction] = useState(null)
     const confirmForm = useForm({ remarks: "" })
     const [selectedRow, setSelectedRow] = useState(null)
@@ -220,6 +268,7 @@ const TravelOrders = () => {
         selectedItem,
         handleCloseForm,
         handleCloseFilter,
+        setPageIndex,
         reloadTable
         } = useCrudTable({
         columns,
@@ -245,6 +294,15 @@ const TravelOrders = () => {
             bulkDeleteEndpoint: route('travel-requests.bulk-destroy'),
             generateReportEndpoint: (id) => route('travel-requests.generate', id),
         },
+        filterLabelMaps: {
+            employee_id: employeeLabelMap,
+            travel_type: travelTypeLabelMap,
+            travel_category_id: travelCategoryLabelMap,
+        },
+        filterKeyLabels: {
+            travel_category_id: "Travel Category",
+        },
+        onClearFilter: clearFilter,
     })
 
     return (
@@ -262,12 +320,13 @@ const TravelOrders = () => {
             <Filter
                 open={isFilterOpen}
                 onClose={handleCloseFilter}
-                onApply={(appliedFilters) =>
-                setFilters((prev) => ({
-                    ...prev,
-                    ...appliedFilters,
-                }))
-                }
+                onApply={(appliedFilters) => {
+                    setFilters((prev) => ({
+                        ...prev,
+                        ...appliedFilters,
+                    }))
+                    setPageIndex(0)
+                }}
                 initialValues={filters}
                 options={filterOptions}
             />

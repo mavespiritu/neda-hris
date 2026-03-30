@@ -1,7 +1,8 @@
 import PageTitle from "@/components/PageTitle"
 import useCrudTable from "@/hooks/useCrudTable"
 import { useForm } from '@inertiajs/react'
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import axios from "axios"
 import Form from "./Form"
 import Filter from "./Filter"
 import { useHasRole } from "@/hooks/useAuth"
@@ -17,12 +18,45 @@ const index = () => {
     } = store()
 
     const [filters, setFilters] = useState({})
+    const [competencyOptions, setCompetencyOptions] = useState([])
 
     useEffect(() => {
         fetchIndicators()
     }, [])
 
+    useEffect(() => {
+        const fetchCompetencies = async () => {
+            try {
+                const res = await axios.get(route("competencies.list"))
+                const items = res.data?.data || []
+                setCompetencyOptions(
+                    items.map((item) => ({
+                        value: String(item.id ?? item.value ?? "").trim(),
+                        label: item.competency ?? item.label ?? "",
+                    }))
+                )
+            } catch (error) {
+                console.error(error)
+            }
+        }
+
+        fetchCompetencies()
+    }, [])
+
     const canModify = useHasRole(["HRIS_HR"])
+
+    const clearFilter = useCallback((key) => {
+        setFilters((prev) => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+        })
+    }, [])
+
+    const competencyLabelMap = useMemo(
+        () => Object.fromEntries(competencyOptions.map((item) => [String(item.value).trim(), item.label])),
+        [competencyOptions]
+    )
 
     const columns = useMemo(() => [
         {
@@ -88,6 +122,14 @@ const index = () => {
             deleteEndpoint: (id) => route('indicators.destroy', id),
             bulkDeleteEndpoint: route('indicators.bulk-destroy')
         },
+        filterLabelMaps: {
+            competency: competencyLabelMap,
+        },
+        filterKeyLabels: {
+            competency: "Competency",
+            proficiency: "Proficiency",
+        },
+        onClearFilter: clearFilter,
     })
 
     return (

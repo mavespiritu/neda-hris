@@ -17,6 +17,7 @@ export default function RecipientComposer({
   autoOpen = false,
   keepOpenOnSelect = false,
   draftOnMissingConversation = false,
+  replaceOnSelect = false,
   compact = false,
   floatingDropdown = false,
 }) {
@@ -102,11 +103,19 @@ export default function RecipientComposer({
     if (!id) return
 
     const alreadySelected = selectedUserIds.map(Number).includes(id)
-    const nextSelectedIds = alreadySelected ? selectedUserIds : [...selectedUserIds, id]
+    const nextSelectedIds = alreadySelected
+      ? selectedUserIds
+      : replaceOnSelect && selectedUserIds.length > 0
+      ? [id]
+      : [...selectedUserIds, id]
 
     setSelectedUserIds((prev) => {
       if (prev.map(Number).includes(id)) {
         return prev
+      }
+
+      if (replaceOnSelect && prev.length > 0) {
+        return [id]
       }
 
       return [...prev, id]
@@ -115,7 +124,7 @@ export default function RecipientComposer({
     setQuery("")
     const candidateConversationId =
       resolveConversationIdForRecipientIds?.(nextSelectedIds)
-      ?? (selectedUserIds.length === 0 ? resolveDirectConversationId?.(id) : null)
+      ?? (nextSelectedIds.length === 1 ? resolveDirectConversationId?.(id) : null)
 
     if (candidateConversationId) {
       onPreviewConversation?.(candidateConversationId, { preserveSelection: true })

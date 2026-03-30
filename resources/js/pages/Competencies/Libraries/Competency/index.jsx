@@ -1,7 +1,7 @@
 import PageTitle from "@/components/PageTitle"
 import useCrudTable from "@/hooks/useCrudTable"
 import { useForm } from '@inertiajs/react'
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import Form from "./Form"
 import Filter from "./Filter"
 import { useHasRole } from "@/hooks/useAuth"
@@ -23,6 +23,20 @@ const index = () => {
     }, [])
 
     const canModify = useHasRole(["HRIS_HR"])
+
+    const clearFilter = useCallback((key) => {
+        setFilters((prev) => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+        })
+    }, [])
+
+    const compTypeLabelMap = useMemo(() => ({
+        org: "Organization",
+        mnt: "Managerial",
+        func: "Functional/Technical",
+    }), [])
 
     const columns = useMemo(() => [
         {
@@ -82,6 +96,13 @@ const index = () => {
             deleteEndpoint: (id) => route('competencies.destroy', id),
             bulkDeleteEndpoint: route('competencies.bulk-destroy')
         },
+        filterLabelMaps: {
+            comp_type: compTypeLabelMap,
+        },
+        filterKeyLabels: {
+            comp_type: "Type",
+        },
+        onClearFilter: clearFilter,
     })
 
     return (

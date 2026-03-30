@@ -40,6 +40,7 @@ import {
   Printer,
   MoreHorizontal,
   Filter as FilterIcon,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTable } from "@/hooks/useTable"
@@ -51,6 +52,7 @@ import { flexRender } from "@tanstack/react-table"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
 export default function useCrudTable({
   columns,
@@ -59,6 +61,11 @@ export default function useCrudTable({
   options = {},
   endpoints = {},
   filters = {},
+  filterChips = [],
+  filterLabelMaps = {},
+  filterKeyLabels = {},
+  onClearFilter = null,
+  hiddenFilterKeys = ["sort", "direction", "search", "page", "per_page", "scope"],
   responseType = "inertia",
   onJsonResponse = null,
 }) {
@@ -140,6 +147,65 @@ export default function useCrudTable({
     setViewItem(null)
     setIsViewOpen(false)
   }, [])
+
+  const handleClearFilter = useCallback(
+    (key) => {
+      if (typeof onClearFilter === "function") {
+        onClearFilter(key)
+        return
+      }
+
+      const nextFilters = { ...(filters || {}) }
+      delete nextFilters[key]
+      delete nextFilters.page
+
+      router.get(routeName, nextFilters, {
+        preserveScroll: true,
+        preserveState: false,
+        replace: true,
+      })
+    },
+    [filters, onClearFilter, routeName]
+  )
+
+  const resolvedFilterChips = useMemo(() => {
+    if (Array.isArray(filterChips) && filterChips.length > 0) {
+      return filterChips
+    }
+
+    const humanizeKey = (key) =>
+      key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+
+    return Object.entries(filters || {})
+      .filter(([key, value]) => !hiddenFilterKeys.includes(key) && value !== "" && value !== null && value !== undefined)
+      .map(([key, value]) => ({
+        key,
+        label: (() => {
+          const keyLabel = filterKeyLabels?.[key] ?? humanizeKey(key)
+          const map = filterLabelMaps?.[key]
+          const rawValue = Array.isArray(value) ? value[0] : value
+          const stringValue = String(rawValue ?? "").trim()
+          const mappedLabel =
+            map && typeof map === "object"
+              ? map[stringValue] ?? map[String(rawValue)] ?? map[value]
+              : null
+
+          const displayValue = mappedLabel ?? (
+            Array.isArray(value)
+              ? value.every((item) => ["string", "number", "boolean"].includes(typeof item))
+                ? value.join(", ")
+                : JSON.stringify(value)
+              : typeof value === "object"
+                ? JSON.stringify(value)
+                : String(value)
+          )
+
+          return `${keyLabel}: ${displayValue}`
+        })(),
+      }))
+  }, [filterChips, filterKeyLabels, filterLabelMaps, filters, hiddenFilterKeys])
 
   const getMobileLabel = useCallback((column) => {
     const metaLabel = column.columnDef?.meta?.mobileLabel
@@ -494,6 +560,8 @@ export default function useCrudTable({
     enableBulkDelete,
     enableFiltering,
     enableSearching,
+    filterChips: resolvedFilterChips,
+    onClearFilter: handleClearFilter,
     form,
     handleAdd,
     handleBulkDelete,
@@ -516,12 +584,14 @@ export default function useCrudTable({
     return function TableView() {
       const {
         enableAdd,
-        enableBulkDelete,
-        enableFiltering,
-        enableSearching,
-        form,
-        handleAdd,
-        handleBulkDelete,
+      enableBulkDelete,
+      enableFiltering,
+      enableSearching,
+      filterChips: chips,
+      onClearFilter: handleClearFilter,
+      form,
+      handleAdd,
+      handleBulkDelete,
         pageCount,
         pageIndex,
         search,
@@ -539,69 +609,90 @@ export default function useCrudTable({
 
       return (
         <div className="grid grid-rows-[auto,1fr,auto] min-h-[calc(100vh-250px)] max-h-screen flex-1 overflow-hidden gap-2">
-          <div className="flex justify-between gap-4">
-            <div className="flex-1 gap-2 p-1">
-              {enableSearching && (
-                <Input
-                  type="search"
-                  placeholder="Type to search..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value)
-                    setPageIndex(0)
-                  }}
-                  className="w-full max-w-md text-sm rounded-md h-8"
-                />
-              )}
-            </div>
+          <div className="space-y-2">
+            <div className="flex justify-between gap-4">
+              <div className="flex-1 gap-2 p-1">
+                {enableSearching && (
+                  <Input
+                    type="search"
+                    placeholder="Type to search..."
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value)
+                      setPageIndex(0)
+                    }}
+                    className="w-full max-w-md text-sm rounded-md h-8"
+                  />
+                )}
+              </div>
 
-            <div className="flex gap-2 p-1">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-8">
-                    <Wrench className="h-4 w-4" />
-                    <span className="hidden md:block">Actions</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
-                  <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
-                  <DropdownMenuGroup>
-                    {enableBulkDelete && (
-                      <DropdownMenuItem
-                        disabled={selectedRowsLength === 0 || form.processing}
-                        onSelect={(e) => {
-                          e.preventDefault()
-                          setDeleteMode("bulk")
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex gap-2 p-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="h-8">
+                      <Wrench className="h-4 w-4" />
+                      <span className="hidden md:block">Actions</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end">
+                    <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      {enableBulkDelete && (
+                        <DropdownMenuItem
+                          disabled={selectedRowsLength === 0 || form.processing}
+                          onSelect={(e) => {
+                            e.preventDefault()
+                            setDeleteMode("bulk")
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              {enableFiltering && (
-                <Button type="button" variant="outline" onClick={handleOpenFilter} className="h-8">
-                  <FilterIcon className="h-4 w-4" />
-                  <span className="hidden md:block">Filters</span>
-                </Button>
-              )}
+                {enableFiltering && (
+                  <Button type="button" variant="outline" onClick={handleOpenFilter} className="h-8">
+                    <FilterIcon className="h-4 w-4" />
+                    <span className="hidden md:block">Filters</span>
+                  </Button>
+                )}
 
-              {enableAdd &&
-                (addEndpoint ? (
-                  <Button type="button" onClick={() => router.visit(addEndpoint)} className="h-8">
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden md:block">Add New</span>
-                  </Button>
-                ) : (
-                  <Button type="button" onClick={handleAdd} className="h-8">
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden md:block">Add New</span>
-                  </Button>
+                {enableAdd &&
+                  (addEndpoint ? (
+                    <Button type="button" onClick={() => router.visit(addEndpoint)} className="h-8">
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden md:block">Add New</span>
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={handleAdd} className="h-8">
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden md:block">Add New</span>
+                    </Button>
                 ))}
+              </div>
             </div>
+
+            {chips?.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 px-1">
+                <span className="text-sm font-medium text-muted-foreground">Active filters:</span>
+                {chips.map((chip) => (
+                  <Badge key={chip.key} variant="secondary" className="gap-1 pr-1">
+                    <span>{chip.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleClearFilter(chip.key)}
+                      className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-muted-foreground/20"
+                      aria-label={`Remove ${chip.label}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="h-full w-full border rounded-lg overflow-auto">
@@ -730,6 +821,7 @@ export default function useCrudTable({
     handleCloseForm,
     handleCloseFilter,
     handleCloseView,
+    setPageIndex,
     reloadTable,
   }
 }

@@ -73,14 +73,6 @@ class FwaController extends Controller
             $logType = 'pmOut';
         }
 
-        // --- Fetch schedule (mysql2)
-        $schedule = $conn2->table('flexi_schedule')
-            ->select('emp_id', 'dtr_type', 'date')
-            ->where('emp_id', $empId)
-            ->where('date', $today)
-            ->where('dtr_type', 'Flexiplace')
-            ->first();
-
         // --- Get latest RTO status separately (no join)
         $latestStatus = $conn2->table('submission_history')
             ->select('model_id', 'status')
@@ -100,8 +92,8 @@ class FwaController extends Controller
             })
             ->exists();
 
-        // Determine flexiplace flag
-        $isFlexiplaceToday = $schedule !== null && $approvedRto;
+        // Scheduling is no longer required for FWA time-in.
+        $isFlexiplaceToday = $approvedRto;
 
         // Return Inertia data
         return Inertia::render('Dtr/Fwa/index', [
@@ -111,7 +103,6 @@ class FwaController extends Controller
                 'pmIn' => $pmIn,
                 'pmOut' => $pmOut,
                 'logType' => $logType,
-                'schedule' => $schedule,
                 'approvedRto' => $approvedRto,
                 'isFlexiplaceToday' => $isFlexiplaceToday,
             ]

@@ -114,6 +114,7 @@ const TimeRecords = () => {
                     <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">Actual AM</th>
                     <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">Actual PM</th>
                     <th rowSpan={2} className="border-t-0 border-r-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Total Hours Rendered</th>
+                    <th rowSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border">Schedule</th>
                     <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">RTO</th>
                     <th colSpan={2} className="border-t-0 px-4 py-2 text-sm font-medium text-gray-700 border-gray-200 border text-center">RAA</th>
                   </tr>
@@ -182,6 +183,13 @@ const TimeRecords = () => {
                         }`}
                       >
                         {r.total_hours || "-"}
+                      </td>
+                      <td
+                        className={`px-4 py-2 border-r-0 border-gray-200 border ${
+                          idx === data.timeRecords.length - 1 ? "border-b-0" : ""
+                        }`}
+                      >
+                        {r.approved_schedule || "-"}
                       </td>
                       <td
                         className={`px-4 py-2 border-r-0 border-gray-200 border ${

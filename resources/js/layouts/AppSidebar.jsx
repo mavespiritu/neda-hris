@@ -188,7 +188,6 @@ const AppSidebar = () => {
       icon: History,
       roles: ['HRIS_Staff'],
       submenu: [
-        { title: 'Schedule', url: '/fwa/schedule', roles: ['HRIS_Staff'], icon: CalendarCheck },
         { title: 'RTO', url: '/rto', roles: ['HRIS_Staff'], icon: Target },
         { title: 'DTR', url: '/fwa', roles: ['HRIS_Staff'], icon: History },
         { title: 'RAA', url: '/raa', roles: ['HRIS_Staff'], icon: Trophy },

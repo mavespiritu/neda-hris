@@ -65,6 +65,49 @@ class RaaController extends Controller
             ->get()
             ->keyBy('emp_id');
 
+        $divisions = $conn3->table('tbldivision')
+            ->select('division_id', 'division_name')
+            ->whereIn('division_id', $employees->pluck('division_id')->filter()->unique()->values()->all())
+            ->orderBy('division_name')
+            ->get()
+            ->map(fn ($division) => [
+                'value' => $division->division_id,
+                'label' => $division->division_name,
+            ])
+            ->values();
+
+        $canUseOwnershipTabs = $request->user()?->hasAnyRole(['HRIS_HR', 'HRIS_DC', 'HRIS_ADC', 'HRIS_RD', 'HRIS_ARD']) ?? false;
+        $scope = $request->input('scope');
+        if ($canUseOwnershipTabs && !in_array($scope, ['my', 'others'], true)) {
+            $scope = 'my';
+        }
+
+        $targetEmployeeIds = $employeeIds;
+
+        if ($request->filled('division_id')) {
+            $targetEmployeeIds = $employees
+                ->filter(fn ($employee) => (string) $employee->division_id === (string) $request->division_id)
+                ->keys()
+                ->values()
+                ->all();
+        }
+
+        if ($scope === 'my') {
+            $targetEmployeeIds = array_values(array_filter(
+                $targetEmployeeIds,
+                fn ($empId) => (string) $empId === (string) $request->user()->ipms_id
+            ));
+        } elseif ($scope === 'others') {
+            $targetEmployeeIds = array_values(array_filter(
+                $targetEmployeeIds,
+                fn ($empId) => (string) $empId !== (string) $request->user()->ipms_id
+            ));
+        }
+
+        if (empty($targetEmployeeIds)) {
+            $targetEmployeeIds = [-1];
+        }
+
         $latestHistoryRTO = DB::raw("(SELECT sh1.* 
             FROM submission_history sh1 
             INNER JOIN (
@@ -113,7 +156,7 @@ class RaaController extends Controller
                     END
                 ) as isLocked'),
             ])
-            ->whereIn('rto.emp_id', $employeeIds)
+            ->whereIn('rto.emp_id', $targetEmployeeIds)
             ->where('sh_rto.status', 'Approved')
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
             ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
@@ -217,12 +260,13 @@ class RaaController extends Controller
                     'value' => $emp->emp_id,
                     'label' => $emp->name,
                 ])->values(),
+                'divisions' => $divisions,
                 'dates'   => $fridays,
                 'statuses'  => collect(['Draft', 'Submitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
                     ->map(fn ($status) => ['value' => $status, 'label' => $status])
                     ->values(),
                 'targets' => $targets,
-                'filters' => $request->only(['emp_id', 'date', 'status', 'sort', 'direction', 'search']),
+                'filters' => $request->only(['emp_id', 'division_id', 'date', 'status', 'scope', 'sort', 'direction', 'search']),
             ],
         ]);
     }
@@ -1251,5 +1295,4 @@ class RaaController extends Controller
         return $pdf->download("{$today}_RAA_{$rtoDate}.pdf");
     }
 }
-
 

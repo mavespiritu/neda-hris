@@ -72,6 +72,7 @@ class ReportController extends Controller
         $table->addCell(2000, ['gridSpan' => 2])->addText("Actual AM", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
         $table->addCell(2000, ['gridSpan' => 2])->addText("Actual PM", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
         $table->addCell(2000, ['vMerge' => 'restart'])->addText("Total Hours", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(2000, ['vMerge' => 'restart'])->addText("Schedule", array_merge($fontStyle, ['bold' => true]));
         $table->addCell(2000, ['gridSpan' => 2])->addText("RTO", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
         $table->addCell(2000, ['gridSpan' => 2])->addText("RAA", array_merge($fontStyle, ['bold' => true]), ['align' => 'center']);
         $table->addCell(2000, ['vMerge' => 'restart'])->addText("Adjusted PM Out", array_merge($fontStyle, ['bold' => true]));
@@ -85,6 +86,7 @@ class ReportController extends Controller
         $table->addCell()->addText("Time Out", array_merge($fontStyle, ['bold' => true]));
         $table->addCell()->addText("Time In", array_merge($fontStyle, ['bold' => true]));
         $table->addCell()->addText("Time Out", array_merge($fontStyle, ['bold' => true]));
+        $table->addCell(null, ['vMerge' => 'continue']);
         $table->addCell(null, ['vMerge' => 'continue']);
         $table->addCell()->addText("Date Submitted", array_merge($fontStyle, ['bold' => true]));
         $table->addCell()->addText("Date Approved", array_merge($fontStyle, ['bold' => true]));
@@ -103,6 +105,7 @@ class ReportController extends Controller
             $table->addCell()->addText($record->pm_time_in ?? '', $fontStyle);
             $table->addCell()->addText($record->pm_time_out ?? '', $fontStyle);
             $table->addCell()->addText($record->total_hours ?? '', $fontStyle);
+            $table->addCell()->addText($record->approved_schedule ?? '', $fontStyle);
             $table->addCell()->addText($record->rto_date_submitted ?? '', $fontStyle);
             $table->addCell()->addText($record->rto_date_approved ?? '', $fontStyle);
             $table->addCell()->addText($record->raa_date_submitted ?? '', $fontStyle);

@@ -1,5 +1,5 @@
 import PageTitle from "@/components/PageTitle"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useHasRole } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuGroup } from "@/components/ui/dropdown-menu"
@@ -23,15 +23,30 @@ import {
     DialogClose
   } from "@/components/ui/dialog"
 import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet"
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { formatDateWithTime, formatTime12 } from "@/lib/utils.jsx"
-import { CalendarDays } from "lucide-react"
-import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2, Paperclip } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Eye, FileText, Paperclip } from "lucide-react"
+import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
 import Form from "./Form"
 import Filter from "./Filter"
 import useCrudTable from "@/hooks/useCrudTable"
@@ -51,12 +66,17 @@ const Raa = () => {
 
     const { toast } = useToast()
 
-    const { auth: { user }, data: { targets, employees, dates, statuses, filters: serverFilters } } = usePage().props
+    const { auth: { user }, data: { targets, employees, divisions, dates, statuses, filters: serverFilters } } = usePage().props
 
+    const canUseOwnershipTabs = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"])
+    const canFilterByStaff = canUseOwnershipTabs
+    const canFilterByDivision = useHasRole(["HRIS_HR", "HRIS_RD", "HRIS_ARD"])
     const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
+    const canModifyRow = canSelectStaff
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
+    const [detailRow, setDetailRow] = useState(null)
     
     const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
         remarks: "",
@@ -66,6 +86,26 @@ const Raa = () => {
         setConfirmAction(action)
         setSelectedRow(row)
     }
+
+    const stripHtml = (value) =>
+        String(value || "")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+
+    const countAccomplishments = (outputs = []) =>
+        outputs.reduce((total, output) => total + (output.accomplishments?.length || 0), 0)
+
+    const countFiles = (outputs = []) =>
+        outputs.reduce(
+            (total, output) =>
+                total +
+                (output.accomplishments || []).reduce(
+                    (accTotal, accomplishment) => accTotal + (accomplishment.files?.length || 0),
+                    0
+                ),
+            0
+        )
 
     const performAction = (e) => {
 
@@ -141,79 +181,19 @@ const Raa = () => {
         {
             header: "Accomplishments",
             accessorKey: "outputs",
-            meta: { className: "w-[30%]" },
+            meta: { className: "w-[20%]" },
             cell: ({ row }) => {
-                const outputs = row.original.outputs || []
-
                 return (
-                <div className="space-y-4">
-                    {outputs.map((output, i) => (
-                    <div key={output.id} className="border rounded-lg p-4">
-                        {/* Target Header */}
-                        <p className="font-semibold text-gray-800 mb-1">
-                        Target Output # {i + 1}: 
-                        </p>
-
-                        {/* Target Description */}
-                        <p className="text-gray-700 mb-2">{output.output}</p>
-
-                        {/* Accomplishments */}
-                        {output.accomplishments.length > 0 && (
-                        <ul className="list-disc list-inside space-y-2 text-gray-700">
-                            {output.accomplishments.map((acc, aIdx) => {
-                            const parts = acc.accomplishment
-                                .split(/<\/p>/i)
-                                .map(p => p.replace(/<p[^>]*>/i, "").trim())
-                                .filter(Boolean)
-
-                            return (
-                                <li key={acc.id} className="space-y-1">
-                                {/* Accomplishment Header */}
-                                <span className="font-medium text-gray-800">Actual Accomplishment # {aIdx + 1}:</span>
-
-                                {/* Accomplishment Content */}
-                                <div className="ml-4 space-y-1">
-                                    {parts.map((part, idx) => (
-                                    <div
-                                        key={`${acc.id}-${idx}`}
-                                        dangerouslySetInnerHTML={{ __html: part }}
-                                        className="text-gray-700"
-                                    />
-                                    ))}
-
-                                    {acc.remarks && (
-                                    <span className="text-xs text-gray-500">
-                                        Remarks/Justification: {acc.remarks}
-                                    </span>
-                                    )}
-
-                                    {/* Files */}
-                                    {acc.files?.length > 0 && (
-                                    <div className="mt-1 flex flex-col gap-1">
-                                        {acc.files.map(file => (
-                                        <a
-                                            key={file.id}
-                                            href={file.path}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
-                                            aria-label={`Download ${file.filename}`}
-                                        >
-                                            <Paperclip className="h-3 w-3" />
-                                            {file.filename}
-                                        </a>
-                                        ))}
-                                    </div>
-                                    )}
-                                </div>
-                                </li>
-                            )
-                            })}
-                        </ul>
-                        )}
-                    </div>
-                    ))}
-                </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-full justify-center text-xs"
+                        onClick={() => setDetailRow(row.original)}
+                    >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View accomplishments
+                    </Button>
                 )
             },
         },
@@ -311,6 +291,70 @@ const Raa = () => {
 
     const [filters, setFilters] = useState(serverFilters || {})
 
+    const activeScope = canUseOwnershipTabs ? (filters.scope || "my") : null
+    const divisionLabelMap = useMemo(
+        () => Object.fromEntries((divisions || []).map((division) => [String(division.value), division.label])),
+        [divisions]
+    )
+    const employeeLabelMap = useMemo(
+        () => Object.fromEntries((employees || []).map((employee) => [String(employee.value), employee.label])),
+        [employees]
+    )
+    const statusLabelMap = useMemo(
+        () => Object.fromEntries((statuses || []).map((status) => [String(status.value), status.label])),
+        [statuses]
+    )
+
+    const activeFilterChips = useMemo(() => {
+        const chips = []
+
+        if (filters.emp_id) {
+            chips.push({
+                key: "emp_id",
+                label: `Staff: ${employeeLabelMap[String(filters.emp_id)] || filters.emp_id}`,
+            })
+        }
+
+        if (filters.division_id) {
+            chips.push({
+                key: "division_id",
+                label: `Division: ${divisionLabelMap[String(filters.division_id)] || filters.division_id}`,
+            })
+        }
+
+        if (filters.date) {
+            chips.push({
+                key: "date",
+                label: `Date: ${format(new Date(filters.date), "MMM d, yyyy")}`,
+            })
+        }
+
+        if (filters.status) {
+            chips.push({
+                key: "status",
+                label: `Status: ${statusLabelMap[String(filters.status)] || filters.status}`,
+            })
+        }
+
+        return chips
+    }, [divisionLabelMap, employeeLabelMap, filters.date, filters.division_id, filters.emp_id, filters.status, statusLabelMap])
+
+    const updateFilters = (updater) => {
+        setFilters((prev) => {
+            const next = typeof updater === "function" ? updater(prev) : updater
+            return next
+        })
+        setPageIndex(0)
+    }
+
+    const clearFilter = (key) => {
+        updateFilters((prev) => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+        })
+    }
+
     const { 
         TableView,
         isFormOpen,
@@ -320,6 +364,7 @@ const Raa = () => {
         selectedItem,
         handleCloseForm,
         handleCloseFilter,
+        setPageIndex,
         } = useCrudTable({
         columns,
         routeName: route('raa.index'),
@@ -336,12 +381,14 @@ const Raa = () => {
             enableFiltering: true,
             enableRowSelection: false,
             enableGenerateReport: true,
-            canModify: canSelectStaff
+            canModify: canModifyRow
         },
         endpoints: {
             editEndpoint: (id) => route('raa.edit', id),
             generateReportEndpoint: (id) => route('raa.generate', id),
         },
+        filterChips: activeFilterChips,
+        onClearFilter: clearFilter,
     })
 
     return (
@@ -349,35 +396,52 @@ const Raa = () => {
             <Head title="Flexiplace RAA" />
             <PageTitle
                 pageTitle="Flexiplace RAA"
-                description="Browse RTOs here ito accomplish RAA"
+                description="Browse RTOs here to accomplish RAA"
                 breadcrumbItems={breadcrumbItems}
             />
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
-                <Button
-                    variant={!filters.status ? "default" : "outline"}
-                    size="sm"
-                    type="button"
-                    className="h-7 rounded-full px-3 text-xs"
-                    onClick={() => setFilters((prev) => ({ ...prev, status: "" }))}
-                >
-                    All
-                </Button>
-                {statuses.map((statusOption) => (
-                    <Button
-                        key={statusOption.value}
-                        variant={filters.status === statusOption.value ? "default" : "outline"}
-                        size="sm"
-                        type="button"
-                        className="h-7 rounded-full px-3 text-xs"
-                        onClick={() => setFilters((prev) => ({ ...prev, status: statusOption.value }))}
+            <div className="space-y-4">
+                {canUseOwnershipTabs && (
+                    <Tabs
+                        value={activeScope || "my"}
+                        onValueChange={(value) => updateFilters((prev) => ({ ...prev, scope: value }))}
+                        className="w-full"
                     >
-                        {statusOption.label}
-                    </Button>
-                ))}
-            </div>
+                        <TabsList className="grid w-full max-w-md grid-cols-2">
+                            <TabsTrigger value="my">My RAA</TabsTrigger>
+                            <TabsTrigger value="others">Staff RAA</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                )}
 
-            <TableView />
+                <div className="rounded-xl border border-border/70 bg-background p-3 sm:p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">Filter by status:</span>
+                        <Button
+                            variant={!filters.status ? "default" : "outline"}
+                            size="sm"
+                            type="button"
+                            className="h-7 rounded-full px-3 text-xs"
+                            onClick={() => updateFilters((prev) => ({ ...prev, status: "" }))}
+                        >
+                            All
+                        </Button>
+                        {statuses.map((statusOption) => (
+                            <Button
+                                key={statusOption.value}
+                                variant={filters.status === statusOption.value ? "default" : "outline"}
+                                size="sm"
+                                type="button"
+                                className="h-7 rounded-full px-3 text-xs"
+                                onClick={() => updateFilters((prev) => ({ ...prev, status: statusOption.value }))}
+                            >
+                                {statusOption.label}
+                            </Button>
+                        ))}
+                    </div>
+
+                    <TableView />
+                </div>
+            </div>
             {isFormOpen && (
                 <Form
                     open={isFormOpen}
@@ -392,11 +456,170 @@ const Raa = () => {
                 <Filter
                     open={isFilterOpen}
                     onClose={handleCloseFilter}
-                    onApply={(appliedFilters) => setFilters(appliedFilters)}
+                    onApply={(appliedFilters) => {
+                        updateFilters((prev) => ({
+                            ...appliedFilters,
+                            scope: prev.scope || (canUseOwnershipTabs ? "my" : ""),
+                        }))
+                    }}
                     initialValues={filters}
                     employees={employees}
+                    divisions={divisions}
+                    showStaffFilter={canFilterByStaff}
+                    showDivisionFilter={canFilterByDivision}
                 />
             )}
+
+            <Sheet
+                open={!!detailRow}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setDetailRow(null)
+                    }
+                }}
+            >
+                <SheetContent side="right" className="w-full sm:max-w-3xl">
+                    <SheetHeader className="pr-10 text-left">
+                        <SheetTitle>RAA Details</SheetTitle>
+                        <SheetDescription>
+                            {detailRow?.employee_name}
+                            {detailRow?.date ? ` - ${format(new Date(detailRow.date), "MMMM d, yyyy")}` : ""}
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    {detailRow && (
+                        <div className="mt-6 space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                                <Badge variant="secondary" className="rounded-full">
+                                    {detailRow.outputs?.length || 0} target{(detailRow.outputs?.length || 0) === 1 ? "" : "s"}
+                                </Badge>
+                                <Badge variant="secondary" className="rounded-full">
+                                    {countAccomplishments(detailRow.outputs || [])} accomplishment{countAccomplishments(detailRow.outputs || []) === 1 ? "" : "s"}
+                                </Badge>
+                                <Badge variant="secondary" className="rounded-full">
+                                    {countFiles(detailRow.outputs || [])} file{countFiles(detailRow.outputs || []) === 1 ? "" : "s"}
+                                </Badge>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <StatusBadge status={detailRow.raa_status} />
+                                {detailRow.raa_date_acted && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Updated {format(new Date(detailRow.raa_date_acted), "MMMM d, yyyy")}
+                                    </span>
+                                )}
+                            </div>
+
+                            <Separator />
+
+                            <ScrollArea className="h-[calc(100vh-12rem)] pr-4">
+                                <Accordion
+                                    type="multiple"
+                                    key={detailRow.id}
+                                    defaultValue={(detailRow.outputs || []).slice(0, 1).map((_, index) => `output-${index}`)}
+                                    className="w-full"
+                                >
+                                    {(detailRow.outputs || []).length > 0 ? (
+                                        detailRow.outputs.map((output, outputIndex) => (
+                                            <AccordionItem key={output.id || outputIndex} value={`output-${outputIndex}`}>
+                                                <AccordionTrigger className="items-start gap-3 text-left no-underline hover:no-underline">
+                                                    <div className="flex flex-col items-start gap-1 text-left">
+                                                        <span className="font-semibold">
+                                                            Target Output # {outputIndex + 1}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {stripHtml(output.output) || "No target description"}
+                                                        </span>
+                                                    </div>
+                                                </AccordionTrigger>
+                                                <AccordionContent>
+                                                    <div className="space-y-3">
+                                                        {output.accomplishments?.length > 0 ? (
+                                                            output.accomplishments.map((acc, accIndex) => {
+                                                                const parts = String(acc.accomplishment || "")
+                                                                    .split(/<\/p>/i)
+                                                                    .map((part) => part.replace(/<p[^>]*>/i, "").trim())
+                                                                    .filter(Boolean)
+
+                                                                return (
+                                                                    <div key={acc.id || `${outputIndex}-${accIndex}`} className="rounded-lg border p-3">
+                                                                        <div className="mb-2 flex items-center gap-2">
+                                                                            <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                            <span className="text-sm font-medium">
+                                                                                Actual Accomplishment # {accIndex + 1}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        <div className="space-y-2">
+                                                                            {parts.length > 0 ? (
+                                                                                parts.map((part, partIndex) => (
+                                                                                    <div
+                                                                                        key={`${acc.id || accIndex}-${partIndex}`}
+                                                                                        className="text-sm text-foreground"
+                                                                                        dangerouslySetInnerHTML={{ __html: part }}
+                                                                                    />
+                                                                                ))
+                                                                            ) : (
+                                                                                <div className="text-sm text-muted-foreground">
+                                                                                    No accomplishment entered.
+                                                                                </div>
+                                                                            )}
+
+                                                                            {acc.remarks && (
+                                                                                <div className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+                                                                                    <span className="font-medium text-foreground">
+                                                                                        Remarks/Justification:
+                                                                                    </span>{" "}
+                                                                                    <span dangerouslySetInnerHTML={{ __html: acc.remarks }} />
+                                                                                </div>
+                                                                            )}
+
+                                                                            {acc.files?.length > 0 && (
+                                                                                <div className="space-y-1">
+                                                                                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                                                        Files
+                                                                                    </div>
+                                                                                    <div className="flex flex-col gap-1">
+                                                                                        {acc.files.map((file) => (
+                                                                                            <a
+                                                                                                key={file.id}
+                                                                                                href={file.path}
+                                                                                                target="_blank"
+                                                                                                rel="noopener noreferrer"
+                                                                                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                                                                                aria-label={`Download ${file.filename}`}
+                                                                                            >
+                                                                                                <Paperclip className="h-3 w-3" />
+                                                                                                {file.filename}
+                                                                                            </a>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })
+                                                        ) : (
+                                                            <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                                                                No accomplishments submitted for this target output.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        ))
+                                    ) : (
+                                        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                            No target outputs available for this RAA.
+                                        </div>
+                                    )}
+                                </Accordion>
+                            </ScrollArea>
+                        </div>
+                    )}
+                </SheetContent>
+            </Sheet>
 
             <Dialog 
                 open={!!confirmAction}
@@ -449,6 +672,3 @@ const Raa = () => {
 }
 
 export default Raa
-
-
-

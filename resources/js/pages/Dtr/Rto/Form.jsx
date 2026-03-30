@@ -12,22 +12,17 @@ import { Button } from "@/components/ui/button"
 import TextInput from "@/components/TextInput"
 import TextArea from "@/components/TextArea"
 import { Label } from "@/components/ui/label"
+import DatePicker from "@/components/DatePicker"
 import SingleComboBox from "@/components/SingleComboBox"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { format } from "date-fns"
 import { useHasRole } from "@/hooks/useAuth"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
-const Form = ({ mode, data, onClose, open, employees, dates }) => {
+const Form = ({ mode, data, onClose, open, employees }) => {
   const isEdit = mode === "edit"
   const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
   const { toast } = useToast()
-
-  const formattedDates = dates.map((d) => ({
-    value: d,
-    label: format(new Date(d), "MMMM dd, yyyy"),
-  }))
 
   const types = [
     {'value': 'WFH', 'label': 'WFH'},
@@ -161,16 +156,12 @@ const Form = ({ mode, data, onClose, open, employees, dates }) => {
 
           <div className="space-y-1">
             <Label>Date of Flexiplace</Label>
-            <SingleComboBox
-              items={formattedDates}
+            <DatePicker
               value={formData.date}
-              onChange={(val) => setData("date", val)}
+              onDateChange={(date) => setData("date", date)}
               placeholder="Select date"
               invalidMessage={errors.date}
             />
-            {errors.date && (
-              <p className="text-xs text-red-500">{errors.date}</p>
-            )}
           </div>
 
           <div className="space-y-2">

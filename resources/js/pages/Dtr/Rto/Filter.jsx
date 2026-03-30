@@ -6,13 +6,24 @@ import { Label } from "@/components/ui/label"
 import SingleComboBox from "@/components/SingleComboBox"
 import DatePicker from "@/components/DatePicker"
 
-const Filter = ({ onClose, open, onApply, initialValues, employees, statuses }) => {
+const Filter = ({
+  onClose,
+  open,
+  onApply,
+  initialValues,
+  employees,
+  statuses,
+  divisions,
+  showStaffFilter = true,
+  showDivisionFilter = true,
+}) => {
 
-  const emptyInitialValues = { emp_id: "", date: "", status: "" }
+  const emptyInitialValues = { emp_id: "", division_id: "", date: "", status: "" }
   const firstOpenRef = useRef(true) // track first open
 
   const { data, setData } = useForm({
     emp_id: initialValues?.emp_id || "",
+    division_id: initialValues?.division_id || "",
     date: initialValues?.date || "",
     status: initialValues?.status || "",
   })
@@ -56,17 +67,32 @@ const Filter = ({ onClose, open, onApply, initialValues, employees, statuses }) 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label>Staff</Label>
-            <SingleComboBox
-              items={employees}
-              onChange={(e) => setData("emp_id", e)}
-              placeholder="Select staff"
-              name="emp_id"
-              id="emp_id"
-              value={data.emp_id}
-            />
-          </div>
+          {showStaffFilter && (
+            <div className="space-y-1">
+              <Label>Staff</Label>
+              <SingleComboBox
+                items={employees}
+                onChange={(e) => setData("emp_id", e)}
+                placeholder="Select staff"
+                name="emp_id"
+                id="emp_id"
+                value={data.emp_id}
+              />
+            </div>
+          )}
+          {showDivisionFilter && (
+            <div className="space-y-1">
+              <Label>Division</Label>
+              <SingleComboBox
+                items={divisions}
+                onChange={(value) => setData("division_id", value)}
+                placeholder="Select division"
+                name="division"
+                id="division"
+                value={data.division_id}
+              />
+            </div>
+          )}
           <div className="space-y-1">
             <Label>Date</Label>
             <DatePicker
@@ -110,4 +136,3 @@ const Filter = ({ onClose, open, onApply, initialValues, employees, statuses }) 
 }
 
 export default Filter
-

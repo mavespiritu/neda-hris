@@ -14,7 +14,7 @@ const Filter = ({ open, onClose, onApply, initialValues, options }) => {
   const { data, setData } = useForm({
     employee_id: initialValues?.employee_id || "",
     travel_type: initialValues?.travel_type || "",
-    travel_category: initialValues?.travel_category || "",
+    travel_category_id: initialValues?.travel_category_id || "",
   })
 
   useEffect(() => {
@@ -72,8 +72,8 @@ const Filter = ({ open, onClose, onApply, initialValues, options }) => {
             <Label>Category</Label>
             <SingleComboBox
               items={options?.travel_categories || []}
-              value={data.travel_category}
-              onChange={(v) => setData("travel_category", v)}
+              value={data.travel_category_id}
+              onChange={(v) => setData("travel_category_id", v)}
               placeholder="Select category"
             />
           </div>

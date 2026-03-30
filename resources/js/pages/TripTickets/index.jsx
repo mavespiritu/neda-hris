@@ -23,6 +23,53 @@ const TripTickets = () => {
   const [isCompleteOpen, setIsCompleteOpen] = useState(false)
   const [completeTarget, setCompleteTarget] = useState(null)
 
+  const vehicleLabelMap = useMemo(() => {
+    const items = Array.isArray(tripTickets.filter_options?.vehicles)
+      ? tripTickets.filter_options.vehicles
+      : Object.values(tripTickets.filter_options?.vehicles ?? {})
+
+    return Object.fromEntries(
+      items.map((item) => [
+        String(item.value ?? item.id ?? item.vehicle_id ?? "").trim(),
+        item.label ?? item.name ?? item.vehicle_name ?? "",
+      ])
+    )
+  }, [tripTickets.filter_options?.vehicles])
+
+  const driverLabelMap = useMemo(() => {
+    const items = Array.isArray(tripTickets.filter_options?.drivers)
+      ? tripTickets.filter_options.drivers
+      : Object.values(tripTickets.filter_options?.drivers ?? {})
+
+    return Object.fromEntries(
+      items.map((item) => [
+        String(item.value ?? item.id ?? item.driver_id ?? "").trim(),
+        item.label ?? item.name ?? item.driver_name ?? "",
+      ])
+    )
+  }, [tripTickets.filter_options?.drivers])
+
+  const dispatcherLabelMap = useMemo(() => {
+    const items = Array.isArray(tripTickets.filter_options?.dispatchers)
+      ? tripTickets.filter_options.dispatchers
+      : Object.values(tripTickets.filter_options?.dispatchers ?? {})
+
+    return Object.fromEntries(
+      items.map((item) => [
+        String(item.value ?? item.id ?? item.dispatcher_id ?? "").trim(),
+        item.label ?? item.name ?? item.dispatcher_name ?? "",
+      ])
+    )
+  }, [tripTickets.filter_options?.dispatchers])
+
+  const clearFilter = useCallback((key) => {
+    setFilters((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }, [])
+
   const handleOpenComplete = useCallback((row) => {
     setCompleteTarget(row.original)
     setIsCompleteOpen(true)
@@ -150,6 +197,17 @@ const TripTickets = () => {
       generateReportEndpoint: (id) => route("trip-tickets.generate", id),
       bulkDeleteEndpoint: route("trip-tickets.bulk-destroy"),
     },
+    filterLabelMaps: {
+      vehicle_id: vehicleLabelMap,
+      driver_id: driverLabelMap,
+      dispatcher_id: dispatcherLabelMap,
+    },
+    filterKeyLabels: {
+      vehicle_id: "Vehicle",
+      driver_id: "Driver",
+      dispatcher_id: "Dispatcher",
+    },
+    onClearFilter: clearFilter,
   })
 
   return (
@@ -195,12 +253,12 @@ const TripTickets = () => {
         <Filter
           open={isFilterOpen}
           onClose={handleCloseFilter}
-          onApply={(appliedFilters) =>
+          onApply={(appliedFilters) => {
             setFilters((prev) => ({
               ...prev,
               ...appliedFilters,
             }))
-          }
+          }}
           initialValues={filters}
           options={tripTickets.filter_options}
         />

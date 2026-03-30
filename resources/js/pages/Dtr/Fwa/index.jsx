@@ -114,38 +114,22 @@ const Fwa = () => {
                   Unable to record time entry today
               </p>
           </div>
-          <p className="pl-6">
-            You cannot use this kiosk for Flexiplace today. Possible reasons:
-            <div className="flex flex-col gap-1 mt-2">
-              {!data.schedule && (
-                <span>
-                  • No Flexiplace schedule found. Check your schedule{" "}
-                  <a
-                    href={route("fwa.schedule.index")}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline text-blue-600 hover:text-blue-800"
-                  >
-                    here
-                  </a>.
-                </span>
-              )}
-
-              {!data.approvedRto && (
-                <span>
-                  • No approved RTO found for today. View or request RTO{" "}
-                  <a
-                    href={route("rto.index")}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline text-blue-600 hover:text-blue-800"
-                  >
-                    here
-                  </a>.
-                </span>
-              )}
+          <div className="pl-6">
+            You cannot use this kiosk for Flexiplace today. Please make sure you have an approved RTO for today.
+            {!data.approvedRto && (
+              <div className="mt-2">
+                View or request RTO{" "}
+                <a
+                  href={route("rto.index")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-blue-600 hover:text-blue-800"
+                >
+                  here
+                </a>.
               </div>
-          </p>
+            )}
+          </div>
         </div>
       )}
 

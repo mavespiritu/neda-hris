@@ -101,14 +101,14 @@ export default function SelectedConversation({
           setSelectedUserIds={setSelectedUserIds}
           startConversation={startConversation}
           onPreviewConversation={onPreviewConversation}
-          resolveDirectConversationId={resolveDirectConversationId}
-          resolveConversationIdForRecipientIds={resolveConversationIdForRecipientIds}
-          onlineUserIds={resolvedOnlineUserIds}
-          avatarUrl={avatarUrl}
-          autoOpen={isComposing}
-          keepOpenOnSelect
-          draftOnMissingConversation
-        />
+        resolveDirectConversationId={resolveDirectConversationId}
+        resolveConversationIdForRecipientIds={resolveConversationIdForRecipientIds}
+        onlineUserIds={resolvedOnlineUserIds}
+        avatarUrl={avatarUrl}
+        autoOpen={isComposing}
+        keepOpenOnSelect
+        draftOnMissingConversation
+      />
       ) : activeConversation ? (
         <div className="group relative space-y-2 pr-12">
           <div className="flex items-center gap-3">

@@ -29,6 +29,7 @@ class RtoController extends Controller
     {
         $conn2 = DB::connection('mysql2'); 
         $conn3 = DB::connection('mysql3'); 
+        $user = Auth::user();
 
         $sort      = $request->get('sort');
         $direction = $request->get('direction', 'asc');
@@ -71,11 +72,54 @@ class RtoController extends Controller
             ->get()
             ->keyBy('emp_id');
 
+        $divisions = $conn3->table('tbldivision')
+            ->select('division_id', 'division_name')
+            ->whereIn('division_id', $employees->pluck('division_id')->filter()->unique()->values()->all())
+            ->orderBy('division_name')
+            ->get()
+            ->map(fn ($division) => [
+                'value' => $division->division_id,
+                'label' => $division->division_name,
+            ])
+            ->values();
+
+        $canUseOwnershipTabs = $user->hasAnyRole(['HRIS_HR', 'HRIS_DC', 'HRIS_ADC', 'HRIS_RD', 'HRIS_ARD']);
+        $scope = $request->input('scope');
+        if ($canUseOwnershipTabs && !in_array($scope, ['my', 'others'], true)) {
+            $scope = 'my';
+        }
+
+        $targetEmployeeIds = $employeeIds;
+
+        if ($request->filled('division_id')) {
+            $targetEmployeeIds = $employees
+                ->filter(fn ($employee) => (string) $employee->division_id === (string) $request->division_id)
+                ->keys()
+                ->values()
+                ->all();
+        }
+
+        if ($scope === 'my') {
+            $targetEmployeeIds = array_values(array_filter(
+                $targetEmployeeIds,
+                fn ($empId) => (string) $empId === (string) $user->ipms_id
+            ));
+        } elseif ($scope === 'others') {
+            $targetEmployeeIds = array_values(array_filter(
+                $targetEmployeeIds,
+                fn ($empId) => (string) $empId !== (string) $user->ipms_id
+            ));
+        }
+
+        if (empty($targetEmployeeIds)) {
+            $targetEmployeeIds = [-1];
+        }
+
         /**
          * 3. Get flexi_rto records
          */
         $targetsQuery = $conn2->table('flexi_rto')
-            ->whereIn('emp_id', $employeeIds)
+            ->whereIn('emp_id', $targetEmployeeIds)
             ->when($request->filled('emp_id'), fn($q) => $q->where('emp_id', $request->emp_id))
             ->when($request->filled('date'), fn($q) => $q->whereDate('date', Carbon::parse($request->date)->format('Y-m-d')))
             ->when($request->filled('status'), function ($q) use ($request) {
@@ -152,38 +196,18 @@ class RtoController extends Controller
             return $item;
         });
 
-        /**
-         * 7. Fridays for Date Picker
-         */
-        $fridays = [];
-        $now = Carbon::now();
-        $months = [
-            Carbon::createFromDate($now->year, $now->month, 1)->subMonth(),
-            Carbon::createFromDate($now->year, $now->month, 1),
-            Carbon::createFromDate($now->year, $now->month, 1)->addMonth(),
-        ];
-
-        foreach ($months as $monthDate) {
-            $date = $monthDate->copy()->startOfMonth();
-            $lastDay = $monthDate->copy()->endOfMonth();
-            while ($date->lte($lastDay)) {
-                if ($date->isFriday()) $fridays[] = $date->format('Y-m-d');
-                $date->addDay();
-            }
-        }
-
         return Inertia::render('Dtr/Rto/index', [
             'data' => [
                 'employees' => $employees->map(fn($emp) => [
                     'value' => $emp->emp_id,
                     'label' => $emp->name
                 ])->values(),
-                'dates'     => $fridays,
+                'divisions' => $divisions,
                 'statuses'  => collect(['Draft', 'Submitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
                     ->map(fn ($status) => ['value' => $status, 'label' => $status])
                     ->values(),
                 'targets'   => $targets,
-                'filters'   => $request->only(['emp_id', 'date', 'status', 'sort', 'direction', 'search']),
+                'filters'   => $request->only(['emp_id', 'division_id', 'date', 'status', 'scope', 'sort', 'direction', 'search']),
             ],
         ]);
     }
@@ -1008,6 +1032,4 @@ class RtoController extends Controller
         return $pdf->download("{$today}_RTO_{$rtoDate}.pdf");
     }
 }
-
-
 
