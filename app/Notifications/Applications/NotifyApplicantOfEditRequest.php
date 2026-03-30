@@ -27,20 +27,13 @@ class NotifyApplicantOfEditRequest extends Notification implements ShouldQueue
         $remarks = $this->payload['remarks'] ?? '';
         $expiresAt = $this->payload['expires_at'] ?? null;
 
-        $mail = (new MailMessage)
+        return (new MailMessage)
             ->subject('(DEPDev RO1 HRIS) Your application was reopened for editing')
-            ->greeting("Hello {$applicantName},")
-            ->line("Your submitted application for {$position} has been reopened for editing.");
-
-        if ($remarks) {
-            $mail->line('Remarks / Instructions:')
-                ->line(strip_tags($remarks));
-        }
-
-        if ($expiresAt) {
-            $mail->line("You may update your application until {$expiresAt}.");
-        }
-
-        return $mail->line('Please review your submission and update it within the allowed period.');
+            ->markdown('emails.applications.application-edit-request', [
+                'applicantName' => $applicantName,
+                'position' => $position,
+                'remarks' => $remarks,
+                'expiresAt' => $expiresAt,
+            ]);
     }
 }

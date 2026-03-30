@@ -6,23 +6,21 @@ export const getCountries = (payload) => {
 }
 
 export const getProvinces = (payload) => {
-    const url = 'https://psgc.gitlab.io/api/provinces/'
+    const url = route('psgc.provinces')
     return axios.get(url, {params: {...payload}})
 }
 
 export const getCitymuns = (payload) => {
-    const { provinceCode } = payload
-    const url = `https://psgc.gitlab.io/api/provinces/${provinceCode}/cities-municipalities/`
+    const url = route('psgc.cities-municipalities')
     return axios.get(url, {params: {...payload}})
 }
 
 export const getDistricts = (payload) => {
-    const url = 'https://psgc.gitlab.io/api/districts/'
+    const url = route('psgc.districts')
     return axios.get(url, {params: {...payload}})
 }
 
 export const getDistrictCitymuns = (payload) => {
-    const { districtCode } = payload
-    const url = `https://psgc.gitlab.io/api/districts/${districtCode}/cities-municipalities/`
+    const url = route('psgc.cities-municipalities')
     return axios.get(url, {params: {...payload}})
 }
