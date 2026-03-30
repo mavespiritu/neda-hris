@@ -656,9 +656,24 @@ export default function MessengerQuickPanel({
     return startConversationWithRecipientIds(recipientIds)
   }
 
-  const handlePreviewConversation = (conversationId) => {
+  const handlePreviewConversation = (conversationId, options = {}) => {
     const match = recentConversations.find((item) => Number(item.id) === Number(conversationId))
-    if (!match) return
+    if (!match) {
+      if (!conversationId) {
+        flushSync(() => {
+          setActiveConversation(null)
+          setMessages([])
+          setHasMore(true)
+          setReplyTo(null)
+          setTypingUser(null)
+          setMessagesLoading(false)
+          if (!options?.preserveSelection) {
+            setSelectedUserIds([])
+          }
+        })
+      }
+      return
+    }
 
     flushSync(() => {
       setActiveConversation(match)
@@ -666,7 +681,9 @@ export default function MessengerQuickPanel({
       setHasMore(true)
       setReplyTo(null)
       setTypingUser(null)
-      setSelectedUserIds([])
+      if (!options?.preserveSelection) {
+        setSelectedUserIds([])
+      }
       setMessagesLoading(true)
     })
   }
@@ -720,6 +737,7 @@ export default function MessengerQuickPanel({
                 onlineUserIds={onlineUserIds}
                 avatarUrl={avatarUrlFor}
                 autoOpen
+                draftOnMissingConversation
               />
             </div>
 

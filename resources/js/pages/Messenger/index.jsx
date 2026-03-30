@@ -992,7 +992,7 @@ export default function Index() {
 
     if (!draft && !attachment) return false
 
-    const targetConversationId = await ensureConversationForDraft()
+    const targetConversationId = activeId || await ensureConversationForDraft()
     if (!targetConversationId) return false
 
     handleSelectConversation(targetConversationId)

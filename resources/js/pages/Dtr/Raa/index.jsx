@@ -478,7 +478,7 @@ const Raa = () => {
                     }
                 }}
             >
-                <SheetContent side="right" className="w-full sm:max-w-3xl">
+                <SheetContent side="right" className="flex h-full max-h-screen w-full flex-col overflow-hidden sm:max-w-3xl">
                     <SheetHeader className="pr-10 text-left">
                         <SheetTitle>RAA Details</SheetTitle>
                         <SheetDescription>
@@ -488,7 +488,7 @@ const Raa = () => {
                     </SheetHeader>
 
                     {detailRow && (
-                        <div className="mt-6 space-y-4">
+                        <div className="mt-6 flex min-h-0 flex-1 flex-col space-y-4">
                             <div className="flex flex-wrap gap-2">
                                 <Badge variant="secondary" className="rounded-full">
                                     {detailRow.outputs?.length || 0} target{(detailRow.outputs?.length || 0) === 1 ? "" : "s"}
@@ -512,7 +512,7 @@ const Raa = () => {
 
                             <Separator />
 
-                            <ScrollArea className="h-[calc(100vh-12rem)] pr-4">
+                            <ScrollArea className="min-h-0 flex-1 pr-4">
                                 <Accordion
                                     type="multiple"
                                     key={detailRow.id}
