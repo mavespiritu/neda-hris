@@ -226,59 +226,6 @@ const Home = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-          <Card className="border-0 bg-white/80 backdrop-blur-md shadow-[0_10px_30px_-16px_rgba(15,23,42,0.35)]">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-500">Positions posted</p>
-                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">
-                    {Number(stats.positions_posted || 0).toLocaleString("en-US")}
-                  </h3>
-                  <p className="text-xs text-slate-500">Open vacancies currently published</p>
-                </div>
-                <div className="rounded-2xl bg-blue-50 p-3 text-blue-700">
-                  <Briefcase className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 bg-white/80 backdrop-blur-md shadow-[0_10px_30px_-16px_rgba(15,23,42,0.35)]">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-500">Applicants catered</p>
-                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">
-                    {Number(stats.applicants_catered || 0).toLocaleString("en-US")}
-                  </h3>
-                  <p className="text-xs text-slate-500">Distinct applicants who submitted</p>
-                </div>
-                <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">
-                  <Users className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 bg-white/80 backdrop-blur-md shadow-[0_10px_30px_-16px_rgba(15,23,42,0.35)]">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-slate-500">Applications submitted</p>
-                  <h3 className="text-3xl font-bold tracking-tight text-slate-900">
-                    {Number(stats.applications_submitted || 0).toLocaleString("en-US")}
-                  </h3>
-                  <p className="text-xs text-slate-500">Total submitted applications on record</p>
-                </div>
-                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
-                  <FileText className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {showFilter && (
             <Card className="p-4 mb-4 animate-fadeIn">
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
