@@ -62,12 +62,6 @@ class ShowDtr
             $logType = 'pmOut';
         }
 
-        $schedule = $conn2->table('flexi_schedule')
-            ->select('emp_id', 'dtr_type', 'date')
-            ->where('emp_id', $empId)
-            ->where('date', $today)
-            ->where('dtr_type', 'Flexiplace')
-            ->first();
 
         $approvedRto = $conn2->table('flexi_rto')
             ->where('emp_id', $empId)
@@ -82,7 +76,8 @@ class ShowDtr
             })
             ->exists();
 
-        $isFlexiplaceToday = $schedule !== null && $approvedRto;
+        // Approved RTO is the only requirement for FWA time-in.
+        $isFlexiplaceToday = $approvedRto;
 
         return Inertia::render('Dtr/Fwa/index', [
             'data' => [
@@ -91,7 +86,6 @@ class ShowDtr
                 'pmIn' => $pmIn,
                 'pmOut' => $pmOut,
                 'logType' => $logType,
-                'schedule' => $schedule,
                 'approvedRto' => $approvedRto,
                 'isFlexiplaceToday' => $isFlexiplaceToday,
             ],
