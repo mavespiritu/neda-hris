@@ -21,8 +21,8 @@ class TripTicketReportBuilder
             return null;
         }
 
-        $latestHistory = $this->fetchLatestToHistory($conn2, $ticket->travel_order_id);
         $staffRows = $this->fetchStaffRows($conn2, $ticket->travel_order_id);
+        $authorizer = $this->fetchAuthorizer($conn2);
         $rawDestinations = $this->fetchDestinations(
             conn2: $conn2,
             tripTicketId: (int) $ticket->id,
@@ -55,7 +55,7 @@ class TripTicketReportBuilder
         ])
           ->push($ticket->dispatcher_id)
           ->push($ticket->driver_id)
-          ->when($latestHistory?->acted_by, fn ($c) => $c->push($latestHistory->acted_by))
+          ->when($authorizer?->signatory, fn ($c) => $c->push($authorizer->signatory))
           ->values();
 
         $employeesById = $this->employeeNamesById($empIds, 'mysql3');
@@ -81,8 +81,8 @@ class TripTicketReportBuilder
             'destinations' => $destinations,
             'prexc' => $ticket->prexc,
             'purpose' => $ticket->purpose,
-            'authorized_by' => $latestHistory ? $this->employeeName($employeesById, $latestHistory->acted_by) : null,
-            'authorized_by_designation' => $this->fetchAuthorizerDesignation($conn2, $ticket->travel_order_id) ?? null,
+            'authorized_by' => $authorizer ? $this->employeeName($employeesById, $authorizer->signatory) : null,
+            'authorized_by_designation' => $authorizer?->designation ?? null,
             'odo_start' => $ticket->odo_start,
             'odo_end' => $ticket->odo_end,
             'fuel_type' => $ticket->fuel_type,
@@ -90,8 +90,6 @@ class TripTicketReportBuilder
             'created_by' => $ticket->created_by,
             'creator' => $this->employeeName($employeesById, $ticket->created_by),
             'date_created' => Carbon::parse($ticket->date_created)->format('F j, Y'),
-            
-            
         ];
 
         $today = now()->format('YmdHis');
@@ -132,21 +130,15 @@ class TripTicketReportBuilder
             ->first();
     }
 
-    private function fetchLatestToHistory($conn2, int $id): ?object
-    {
-        return $conn2->table('submission_history')
-            ->where('model', 'Vehicle Request')
-            ->where('model_id', $id)
-            ->orderByDesc('date_acted')
-            ->first();
-    }
-
-    private function fetchAuthorizerDesignation($conn2, int $id): ?string
+    private function fetchAuthorizer($conn2): ?object
     {
         return $conn2->table('travel_order_signatories')
-            ->select('designation')
+            ->select(['signatory', 'designation'])
             ->where('type', 'Approver_TT')
-            ->value('designation');
+            ->whereNotNull('signatory')
+            ->where('signatory', '!=', '')
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function fetchStaffRows($conn2, int $id): Collection
