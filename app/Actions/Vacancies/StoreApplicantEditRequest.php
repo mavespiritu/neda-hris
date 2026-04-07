@@ -120,7 +120,8 @@ class StoreApplicantEditRequest
             $validated,
             $expiresAt,
             $userIpmsId,
-            $userId
+            $userId,
+            $remarks
         ) {
             $existing = AppEditRequest::query()
                 ->where('application_id', $application)
@@ -217,6 +218,8 @@ class StoreApplicantEditRequest
     }
 
 }
+
+
 
 
 
