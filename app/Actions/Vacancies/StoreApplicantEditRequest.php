@@ -38,7 +38,8 @@ class StoreApplicantEditRequest
             'remarks.required' => 'Remarks is required.',
         ])->validate();
 
-        $normalizedRemarks = trim(strip_tags($validated['remarks']));
+        $remarks = $validated['remarks'];
+        $normalizedRemarks = trim(strip_tags($remarks));
 
         if ($normalizedRemarks === '') {
             return response()->json([
@@ -129,7 +130,7 @@ class StoreApplicantEditRequest
 
             if ($existing) {
                 $existing->fill([
-                    'remarks' => $validated['remarks'],
+                    'remarks' => $remarks,
                     'status' => 'Open',
                     'opened_at' => now(),
                     'expires_at' => $expiresAt,
@@ -143,7 +144,7 @@ class StoreApplicantEditRequest
                 $editRequest = AppEditRequest::query()->create([
                     'application_id' => $application,
                     'vacancy_id' => $vacancy,
-                    'remarks' => $validated['remarks'],
+                    'remarks' => $remarks,
                     'status' => 'Open',
                     'opened_at' => now(),
                     'expires_at' => $expiresAt,
@@ -158,7 +159,7 @@ class StoreApplicantEditRequest
             AppEditRequestLog::query()->create([
                 'app_edit_request_id' => $editRequest->id,
                 'action' => $action,
-                'remarks' => $validated['remarks'],
+                'remarks' => $remarks,
                 'acted_by' => $userId,
                 'acted_at' => now(),
             ]);
@@ -171,7 +172,7 @@ class StoreApplicantEditRequest
                 ->notify(new NotifyApplicantOfEditRequest([
                     'applicant_name' => $applicationRecord->applicant_name,
                     'position' => $vacancyRecord?->position_description,
-                    'remarks' => $validated['remarks'],
+                    'remarks' => $remarks,
                     'expires_at' => $expiresAt->format('F j, Y'),
                 ]));
 
@@ -216,3 +217,6 @@ class StoreApplicantEditRequest
     }
 
 }
+
+
+
