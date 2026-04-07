@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Raa;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -19,6 +20,14 @@ use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use App\Notifications\NotifyArdOfRaaEndorsement;
 use App\Notifications\NotifyStaffOfRaaApproval;
+use App\States\Raa\Approved;
+use App\States\Raa\Disapproved;
+use App\States\Raa\Draft;
+use App\States\Raa\Endorsed;
+use App\States\Raa\NeedsRevision;
+use App\States\Raa\Resubmitted;
+use App\States\Raa\Returned;
+use App\States\Raa\Submitted;
 use Barryvdh\DomPDF\Facade\Pdf;
 use TCPDF;
 use Illuminate\Support\Facades\Gate;
@@ -262,7 +271,7 @@ class RaaController extends Controller
                 ])->values(),
                 'divisions' => $divisions,
                 'dates'   => $fridays,
-                'statuses'  => collect(['Draft', 'Submitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
+                'statuses'  => collect(['Draft', 'Submitted', 'Resubmitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
                     ->map(fn ($status) => ['value' => $status, 'label' => $status])
                     ->values(),
                 'targets' => $targets,
@@ -411,7 +420,7 @@ class RaaController extends Controller
             // Insert/update RAA header
             $conn2->table('flexi_raa')->updateOrInsert(
                 ['rto_id' => $id],
-                ['rto_id' => $id, 'created_by' => auth()->user()->ipms_id, 'created_at' => now()]
+                ['rto_id' => $id, 'created_by' => auth()->user()->ipms_id, 'created_at' => now(), 'raa_state' => Draft::class]
             );
 
             $raaId = $conn2->table('flexi_raa')
@@ -517,7 +526,6 @@ class RaaController extends Controller
             $conn2->commit();
 
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('RAA Error: ' . $e->getMessage());
 
             return back()->with([
@@ -642,7 +650,6 @@ class RaaController extends Controller
                 'message' => 'Target outputs updated successfully.',
             ]);
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Update Error: ' . $e->getMessage());
 
             return back()->with([
@@ -658,27 +665,29 @@ class RaaController extends Controller
         $conn2 = DB::connection('mysql2');
 
         try {
+            return $conn2->transaction(function () use ($id) {
+                $raa = Raa::query()->lockForUpdate()->where('rto_id', $id)->first();
 
-            $conn2->beginTransaction();
+                if (! $raa) {
+                    abort(404, 'RAA not found');
+                }
 
-            $raa = $conn2->table('flexi_raa')->where('rto_id', $id)->first();
+                if ($raa->state instanceof Returned || $raa->state instanceof NeedsRevision) {
+                    $targetLabel = trim((string) $raa->raa_return_to_state);
 
-            if (!$raa) {
-                abort(404, 'RAA not found');
-            }
+                    if ($targetLabel === '') {
+                        throw new \RuntimeException('Return target is missing. Cannot resubmit.');
+                    }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Submitted',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-            ]);
+                    $raa->state->transitionTo(Resubmitted::class, auth()->user()->ipms_id);
+                    $raa->refresh();
+                    $raa->state->transitionTo($this->raaTargetStateClass($targetLabel), auth()->user()->ipms_id);
+                    return;
+                }
 
-            $conn2->commit();
-
+                $raa->state->transitionTo(Submitted::class, auth()->user()->ipms_id);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error submitting RAA: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -688,34 +697,29 @@ class RaaController extends Controller
             ]);
         }
     }
-
     public function endorse($id)
     {
-
         $conn2 = DB::connection('mysql2');
 
         try {
+            return $conn2->transaction(function () use ($id) {
+                $raa = Raa::query()->lockForUpdate()->where('rto_id', $id)->first();
 
-            $conn2->beginTransaction();
+                if (!$raa) {
+                    abort(404, 'RTO not found');
+                }
 
-            $raa = $conn2->table('flexi_raa')->where('rto_id', $id)->first();
+                if ((string) $raa->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot endorse your own RAA.',
+                    ]);
+                }
 
-            if (!$raa) {
-                abort(404, 'RTO not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Endorsed',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-            ]);
-
-            $conn2->commit();
-
+                $raa->state->transitionTo(Endorsed::class, auth()->user()->ipms_id);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error endorsing RAA: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -733,13 +737,12 @@ class RaaController extends Controller
         $conn4 = DB::connection('mysql4');
 
         try {
-
             $conn2->beginTransaction();
             $conn3->beginTransaction();
             $conn4->beginTransaction();
 
             $link = $conn4->table('email_links')->where('token', $token)->first();
-            
+
             if (!$link) {
                 abort(404, 'Invalid link.');
             }
@@ -755,8 +758,8 @@ class RaaController extends Controller
                     'message' => 'This link has already been used.'
                 ]);
             }
-            
-            $raa = $conn2->table('flexi_raa')->where('id', $link->model_id)->first();
+
+            $raa = Raa::query()->lockForUpdate()->find($link->model_id);
 
             if (!$raa) {
                 abort(404, 'RAA not found');
@@ -774,19 +777,21 @@ class RaaController extends Controller
                 abort(404, 'User not found');
             }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Endorsed',
-                'acted_by' => $user->ipms_id,
-                'date_acted' => now(),
-            ]);
+            if ((string) $raa->emp_id === (string) $user->ipms_id) {
+                $conn2->rollBack();
+                $conn3->rollBack();
+                $conn4->rollBack();
+                return Inertia::render('ThankYou', [
+                    'message' => 'You cannot endorse your own RAA.',
+                ]);
+            }
+
+            $raa->state->transitionTo(Endorsed::class, $user->ipms_id);
 
             $conn4->table('email_links')
-            ->where('token', $token)
-            ->update(['is_used' => true]);
+                ->where('token', $token)
+                ->update(['is_used' => true]);
 
-            // Audit log (optional)
             Log::info("RAA {$raa->id} endorsed via email by user {$user->email}");
 
             $ard = User::whereHas('roles', function ($query) {
@@ -794,11 +799,8 @@ class RaaController extends Controller
             })->get();
 
             if ($ard->isEmpty()) {
-
-                Log::warning("No ARD users found for endorsement notification.");
-
+                Log::warning('No ARD users found for endorsement notification.');
             } else {
-
                 $submitter = User::where('ipms_id', $rto->emp_id)->first();
 
                 if ($submitter) {
@@ -819,13 +821,11 @@ class RaaController extends Controller
             return Inertia::render('ThankYou', [
                 'message' => 'You have successfully endorsed the RAA.',
             ]);
-
         } catch (\Exception $e) {
-            $conn2->rollBack();
             $conn3->rollBack();
             $conn4->rollBack();
-            Log::error("Failed email endorsement for RAA: " . $e->getMessage());
-            
+            Log::error('Failed email endorsement for RAA: ' . $e->getMessage());
+
             return Inertia::render('ThankYou', [
                 'message' => 'Something went wrong. Please contact the ICT Unit.',
             ]);
@@ -834,31 +834,27 @@ class RaaController extends Controller
 
     public function approve($id)
     {
-
         $conn2 = DB::connection('mysql2');
 
         try {
+            return $conn2->transaction(function () use ($id) {
+                $raa = Raa::query()->lockForUpdate()->where('rto_id', $id)->first();
 
-            $conn2->beginTransaction();
+                if (!$raa) {
+                    abort(404, 'RAA not found');
+                }
 
-            $raa = $conn2->table('flexi_raa')->where('rto_id', $id)->first();
+                if ((string) $raa->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot approve your own RAA.',
+                    ]);
+                }
 
-            if (!$raa) {
-                abort(404, 'RAA not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Approved',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-            ]);
-
-            $conn2->commit();
-
+                $raa->state->transitionTo(Approved::class, auth()->user()->ipms_id);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error approving RAA: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -876,13 +872,12 @@ class RaaController extends Controller
         $conn4 = DB::connection('mysql4');
 
         try {
-            
             $conn2->beginTransaction();
             $conn3->beginTransaction();
             $conn4->beginTransaction();
 
             $link = $conn4->table('email_links')->where('token', $token)->first();
-            
+
             if (!$link) {
                 abort(404, 'Invalid link.');
             }
@@ -898,8 +893,8 @@ class RaaController extends Controller
                     'message' => 'This link has already been used.'
                 ]);
             }
-            
-            $raa = $conn2->table('flexi_raa')->where('id', $link->model_id)->first();
+
+            $raa = Raa::query()->lockForUpdate()->find($link->model_id);
 
             if (!$raa) {
                 abort(404, 'RAA not found');
@@ -917,22 +912,24 @@ class RaaController extends Controller
                 abort(404, 'User not found');
             }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Approved',
-                'acted_by' => $user->ipms_id,
-                'date_acted' => now(),
-            ]);
+            if ((string) $raa->emp_id === (string) $user->ipms_id) {
+                $conn2->rollBack();
+                $conn3->rollBack();
+                $conn4->rollBack();
+                return Inertia::render('ThankYou', [
+                    'message' => 'You cannot approve your own RAA.',
+                ]);
+            }
+
+            $raa->state->transitionTo(Approved::class, $user->ipms_id);
 
             $conn4->table('email_links')
-            ->where('token', $token)
-            ->update(['is_used' => true]);
-
+                ->where('token', $token)
+                ->update(['is_used' => true]);
 
             $staff = $conn3->table('tblemployee')
-            ->where('emp_id', $rto->emp_id)
-            ->first();
+                ->where('emp_id', $rto->emp_id)
+                ->first();
 
             if (!$staff) {
                 abort(404, 'Staff not found');
@@ -960,7 +957,6 @@ class RaaController extends Controller
                 Notification::send($submitter, new NotifyStaffOfRaaApproval($payload));
             }
 
-            // Audit log (optional)
             Log::info("RAA {$raa->id} approved via email by user {$user->email}");
 
             $conn2->commit();
@@ -970,13 +966,11 @@ class RaaController extends Controller
             return Inertia::render('ThankYou', [
                 'message' => 'You have successfully approved the RAA.',
             ]);
-
         } catch (\Exception $e) {
-            $conn2->rollBack();
             $conn3->rollBack();
             $conn4->rollBack();
-            Log::error("Failed email approval for RAA: " . $e->getMessage());
-            
+            Log::error('Failed email approval for RAA: ' . $e->getMessage());
+
             return Inertia::render('ThankYou', [
                 'message' => 'Something went wrong. Please contact the ICT Unit.',
             ]);
@@ -985,7 +979,6 @@ class RaaController extends Controller
 
     public function disapprove($id, Request $request)
     {
-
         $conn2 = DB::connection('mysql2');
 
         $request->validate(
@@ -1000,28 +993,24 @@ class RaaController extends Controller
         );
 
         try {
+            return $conn2->transaction(function () use ($id, $request) {
+                $raa = Raa::query()->lockForUpdate()->where('rto_id', $id)->first();
 
-            $conn2->beginTransaction();
+                if (!$raa) {
+                    abort(404, 'RAA not found');
+                }
 
-            $raa = $conn2->table('flexi_raa')->where('rto_id', $id)->first();
+                if ((string) $raa->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot disapprove your own RAA.',
+                    ]);
+                }
 
-            if (!$raa) {
-                abort(404, 'RAA not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Disapproved',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-                'remarks' => $request->remarks
-            ]);
-
-            $conn2->commit();
-
+                $raa->state->transitionTo(Disapproved::class, auth()->user()->ipms_id, $request->remarks);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error disapproving RAA: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -1034,7 +1023,6 @@ class RaaController extends Controller
 
     public function return($id, Request $request)
     {
-
         $conn2 = DB::connection('mysql2');
 
         $request->validate(
@@ -1049,28 +1037,29 @@ class RaaController extends Controller
         );
 
         try {
+            return $conn2->transaction(function () use ($id, $request) {
+                $raa = Raa::query()->lockForUpdate()->where('rto_id', $id)->first();
 
-            $conn2->beginTransaction();
+                if (!$raa) {
+                    abort(404, 'RAA not found');
+                }
 
-            $raa = $conn2->table('flexi_raa')->where('rto_id', $id)->first();
+                $rto = DB::connection('mysql2')->table('flexi_rto')
+                    ->select('emp_id')
+                    ->where('id', $raa->rto_id)
+                    ->first();
 
-            if (!$raa) {
-                abort(404, 'RAA not found');
-            }
+                if ((string) $raa->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot return your own RAA.',
+                    ]);
+                }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RAA',
-                'model_id' => $raa->id,
-                'status' => 'Needs Revision',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-                'remarks' => $request->remarks
-            ]);
-
-            $conn2->commit();
-
+                $raa->state->transitionTo(Returned::class, auth()->user()->ipms_id, (string) $raa->state->label(), (string) ($rto->emp_id ?? ''), $request->remarks);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error returning RAA: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -1080,7 +1069,18 @@ class RaaController extends Controller
             ]);
         }
     }
-    
+
+    private function raaTargetStateClass(string $label): string
+    {
+        return match ($label) {
+            'Submitted' => Submitted::class,
+            'Endorsed' => Endorsed::class,
+            'Approved' => Approved::class,
+            'Disapproved' => Disapproved::class,
+            default => throw new \RuntimeException("Invalid return target state: {$label}"),
+        };
+    }
+
     public function generate($id)
     {
         $conn2 = DB::connection('mysql2');
@@ -1091,7 +1091,7 @@ class RaaController extends Controller
         $fullName = DB::raw("
             CONCAT(
                 e.fname, ' ',
-                IF(e.mname IS NOT NULL AND e.mname != '', CONCAT(LEFT(e.mname, 1), '. '), ''),
+                IF(e.mname IS NOT NULL AND e.mname != ', CONCAT(LEFT(e.mname, 1), '. '), '),
                 e.lname
             ) AS name
         ");
@@ -1109,7 +1109,7 @@ class RaaController extends Controller
         if (!$rto) abort(404, 'RTO not found');
 
         $employee = $conn3->table('tblemployee')
-            ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+            ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != ', CONCAT(LEFT(mname,1),'. '),') , lname) as name"), 'division_id'])
             ->where('emp_id', $rto->emp_id)
             ->first();
 
@@ -1161,7 +1161,7 @@ class RaaController extends Controller
 
         $supervisorInfo = $supervisorEmpId
             ? $conn3->table('tblemployee as e')
-                ->select(['e.emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'e.division_id'])
+                ->select(['e.emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != ', CONCAT(LEFT(mname,1),'. '),') , lname) as name"), 'e.division_id'])
                 ->where('e.work_status', 'active')
                 ->where('e.emp_id', $supervisorEmpId)
                 ->first()
@@ -1183,7 +1183,7 @@ class RaaController extends Controller
 
         $approverName = $approverInfo
             ? $conn3->table('tblemployee as e')
-                ->select(['e.emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'e.division_id'])
+                ->select(['e.emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != ', CONCAT(LEFT(mname,1),'. '),') , lname) as name"), 'e.division_id'])
                 ->where(['e.emp_id' => $approverInfo->acted_by, 'e.work_status' => 'active'])
                 ->first()?->name
             : $conn2->table('settings')->where('title', 'Agency Sub-Head')->value('value');
@@ -1261,7 +1261,7 @@ class RaaController extends Controller
         $pdf->AddPage();
 
         // Output the HTML content
-        $pdf->writeHTML($html, true, false, true, false, '');
+        $pdf->writeHTML($html, true, false, true, false, ');
 
         // -----------------------------
         // Apply digital signature if available
@@ -1271,7 +1271,7 @@ class RaaController extends Controller
             file_put_contents($tempP12, $creator->digital_sig);
 
             $certs = [];
-            $p12Password = ''; // set password if your .p12 has one
+            $p12Password = '; // set password if your .p12 has one
             if (openssl_pkcs12_read(file_get_contents($tempP12), $certs, $p12Password)) {
                 // write cert and private key to temp PEM files
                 $tempCert = tempnam(sys_get_temp_dir(), 'cert') . '_cert.pem';
@@ -1283,8 +1283,8 @@ class RaaController extends Controller
                 $pdf->setSignature(
                     $tempCert,
                     $tempKey,
-                    '', // private key password
-                    '', // certification info
+                    ', // private key password
+                    ', // certification info
                     2,  // certification level
                     ['Name' => $rto->name ?? '', 'Location' => 'DEPDev RO1', 'Reason' => 'RAA Submission']
                 );
@@ -1295,4 +1295,23 @@ class RaaController extends Controller
         return $pdf->download("{$today}_RAA_{$rtoDate}.pdf");
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

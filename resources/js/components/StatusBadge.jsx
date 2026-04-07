@@ -39,6 +39,11 @@ const statusMap = {
     className: "bg-gray-100 text-gray-700 hover:bg-gray-100 hover:text-gray-700",
     icon: FileText,
   },
+  Resubmitted: {
+    label: "Resubmitted",
+    className: "bg-amber-100 text-amber-700 hover:bg-amber-100 hover:text-amber-700",
+    icon: Clock,
+  },
   Pending: {
     label: "Pending",
     className: "bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground",
@@ -82,3 +87,6 @@ const StatusBadge = ({ status }) => {
 }
 
 export default StatusBadge
+
+
+

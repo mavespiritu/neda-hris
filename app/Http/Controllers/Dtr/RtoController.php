@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Rto;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -20,6 +21,14 @@ use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use App\Notifications\NotifyArdOfRtoEndorsement;
 use App\Notifications\NotifyStaffOfRtoApproval;
+use App\States\Rto\Approved;
+use App\States\Rto\Disapproved;
+use App\States\Rto\Draft;
+use App\States\Rto\Endorsed;
+use App\States\Rto\NeedsRevision;
+use App\States\Rto\Resubmitted;
+use App\States\Rto\Returned;
+use App\States\Rto\Submitted;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Gate;
 
@@ -203,7 +212,7 @@ class RtoController extends Controller
                     'label' => $emp->name
                 ])->values(),
                 'divisions' => $divisions,
-                'statuses'  => collect(['Draft', 'Submitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
+                'statuses'  => collect(['Draft', 'Submitted', 'Resubmitted', 'Endorsed', 'Approved', 'Disapproved', 'Needs Revision'])
                     ->map(fn ($status) => ['value' => $status, 'label' => $status])
                     ->values(),
                 'targets'   => $targets,
@@ -268,6 +277,7 @@ class RtoController extends Controller
                 'other_type' => $validated['type'] === 'Other' ? $validated['other_type'] : null,
                 'created_by' => $user->ipms_id,
                 'created_at' => now(),
+                'rto_state'  => Draft::class,
             ]);
 
             foreach ($validated['outputs'] as $out) {
@@ -297,7 +307,6 @@ class RtoController extends Controller
                 'message' => 'Target outputs saved successfully.',
             ]);
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Store Error: ' . $e->getMessage());
 
             return back()->with([
@@ -410,7 +419,6 @@ class RtoController extends Controller
                 'message' => 'Target outputs updated successfully.',
             ]);
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Update Error: ' . $e->getMessage());
 
             return back()->with([
@@ -502,31 +510,32 @@ class RtoController extends Controller
 
     public function submit($id)
     {
-
         $conn2 = DB::connection('mysql2');
 
         try {
+            return $conn2->transaction(function () use ($id) {
+                $rto = Rto::query()->lockForUpdate()->find($id);
 
-            $conn2->beginTransaction();
+                if (! $rto) {
+                    abort(404, 'RTO not found');
+                }
 
-            $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
+                if ($rto->state instanceof Returned || $rto->state instanceof NeedsRevision) {
+                    $targetLabel = trim((string) $rto->rto_return_to_state);
 
-            if (!$rto) {
-                abort(404, 'RTO not found');
-            }
+                    if ($targetLabel === '') {
+                        throw new \RuntimeException('Return target is missing. Cannot resubmit.');
+                    }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $id,
-                'status' => 'Submitted',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-            ]);
+                    $rto->state->transitionTo(Resubmitted::class, auth()->user()->ipms_id);
+                    $rto->refresh();
+                    $rto->state->transitionTo($this->rtoTargetStateClass($targetLabel), auth()->user()->ipms_id);
+                    return;
+                }
 
-            $conn2->commit();
-
+                $rto->state->transitionTo(Submitted::class, auth()->user()->ipms_id);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error submitting RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -536,34 +545,29 @@ class RtoController extends Controller
             ]);
         }
     }
-
     public function endorse($id)
     {
-
         $conn2 = DB::connection('mysql2');
 
         try {
+            return $conn2->transaction(function () use ($id) {
+                $rto = Rto::query()->lockForUpdate()->find($id);
 
-            $conn2->beginTransaction();
+                if (!$rto) {
+                    abort(404, 'RTO not found');
+                }
 
-            $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
+                if ((string) $rto->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot endorse your own RTO.',
+                    ]);
+                }
 
-            if (!$rto) {
-                abort(404, 'RTO not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $id,
-                'status' => 'Endorsed',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-            ]);
-
-            $conn2->commit();
-
+                $rto->state->transitionTo(Endorsed::class, auth()->user()->ipms_id);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error endorsing RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -581,9 +585,12 @@ class RtoController extends Controller
         $conn4 = DB::connection('mysql4');
 
         try {
+            $conn2->beginTransaction();
+            $conn3->beginTransaction();
+            $conn4->beginTransaction();
 
             $link = $conn4->table('email_links')->where('token', $token)->first();
-            
+
             if (!$link) {
                 abort(404, 'Invalid link.');
             }
@@ -599,8 +606,8 @@ class RtoController extends Controller
                     'message' => 'This link has already been used.'
                 ]);
             }
-            
-            $rto = $conn2->table('flexi_rto')->where('id', $link->model_id)->first();
+
+            $rto = Rto::query()->lockForUpdate()->find($link->model_id);
 
             if (!$rto) {
                 abort(404, 'RTO not found');
@@ -612,19 +619,21 @@ class RtoController extends Controller
                 abort(404, 'User not found');
             }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $rto->id,
-                'status' => 'Endorsed',
-                'acted_by' => $user->ipms_id,
-                'date_acted' => now(),
-            ]);
+            if ((string) $rto->emp_id === (string) $user->ipms_id) {
+                $conn2->rollBack();
+                $conn3->rollBack();
+                $conn4->rollBack();
+                return Inertia::render('ThankYou', [
+                    'message' => 'You cannot endorse your own RTO.',
+                ]);
+            }
+
+            $rto->state->transitionTo(Endorsed::class, $user->ipms_id);
 
             $conn4->table('email_links')
-            ->where('token', $token)
-            ->update(['is_used' => true]);
+                ->where('token', $token)
+                ->update(['is_used' => true]);
 
-            // Audit log (optional)
             Log::info("RTO {$rto->id} endorsed via email by user {$user->email}");
 
             $ard = User::whereHas('roles', function ($query) {
@@ -632,11 +641,8 @@ class RtoController extends Controller
             })->get();
 
             if ($ard->isEmpty()) {
-
-                Log::warning("No ARD users found for endorsement notification.");
-
+                Log::warning('No ARD users found for endorsement notification.');
             } else {
-
                 $submitter = User::where('ipms_id', $rto->emp_id)->first();
 
                 if ($submitter) {
@@ -650,13 +656,19 @@ class RtoController extends Controller
                 }
             }
 
+            $conn2->commit();
+            $conn3->commit();
+            $conn4->commit();
+
             return Inertia::render('ThankYou', [
                 'message' => 'You have successfully endorsed the RTO.',
             ]);
-
         } catch (\Exception $e) {
-            Log::error("Failed email endorsement for RTO: " . $e->getMessage());
-            
+            $conn2->rollBack();
+            $conn3->rollBack();
+            $conn4->rollBack();
+            Log::error('Failed email endorsement for RTO: ' . $e->getMessage());
+
             return Inertia::render('ThankYou', [
                 'message' => 'Something went wrong. Please contact the ICT Unit.',
             ]);
@@ -665,31 +677,27 @@ class RtoController extends Controller
 
     public function approve($id)
     {
-
         $conn2 = DB::connection('mysql2');
 
         try {
+            return $conn2->transaction(function () use ($id) {
+                $rto = Rto::query()->lockForUpdate()->find($id);
 
-            $conn2->beginTransaction();
+                if (!$rto) {
+                    abort(404, 'RTO not found');
+                }
 
-            $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
+                if ((string) $rto->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot approve your own RTO.',
+                    ]);
+                }
 
-            if (!$rto) {
-                abort(404, 'RTO not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $id,
-                'status' => 'Approved',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-            ]);
-            
-            $conn2->commit();
-
+                $rto->state->transitionTo(Approved::class, auth()->user()->ipms_id);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error approving RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -707,9 +715,12 @@ class RtoController extends Controller
         $conn4 = DB::connection('mysql4');
 
         try {
+            $conn2->beginTransaction();
+            $conn3->beginTransaction();
+            $conn4->beginTransaction();
 
             $link = $conn4->table('email_links')->where('token', $token)->first();
-            
+
             if (!$link) {
                 abort(404, 'Invalid link.');
             }
@@ -725,8 +736,8 @@ class RtoController extends Controller
                     'message' => 'This link has already been used.'
                 ]);
             }
-            
-            $rto = $conn2->table('flexi_rto')->where('id', $link->model_id)->first();
+
+            $rto = Rto::query()->lockForUpdate()->find($link->model_id);
 
             if (!$rto) {
                 abort(404, 'RTO not found');
@@ -738,22 +749,24 @@ class RtoController extends Controller
                 abort(404, 'User not found');
             }
 
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $rto->id,
-                'status' => 'Approved',
-                'acted_by' => $user->ipms_id,
-                'date_acted' => now(),
-            ]);
+            if ((string) $rto->emp_id === (string) $user->ipms_id) {
+                $conn2->rollBack();
+                $conn3->rollBack();
+                $conn4->rollBack();
+                return Inertia::render('ThankYou', [
+                    'message' => 'You cannot approve your own RTO.',
+                ]);
+            }
+
+            $rto->state->transitionTo(Approved::class, $user->ipms_id);
 
             $conn4->table('email_links')
-            ->where('token', $token)
-            ->update(['is_used' => true]);
-
+                ->where('token', $token)
+                ->update(['is_used' => true]);
 
             $staff = $conn3->table('tblemployee')
-            ->where('emp_id', $rto->emp_id)
-            ->first();
+                ->where('emp_id', $rto->emp_id)
+                ->first();
 
             if (!$staff) {
                 return redirect()->back()->with([
@@ -785,16 +798,21 @@ class RtoController extends Controller
                 Notification::send($submitter, new NotifyStaffOfRtoApproval($payload));
             }
 
-            // Audit log (optional)
             Log::info("RTO {$rto->id} approved via email by user {$user->email}");
+
+            $conn2->commit();
+            $conn3->commit();
+            $conn4->commit();
 
             return Inertia::render('ThankYou', [
                 'message' => 'You have successfully approved the RTO.',
             ]);
-
         } catch (\Exception $e) {
-            Log::error("Failed email approval for RTO: " . $e->getMessage());
-            
+            $conn2->rollBack();
+            $conn3->rollBack();
+            $conn4->rollBack();
+            Log::error('Failed email approval for RTO: ' . $e->getMessage());
+
             return Inertia::render('ThankYou', [
                 'message' => 'Something went wrong. Please contact the ICT Unit.',
             ]);
@@ -803,7 +821,6 @@ class RtoController extends Controller
 
     public function disapprove($id, Request $request)
     {
-
         $conn2 = DB::connection('mysql2');
 
         $request->validate(
@@ -818,28 +835,24 @@ class RtoController extends Controller
         );
 
         try {
+            return $conn2->transaction(function () use ($id, $request) {
+                $rto = Rto::query()->lockForUpdate()->find($id);
 
-            $conn2->beginTransaction();
+                if (!$rto) {
+                    abort(404, 'RTO not found');
+                }
 
-            $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
+                if ((string) $rto->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot disapprove your own RTO.',
+                    ]);
+                }
 
-            if (!$rto) {
-                abort(404, 'RTO not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $id,
-                'status' => 'Disapproved',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-                'remarks' => $request->remarks
-            ]);
-
-            $conn2->commit();
-
+                $rto->state->transitionTo(Disapproved::class, auth()->user()->ipms_id, $request->remarks);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error disapproving RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -852,7 +865,6 @@ class RtoController extends Controller
 
     public function return($id, Request $request)
     {
-
         $conn2 = DB::connection('mysql2');
 
         $request->validate(
@@ -867,28 +879,24 @@ class RtoController extends Controller
         );
 
         try {
+            return $conn2->transaction(function () use ($id, $request) {
+                $rto = Rto::query()->lockForUpdate()->find($id);
 
-            $conn2->beginTransaction();
+                if (!$rto) {
+                    abort(404, 'RTO not found');
+                }
 
-            $rto = $conn2->table('flexi_rto')->where('id', $id)->first();
+                if ((string) $rto->emp_id === (string) auth()->user()->ipms_id) {
+                    return redirect()->back()->with([
+                        'status' => 'error',
+                        'title' => 'Uh oh!',
+                        'message' => 'You cannot return your own RTO.',
+                    ]);
+                }
 
-            if (!$rto) {
-                abort(404, 'RTO not found');
-            }
-
-            $conn2->table('submission_history')->insert([
-                'model' => 'RTO',
-                'model_id' => $id,
-                'status' => 'Needs Revision',
-                'acted_by' => auth()->user()->ipms_id,
-                'date_acted' => now(),
-                'remarks' => $request->remarks
-            ]);
-
-            $conn2->commit();
-
+                $rto->state->transitionTo(Returned::class, auth()->user()->ipms_id, (string) $rto->state->label(), (string) $rto->emp_id, $request->remarks);
+            });
         } catch (\Exception $e) {
-            $conn2->rollBack();
             Log::error('Error returning RTO: ' . $e->getMessage());
 
             return redirect()->back()->with([
@@ -898,7 +906,18 @@ class RtoController extends Controller
             ]);
         }
     }
-    
+
+    private function rtoTargetStateClass(string $label): string
+    {
+        return match ($label) {
+            'Submitted' => Submitted::class,
+            'Endorsed' => Endorsed::class,
+            'Approved' => Approved::class,
+            'Disapproved' => Disapproved::class,
+            default => throw new \RuntimeException("Invalid return target state: {$label}"),
+        };
+    }
+
     public function generate($id)
     {
         $conn2 = DB::connection('mysql2');
@@ -919,7 +938,7 @@ class RtoController extends Controller
 
         // Fetch employee info separately
         $employee = $conn3->table('tblemployee')
-            ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+            ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != ', CONCAT(LEFT(mname,1),'. '),') , lname) as name"), 'division_id'])
             ->where('emp_id', $rto->emp_id)
             ->first();
 
@@ -953,7 +972,7 @@ class RtoController extends Controller
 
         $supervisorInfo = $supervisorEmpId
             ? $conn3->table('tblemployee')
-                ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+                ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != ', CONCAT(LEFT(mname,1),'. '),') , lname) as name"), 'division_id'])
                 ->where('work_status', 'active')
                 ->where('emp_id', $supervisorEmpId)
                 ->first()
@@ -975,7 +994,7 @@ class RtoController extends Controller
 
         if ($approverInfo) {
             $approverEmp = $conn3->table('tblemployee')
-                ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != '', CONCAT(LEFT(mname,1),'. '),'') , lname) as name"), 'division_id'])
+                ->select(['emp_id', DB::raw("CONCAT(fname,' ', IF(mname IS NOT NULL AND mname != ', CONCAT(LEFT(mname,1),'. '),') , lname) as name"), 'division_id'])
                 ->where('emp_id', $approverInfo->acted_by)
                 ->where('work_status', 'active')
                 ->first();
@@ -1032,4 +1051,23 @@ class RtoController extends Controller
         return $pdf->download("{$today}_RTO_{$rtoDate}.pdf");
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

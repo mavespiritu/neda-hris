@@ -39,6 +39,25 @@ class StoreDtr
         $logType = $request->input('logType');
         $timeNow = Carbon::now();
         $session = in_array($logType, ['amIn', 'amOut'], true) ? 'AM' : 'PM';
+        $approvedRto = $conn3->table('flexi_rto')
+            ->where('emp_id', $empId)
+            ->whereDate('date', $today->format('Y-m-d'))
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('submission_history as sh')
+                    ->whereColumn('sh.model_id', 'flexi_rto.id')
+                    ->where('sh.model', 'RTO')
+                    ->where('sh.status', 'Approved');
+            })
+            ->exists();
+
+        if (! $approvedRto) {
+            return redirect()->back()->with([
+                'status' => 'error',
+                'title' => 'Not Allowed',
+                'message' => 'You can only time in once your RTO has been approved.',
+            ]);
+        }
 
         try {
             $conn3->beginTransaction();
@@ -198,3 +217,4 @@ class StoreDtr
         }
     }
 }
+

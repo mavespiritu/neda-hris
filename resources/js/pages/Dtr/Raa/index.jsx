@@ -240,6 +240,7 @@ const Raa = () => {
             const status = row.original.raa_status
             const outputs = row.original.outputs || []
             const skipEndorsement = !!row.original.skip_endorsement
+            const isOwnRequest = String(row.original.emp_id ?? row.original.rto_emp_id ?? "") === String(props.auth.user?.ipms_id ?? "")
 
             // Check if there are any accomplishments encoded
             const hasAccomplishments = outputs.some(output => (output.accomplishments || []).length > 0)
@@ -249,21 +250,24 @@ const Raa = () => {
             if ([null, "Draft", "Needs Revision"].includes(status) && roles.some(r => ["HRIS_Staff", "HRIS_HR"].includes(r)) && hasAccomplishments) {
                 actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
             }
-            if (status === "Submitted" && skipEndorsement && roles.some(r => ["HRIS_ARD", "HRIS_RD"].includes(r))) {
-                actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
-                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
-                actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
-            } else if (status === "Submitted" && !skipEndorsement && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
-                actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
-                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
-            }
-            if (status === "Endorsed" && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
-                actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
-                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
-                actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
-            }
-            if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
-                actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+
+            if (!isOwnRequest) {
+                if (status === "Submitted" && skipEndorsement && roles.some(r => ["HRIS_ARD", "HRIS_RD"].includes(r))) {
+                    actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
+                    actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                    actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
+                } else if (status === "Submitted" && !skipEndorsement && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
+                    actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
+                    actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                }
+                if (status === "Endorsed" && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
+                    actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
+                    actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                    actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
+                }
+                if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
+                    actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
+                }
             }
 
             if (actions.length === 0) return null
@@ -672,3 +676,4 @@ const Raa = () => {
 }
 
 export default Raa
+
