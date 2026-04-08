@@ -26,7 +26,10 @@ Below are the details of the RAA:
                         <td rowspan="{{ count($output->accomplishments) }}" style="width: 5%; text-align:center;">{{ $i + 1 }}.</td>
                         <td rowspan="{{ count($output->accomplishments) }}">{{ $output->output ?? '' }}</td>
                     @endif
-                    <td>{!! $accomplishment->accomplishment ?? '' !!}</td>
+                    <td>
+                        {!! $accomplishment->accomplishment ?? '' !!}
+                        @include('emails.partials.raa-movs', ['accomplishment' => $accomplishment])
+                    </td>
                     <td>{!! $accomplishment->remarks ?? '' !!}</td>
                 </tr>
             @endforeach

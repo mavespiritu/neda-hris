@@ -8,6 +8,34 @@ use Illuminate\Support\Facades\Auth;
 
 class EmployeeController extends Controller
 {
+    protected function employeeFullName(object|array $employee): string
+    {
+        $first = trim((string) data_get($employee, 'fname', ''));
+        $middle = trim((string) data_get($employee, 'mname', ''));
+        $last = trim((string) data_get($employee, 'lname', ''));
+        $ext = trim((string) data_get($employee, 'ext_name', ''));
+
+        $parts = [];
+
+        if ($first !== '') {
+            $parts[] = $first;
+        }
+
+        if ($middle !== '') {
+            $parts[] = mb_substr($middle, 0, 1) . '.';
+        }
+
+        if ($last !== '') {
+            $parts[] = $last;
+        }
+
+        if ($ext !== '') {
+            $parts[] = $ext;
+        }
+
+        return trim(implode(' ', $parts));
+    }
+
     public function getEmployees(Request $request)
     {
         $conn3 = DB::connection('mysql3'); // employees, position tables
@@ -38,7 +66,9 @@ class EmployeeController extends Controller
         $employeesQuery = $conn3->table('tblemployee as e')
             ->select([
                 'e.emp_id as value',
-                DB::raw('concat(e.lname,", ",e.fname," ",e.mname) as label'),
+                'e.lname',
+                'e.fname',
+                'e.mname',
                 'epi.position_id',
                 'p.post_description as position',
                 'epi.item_no',
@@ -110,7 +140,7 @@ class EmployeeController extends Controller
 
             return [
                 'value'       => $emp->value,
-                'label'       => $emp->label,
+                'label'       => $this->employeeFullName($emp),
                 'position_id' => $emp->position_id,
                 'position'    => $emp->position,
                 'item_no'     => $emp->item_no,
@@ -137,12 +167,19 @@ class EmployeeController extends Controller
         $employees = $conn3->table('tblemployee')
             ->select([
                 'emp_id as value',
-                DB::raw('concat(lname,", ",fname," ",mname) as label'),
+                'lname',
+                'fname',
+                'mname',
             ])
             ->orderBy('lname', 'asc')
             ->orderBy('fname', 'asc')
             ->orderBy('mname', 'asc')
             ->get();
+
+        $employees = $employees->map(fn ($employee) => [
+            'value' => $employee->value,
+            'label' => $this->employeeFullName($employee),
+        ])->values();
         
         return response()->json($employees);  
     }
@@ -154,7 +191,9 @@ class EmployeeController extends Controller
         $employees = $conn3->table('tblemployee')
             ->select([
                 'emp_id as value',
-                DB::raw('concat(lname,", ",fname," ",mname) as label'),
+                'lname',
+                'fname',
+                'mname',
             ])
             ->where('work_status', 'active');
 
@@ -167,6 +206,11 @@ class EmployeeController extends Controller
         ->orderBy('fname', 'asc')
         ->orderBy('mname', 'asc')
         ->get();
+
+        $employees = $employees->map(fn ($employee) => [
+            'value' => $employee->value,
+            'label' => $this->employeeFullName($employee),
+        ])->values();
         
         return response()->json($employees);
     }
@@ -186,7 +230,9 @@ class EmployeeController extends Controller
         $employees = $conn3->table('tblemployee')
             ->select([
                 'emp_id as value',
-                DB::raw('concat(lname,", ",fname," ",mname) as label'),
+                'lname',
+                'fname',
+                'mname',
             ])
             ->where('work_status', 'active');
 
@@ -205,6 +251,11 @@ class EmployeeController extends Controller
         ->orderBy('fname', 'asc')
         ->orderBy('mname', 'asc')
         ->get();
+
+        $employees = $employees->map(fn ($employee) => [
+            'value' => $employee->value,
+            'label' => $this->employeeFullName($employee),
+        ])->values();
         
         return response()->json($employees);
     }

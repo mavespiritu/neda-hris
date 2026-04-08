@@ -1,7 +1,8 @@
 import { create } from "zustand"
+import axios from "axios"
 
 export const store = create((set) => ({
-  programs: {
+  groups: {
     data: {
       data: [],
       current_page: 1,
@@ -12,16 +13,16 @@ export const store = create((set) => ({
     error: null,
     filters: {},
   },
-  setPrograms: (updater) =>
+  setGroups: (updater) =>
     set((state) =>
       typeof updater === "function"
-        ? { programs: updater(state.programs) }
-        : { programs: updater }
+        ? { groups: updater(state.groups) }
+        : { groups: updater }
     ),
-  fetchPrograms: async ({ filters = {} } = {}) => {
+  fetchGroups: async ({ filters = {} } = {}) => {
     set((state) => ({
-      programs: {
-        ...state.programs,
+      groups: {
+        ...state.groups,
         isLoading: true,
         error: null,
         filters,
@@ -29,10 +30,10 @@ export const store = create((set) => ({
     }))
 
     try {
-      const response = await axios.get(route("performance.programs.index"), { params: filters })
+      const response = await axios.get(route("settings.groups.index"), { params: filters })
       set((state) => ({
-        programs: {
-          ...state.programs,
+        groups: {
+          ...state.groups,
           data: response.data,
           isLoading: false,
           error: null,
@@ -40,13 +41,12 @@ export const store = create((set) => ({
       }))
     } catch (error) {
       set((state) => ({
-        programs: {
-          ...state.programs,
-          error: error.message || "Failed to fetch Programs.",
+        groups: {
+          ...state.groups,
+          error: error.message || "Failed to fetch groups.",
           isLoading: false,
         },
       }))
     }
   },
 }))
-

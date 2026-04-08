@@ -6,6 +6,7 @@ use App\Actions\Settings\GetAccountSettings;
 use App\Actions\Settings\GetCgaEnableUpdatingDates;
 use App\Actions\Settings\GetOrganizationSettings;
 use App\Actions\Settings\GetRecruitmentSettings;
+use App\Actions\Settings\ManageGroups;
 use App\Actions\Settings\ListActiveCgaSubmissionSchedules;
 use App\Actions\Settings\ListCgaSubmissionSchedules;
 use App\Actions\Settings\SetCgaEnableUpdatingDates;
@@ -74,4 +75,10 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/settings/recruitment', GetRecruitmentSettings::class)->name('settings.recruitment');
     Route::patch('/settings/recruitment', UpdateRecruitmentSettings::class)
     ->name('settings.recruitment.update');
+
+    Route::get('/settings/groups', ManageGroups::class)->name('settings.groups.index');
+    Route::post('/settings/groups', [ManageGroups::class, 'store'])->name('settings.groups.store');
+    Route::put('/settings/groups/{id}', [ManageGroups::class, 'update'])->name('settings.groups.update');
+    Route::delete('/settings/groups/{id}', [ManageGroups::class, 'destroy'])->name('settings.groups.destroy');
+    Route::post('/settings/groups/bulk-destroy', [ManageGroups::class, 'bulkDestroy'])->name('settings.groups.bulk-destroy');
 });

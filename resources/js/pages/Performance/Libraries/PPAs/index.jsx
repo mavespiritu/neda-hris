@@ -1,4 +1,4 @@
-import PageTitle from "@/components/PageTitle"
+﻿import PageTitle from "@/components/PageTitle"
 import useCrudTable from "@/hooks/useCrudTable"
 import { useEffect, useMemo, useState } from "react"
 import Form from "./Form"
@@ -18,8 +18,9 @@ const index = () => {
 
   const columns = useMemo(
     () => [
-      { header: "PAP / Activity", accessorKey: "activity", meta: { enableSorting: true } },
-      { header: "Description", accessorKey: "description", meta: { enableSorting: true } },
+      { header: "Short Code", accessorKey: "short_code", meta: { enableSorting: true } },
+      { header: "Title", accessorKey: "title", meta: { enableSorting: true } },
+      { header: "Label", accessorKey: "label", meta: { enableSorting: true } },
     ],
     []
   )
@@ -58,7 +59,7 @@ const index = () => {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <PageTitle pageTitle="PAPs / Activities" description="Manage library of PAPs and activities here." />
+      <PageTitle pageTitle="MFO/PAP" description="Manage the MFO/PAP library here." />
       <div className="overflow-x-auto">
         <div className="relative">
           {ppas.isLoading && (

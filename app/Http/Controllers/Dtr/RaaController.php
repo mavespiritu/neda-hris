@@ -34,6 +34,29 @@ use Illuminate\Support\Facades\Gate;
 
 class RaaController extends Controller
 {
+    private function formatEmployeeName(?string $fname, ?string $mname, ?string $lname): string
+    {
+        $first = trim((string) $fname);
+        $middle = trim((string) $mname);
+        $last = trim((string) $lname);
+
+        $parts = [];
+
+        if ($first !== '') {
+            $parts[] = $first;
+        }
+
+        if ($middle !== '') {
+            $parts[] = mb_strtoupper(mb_substr($middle, 0, 1)) . '.';
+        }
+
+        if ($last !== '') {
+            $parts[] = $last;
+        }
+
+        return trim(preg_replace('/\s+/', ' ', implode(' ', $parts)));
+    }
+
     public function index(Request $request)
     {
         $conn2 = DB::connection('mysql2');
@@ -55,7 +78,7 @@ class RaaController extends Controller
         $employeesQuery = $conn3->table('tblemployee')
             ->select([
                 'emp_id',
-                DB::raw('concat(lname, ", ", fname, " ", mname) as name'),
+                DB::raw("CONCAT(fname, ' ', IF(mname IS NOT NULL AND TRIM(mname) <> '', CONCAT(LEFT(TRIM(mname), 1), '. '), ''), lname) as name"),
                 'division_id'
             ])
             ->whereIn('emp_id', $visibleEmployeeIdsQuery)
@@ -69,7 +92,7 @@ class RaaController extends Controller
         $allEmployees = $conn3->table('tblemployee')
             ->select([
                 'emp_id',
-                DB::raw('concat(lname, ", ", fname, " ", mname) as name')
+                DB::raw("CONCAT(fname, ' ', IF(mname IS NOT NULL AND TRIM(mname) <> '', CONCAT(LEFT(TRIM(mname), 1), '. '), ''), lname) as name")
             ])
             ->get()
             ->keyBy('emp_id');
@@ -147,6 +170,7 @@ class RaaController extends Controller
             ->leftJoin($latestHistoryRAA, 'sh_raa.model_id', '=', 'raa.id')
             ->select([
                 'rto.*',
+                'raa.id as raa_id',
                 'sh_rto.status as rto_status',
                 'sh_rto.acted_by as rto_acted_by',
                 'sh_rto.remarks as rto_remarks',
@@ -279,6 +303,80 @@ class RaaController extends Controller
                 'targets' => $targets,
                 'filters' => $request->only(['emp_id', 'division_id', 'date', 'status', 'scope', 'sort', 'direction', 'search']),
             ],
+        ]);
+    }
+
+    public function history($id)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $raa = $conn2->table('flexi_raa as raa')
+            ->leftJoin('flexi_rto as rto', 'rto.id', '=', 'raa.rto_id')
+            ->select([
+                'raa.id',
+                'raa.rto_id',
+                'raa.created_at',
+                'rto.emp_id as emp_id',
+            ])
+            ->where('raa.id', $id)
+            ->first();
+
+        if (! $raa) {
+            abort(404, 'RAA not found');
+        }
+
+        $histories = $conn2->table('submission_history as sh')
+            ->select([
+                'sh.id',
+                'sh.status',
+                'sh.acted_by',
+                'sh.date_acted',
+                'sh.remarks',
+            ])
+            ->where('sh.model', 'RAA')
+            ->where('sh.model_id', $id)
+            ->orderByDesc('sh.date_acted')
+            ->orderByDesc('sh.id')
+            ->get();
+
+        $employeeIds = $histories
+            ->pluck('acted_by')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $employees = collect();
+
+        if (! empty($employeeIds)) {
+            $employees = $conn3->table('tblemployee')
+                ->select(['emp_id', 'lname', 'fname', 'mname'])
+                ->whereIn('emp_id', $employeeIds)
+                ->get()
+                ->keyBy('emp_id');
+        }
+
+        $payload = $histories->map(function ($item) use ($employees) {
+            $employee = $employees->get($item->acted_by);
+
+            $name = $employee
+                ? $this->formatEmployeeName($employee->fname ?? null, $employee->mname ?? null, $employee->lname ?? null)
+                : 'System';
+
+            return [
+                'id' => $item->id,
+                'status' => $item->status,
+                'acted_by' => $item->acted_by,
+                'acted_by_name' => $name,
+                'date_acted' => $item->date_acted,
+                'remarks' => $item->remarks,
+            ];
+        })->values();
+
+        return response()->json([
+            'raa' => $raa,
+            'histories' => $payload,
         ]);
     }
 
@@ -1297,10 +1395,6 @@ class RaaController extends Controller
         return $pdf->download("{$today}_RAA_{$rtoDate}.pdf");
     }
 }
-
-
-
-
 
 
 

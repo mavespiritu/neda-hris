@@ -12,10 +12,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Notifications\Concerns\BuildsRaaEmailPayload;
 
 class NotifySupervisorOfRaaSubmission extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, BuildsRaaEmailPayload;
 
     private $payload;
 
@@ -54,28 +55,14 @@ class NotifySupervisorOfRaaSubmission extends Notification implements ShouldQueu
             ->where('id', $raa->rto_id)
             ->first();
 
-        $outputs = $conn2->table('flexi_target')
-            ->where('rto_id', $rto->id)
-            ->get();
-
-        $outputIds = $outputs->pluck('id');
-
-        $accomplishments = $conn2->table('flexi_accomplishment')
-        ->whereIn('target_id', $outputIds)
-        ->select('id', 'accomplishment', 'remarks', 'rto_id', 'raa_id', 'target_id')
-        ->get();
-
-        $accomplishmentsByTarget = $accomplishments->groupBy('target_id');
-
-        foreach ($outputs as $output) {
-            $accs = $accomplishmentsByTarget->get($output->id, collect());
-
-            $output->accomplishments = $accs;
-        }
+        $outputs = $this->buildRaaOutputs((int) $rto->id);
 
         $sender = $conn3->table('tblemployee')
         ->where('emp_id', $rto->emp_id)
         ->first();
+
+        $senderSalutation = $sender->gender == 'Male' ? 'Mr.' : 'Ms.';
+        $senderName = $senderSalutation.' '.$this->formatEmployeeName($sender->fname, $sender->mname, $sender->lname);
 
         $token = (string) Str::uuid();
 

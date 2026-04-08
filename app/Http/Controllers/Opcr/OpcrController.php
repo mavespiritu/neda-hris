@@ -14,10 +14,10 @@ class OpcrController extends Controller
 
         abort_unless($user?->hasAnyRole(['HRIS_DC', 'HRIS_RD', 'HRIS_ARD']), 403, 'Only office-level performance users can access OPCR.');
 
-        return Inertia::render('Opcr/index', [
+        return Inertia::render('Performance/Opcr/index', [
             'summary' => [
-                'program_count' => 5,
-                'activity_count' => 5,
+                'program_count' => 0,
+                'activity_count' => 0,
                 'monitoring_link' => route('emails.index'),
             ],
         ]);

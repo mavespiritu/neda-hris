@@ -19,6 +19,7 @@ class PerformanceLibraryItem extends Model
         'scope',
         'indicator_type',
         'target',
+        'measurement',
         'unit',
         'sort_order',
         'is_active',

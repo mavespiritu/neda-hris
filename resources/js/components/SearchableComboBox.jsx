@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -28,10 +28,15 @@ const debounce = (fn, delay) => {
 const SearchableComboBox = ({
   name,
   onChange,
+  onAdd,
+  canAdd = false,
+  excludeValues = [],
   value,
   selectedItem,
   invalidMessage,
   placeholder = "Search...",
+  addLabel = "Add New Item",
+  minSearchChars = 3,
   ref,
   width,
   labelWidth,
@@ -44,7 +49,8 @@ const SearchableComboBox = ({
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedValue, setSelectedValue] = useState(value)
-  const [selectedLabel, setSelectedLabel] = useState("") // ✅ store label to persist visible text
+  const [selectedLabel, setSelectedLabel] = useState("")
+  const excludedValueSet = useMemo(() => new Set((excludeValues || []).filter(Boolean).map((item) => String(item))), [excludeValues])
 
   useEffect(() => {
     if (selectedItem) {
@@ -55,15 +61,32 @@ const SearchableComboBox = ({
 
   const fetchItems = useCallback(
     debounce(async (term) => {
-      if (!term || term.length < 3) {
+      if (!term || term.length < minSearchChars) {
         setItems([])
         return
       }
+
       try {
         setLoading(true)
         const response = await fetch(`${apiUrl}?search=${encodeURIComponent(term)}`)
         const data = await response.json()
-        setItems(data)
+        const rawItems = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+        setItems(
+          rawItems
+              .map((item) => ({
+                ...item,
+                value: item.value ?? item.id,
+                label:
+                  item.label ??
+                  item.category ??
+                  item.activity ??
+                  item.target ??
+                  item.name ??
+                  item.title ??
+                  String(item.id ?? ""),
+              }))
+            .filter((item) => !excludedValueSet.has(String(item.value)))
+        )
       } catch (err) {
         console.error("Error fetching items:", err)
         setItems([])
@@ -71,7 +94,7 @@ const SearchableComboBox = ({
         setLoading(false)
       }
     }, 500),
-    [apiUrl]
+    [apiUrl, excludedValueSet, minSearchChars]
   )
 
   const handleSearch = (term) => {
@@ -79,7 +102,7 @@ const SearchableComboBox = ({
     fetchItems(term)
   }
 
-  // ✅ Modified to include full item
+  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Modified to include full item
   const toggleSelection = (currentValue, currentItem) => {
     if (disabled || loading) return
     const isSame = selectedValue === currentValue
@@ -88,7 +111,7 @@ const SearchableComboBox = ({
 
     setSelectedValue(newValue)
     setSelectedLabel(newItem?.label || "")
-    onChange(newValue, newItem) // ✅ pass both value & item
+    onChange(newValue, newItem) // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ pass both value & item
     setOpen(false)
   }
 
@@ -108,7 +131,7 @@ const SearchableComboBox = ({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "justify-between w-full relative",
+              "justify-between w-full relative h-auto min-h-10 items-start",
               invalidMessage ? "border-red-500" : ""
             )}
             onClick={() => !disabled && setOpen((prev) => !prev)}
@@ -116,8 +139,8 @@ const SearchableComboBox = ({
           >
             <span
               className={cn(
-                "text-left pr-2 flex items-center gap-2 truncate overflow-hidden whitespace-nowrap",
-                labelWidth || "w-[380px]",
+                "flex min-w-0 flex-1 items-center gap-2 pr-2 text-left whitespace-normal break-words",
+                labelWidth || "w-full",
                 !selectedValue && "text-gray-700"
               )}
             >
@@ -167,7 +190,7 @@ const SearchableComboBox = ({
                       <CommandItem
                         key={item.value}
                         value={item.label}
-                        onSelect={() => toggleSelection(item.value, item)} // ✅ include item
+                        onSelect={() => toggleSelection(item.value, item)} // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ include item
                         className="text-sm"
                       >
                         <Check
@@ -182,10 +205,25 @@ const SearchableComboBox = ({
                       </CommandItem>
                     ))}
                   </CommandGroup>
-                ) : searchTerm.length >= 3 ? (
-                  <CommandEmpty>No results found</CommandEmpty>
+                ) : searchTerm.length >= minSearchChars ? (
+                  <div className="space-y-2 p-2">
+                    <CommandEmpty>No results found</CommandEmpty>
+                    {canAdd && onAdd && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-auto w-full px-2 py-2 justify-center text-sm font-medium text-slate-900"
+                        onClick={() => {
+                          onAdd(searchTerm)
+                          setOpen(false)
+                        }}
+                      >
+                        {addLabel}
+                      </Button>
+                    )}
+                  </div>
                 ) : (
-                  <CommandEmpty>Type at least 3 characters...</CommandEmpty>
+                  <CommandEmpty>Type at least {minSearchChars} characters...</CommandEmpty>
                 )}
               </CommandList>
             </Command>
@@ -197,3 +235,5 @@ const SearchableComboBox = ({
 }
 
 export default SearchableComboBox
+
+

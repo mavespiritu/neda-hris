@@ -6,6 +6,7 @@ import Organization from "./Organization"
 import Recruitment from "./Recruitment"
 import Competencies from "./Competencies"
 import TravelOrders from "./TravelOrders"
+import Groups from "./Groups"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
 import { cn } from "@/lib/utils.jsx"
 
@@ -17,6 +18,7 @@ const Settings = () => {
   const canOrganization = useHasRole(["HRIS_HR", "HRIS_Administrator"])
   const canRecruitment = useHasRole(["HRIS_HR", "HRIS_Administrator"])
   const canCompetencies = useHasRole(["HRIS_HR", "HRIS_Administrator"])
+  const canGroups = useHasRole(["HRIS_HR", "HRIS_Administrator"])
   const canTravelOrders = useHasRole(["HRIS_PRU", "HRIS_Administrator"])
   const canNotifications = useHasRole(["HRIS_HR", "HRIS_Administrator"])
   const canSignatories = useHasRole(["HRIS_Administrator"])
@@ -32,6 +34,7 @@ const Settings = () => {
       { key: "Organization", label: "Organization", allowed: canOrganization },
       { key: "Recruitment", label: "Recruitment", allowed: canRecruitment },
       { key: "Competencies", label: "Competencies", allowed: canCompetencies },
+      { key: "Groups", label: "Groups", allowed: canGroups },
       { key: "TravelOrders", label: "Travels", allowed: canTravelOrders },
       { key: "Notifications", label: "Notifications", allowed: canNotifications },
       { key: "Signatories", label: "Signatories", allowed: canSignatories },
@@ -41,6 +44,7 @@ const Settings = () => {
       canOrganization,
       canRecruitment,
       canCompetencies,
+      canGroups,
       canTravelOrders,
       canNotifications,
       canSignatories,
@@ -81,6 +85,7 @@ const Settings = () => {
     Organization: <Organization />,
     Recruitment: <Recruitment />,
     Competencies: <Competencies />,
+    Groups: <Groups />,
     TravelOrders: <TravelOrders />,
     Notifications: <div className="p-4 border rounded">Notifications settings go here.</div>,
     Signatories: <div className="p-4 border rounded">Signatories settings go here.</div>,

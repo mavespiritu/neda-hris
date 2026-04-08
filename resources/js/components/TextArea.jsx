@@ -1,19 +1,15 @@
 import { cn } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 
-const TextArea = (
-  ({ name, value, onChange, invalidMessage, ref}) => {
-    return (
-      <div ref={ref} className="w-full">
-        <Textarea 
-          name={name} 
-          value={value} 
-          onChange={onChange} 
-          className={cn("w-full min-h-36", invalidMessage ? 'border-red-500' : '')} 
-        />
-      </div>
-    )
-  }
-)
+const TextArea = ({ invalidMessage, className, ...props }) => {
+  return (
+    <div className="w-full">
+      <Textarea
+        {...props}
+        className={cn("w-full min-h-36", invalidMessage ? "border-red-500" : "", className)}
+      />
+    </div>
+  )
+}
 
 export default TextArea

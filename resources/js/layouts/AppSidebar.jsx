@@ -1,4 +1,4 @@
-import React from "react"
+﻿import React from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -118,10 +118,10 @@ const AppSidebar = () => {
       roles: ['HRIS_Staff', 'HRIS_DC', 'HRIS_ADC', 'HRIS_RD', 'HRIS_ARD', 'HRIS_HR', 'HRIS_Administrator'],
       submenu: [
         { title: 'Emails', url: '/emails', roles: ['HRIS_Staff', 'HRIS_DC', 'HRIS_ADC', 'HRIS_RD', 'HRIS_ARD', 'HRIS_HR', 'HRIS_Administrator'], icon: Mails },
-        { title: 'Libraries', url: '/performance/libraries', roles: ['HRIS_HR', 'HRIS_Administrator'], icon: FolderArchive },
         { title: 'OPCR', url: '/opcrs', roles: ['HRIS_DC', 'HRIS_RD', 'HRIS_ARD'], icon: Building },
         { title: 'DPCR', url: '/dpcrs', roles: ['HRIS_DC', 'HRIS_ADC'], icon: UsersRound },
         { title: 'IPCR', url: '/ipcrs', roles: ['HRIS_Staff'], icon: UserRound },
+        { title: 'Libraries', url: '/performance/libraries', roles: ['HRIS_HR', 'HRIS_Administrator'], icon: FolderArchive },
       ],
     },
     {

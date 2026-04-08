@@ -1,5 +1,5 @@
 import PageTitle from "@/components/PageTitle"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useHasRole } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuGroup } from "@/components/ui/dropdown-menu"
@@ -23,15 +23,22 @@ import {
     DialogClose
   } from "@/components/ui/dialog"
 import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet"
+import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatDateWithTime, formatTime12 } from "@/lib/utils.jsx"
+import { formatDateWithTime, formatFullName } from "@/lib/utils.jsx"
 import { CalendarDays } from "lucide-react"
-import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
+import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2, History, Clock3 } from "lucide-react"
 import Form from "./Form"
 import Filter from "./Filter"
 import useCrudTable from "@/hooks/useCrudTable"
@@ -41,6 +48,9 @@ import { useToast } from "@/hooks/use-toast"
 import { Label } from "@/components/ui/label"
 import SingleComboBox from "@/components/SingleComboBox"
 import RichTextEditor from "@/components/RichTextEditor"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 
 const breadcrumbItems = [
   { label: "Home", href: "/" },
@@ -54,13 +64,25 @@ const Rto = () => {
 
     const { auth: { user }, data: { targets, employees, divisions, statuses, filters: serverFilters } } = usePage().props
 
-    const canUseOwnershipTabs = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"])
+    const canUseOwnershipTabs =
+        useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"]) &&
+        !useHasRole("HRIS_Staff")
     const canFilterByStaff = canUseOwnershipTabs
     const canFilterByDivision = useHasRole(["HRIS_HR", "HRIS_RD", "HRIS_ARD"])
+    const canFilterByStatus = useHasRole(["HRIS_HR", "HRIS_RD", "HRIS_ARD"])
     const canModifyRow = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
+    const canOverrideRowActions = useHasRole(["HRIS_HR", "HRIS_ARD"])
+    const canMutateByStatus = useCallback((row) => {
+        const status = row.original.status
+        return ["Draft", "Returned", "Needs Revision"].includes(status)
+    }, [])
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
+    const [historyRow, setHistoryRow] = useState(null)
+    const [historyEntries, setHistoryEntries] = useState([])
+    const [historyLoading, setHistoryLoading] = useState(false)
+    const [historyError, setHistoryError] = useState("")
     
     const { data, setData, post, processing, reset, errors, clearErrors } = useForm({
         remarks: "",
@@ -69,6 +91,32 @@ const Rto = () => {
     const handleAction = (action, row) => {
         setConfirmAction(action)
         setSelectedRow(row)
+    }
+
+    const handleViewHistory = async (row) => {
+        setHistoryRow(row.original)
+        setHistoryEntries([])
+        setHistoryError("")
+        setHistoryLoading(true)
+
+        try {
+            const response = await fetch(route("rto.history", row.original.id), {
+                headers: {
+                    Accept: "application/json",
+                },
+            })
+
+            if (!response.ok) {
+                throw new Error("Unable to load submission history.")
+            }
+
+            const payload = await response.json()
+            setHistoryEntries(payload?.histories || [])
+        } catch (error) {
+            setHistoryError(error?.message || "Unable to load submission history.")
+        } finally {
+            setHistoryLoading(false)
+        }
     }
 
     const performAction = (e) => {
@@ -238,23 +286,21 @@ const Rto = () => {
                 }
             }
 
-            if (actions.length === 0) return null
-
             return (
                 <div className="flex flex-col gap-2">
-                {actions.map((action, i) => (
-                    <Button
-                    key={i}
-                    size="xs"
-                    variant="link"
-                    title={action.label}
-                    onClick={() => handleAction(action.label, row)}
-                    className={`text-xs flex justify-start ${action.label === 'Disapprove' && 'text-red-500'}`}
-                    >
-                        {action.icon}
-                        {action.label}
-                    </Button>
-                ))}
+                    {actions.map((action, i) => (
+                        <Button
+                            key={i}
+                            size="xs"
+                            variant="link"
+                            title={action.label}
+                            onClick={() => handleAction(action.label, row)}
+                            className={`text-xs flex justify-start ${action.label === 'Disapprove' && 'text-red-500'}`}
+                        >
+                            {action.icon}
+                            {action.label}
+                        </Button>
+                    ))}
                 </div>
             )
             }
@@ -335,6 +381,14 @@ const Rto = () => {
         })
     }
 
+    const renderRowActions = useCallback((row) => ([
+        {
+            label: "History",
+            icon: <History className="h-4 w-4" />,
+            onClick: () => handleViewHistory(row),
+        },
+    ]), [handleViewHistory])
+
     const { 
         TableView,
         isFormOpen,
@@ -352,16 +406,17 @@ const Rto = () => {
         filters,
         options: {
             enableAdd: true,
-            enableEdit: true,
+            enableEdit: canMutateByStatus,
             enableView: false,
             enableViewAsLink: false,
-            enableDelete: true, 
+            enableDelete: canMutateByStatus,
             enableBulkDelete: true,
             enableSearching: true,
             enableFiltering: true,
             enableRowSelection: row => !row.original.isLocked || canModifyRow,
             enableGenerateReport: true,
-            canModify: canModifyRow
+            canModify: canOverrideRowActions,
+            rowActions: renderRowActions,
         },
         endpoints: {
             //editEndpoint: (id) => route('rto.edit', id),
@@ -454,6 +509,7 @@ const Rto = () => {
                     statuses={statuses}
                     showStaffFilter={canFilterByStaff}
                     showDivisionFilter={canFilterByDivision}
+                    showStatusFilter={canFilterByStatus}
                 />
             )}
 
@@ -503,11 +559,94 @@ const Rto = () => {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            <Sheet
+                open={!!historyRow}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setHistoryRow(null)
+                        setHistoryEntries([])
+                        setHistoryError("")
+                        setHistoryLoading(false)
+                    }
+                }}
+            >
+                <SheetContent side="right" className="flex h-full max-h-screen w-full flex-col overflow-hidden sm:max-w-3xl">
+                    <SheetHeader className="pr-10 text-left">
+                        <SheetTitle>Submission History</SheetTitle>
+                        <SheetDescription>
+                            {formatFullName(historyRow?.employee_name)}  
+                            {historyRow?.date ? ` - ${format(new Date(historyRow.date), "MMMM d, yyyy")}` : ""}
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+                        <div className="flex flex-wrap gap-2">
+                            {historyRow?.status && (
+                                <StatusBadge status={historyRow.status} />
+                            )}
+                        </div>
+
+                        <Separator />
+
+                        <ScrollArea className="min-h-0 flex-1 pr-4">
+                            {historyLoading ? (
+                                <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Loading submission history...
+                                </div>
+                            ) : historyError ? (
+                                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                                    {historyError}
+                                </div>
+                            ) : historyEntries.length > 0 ? (
+                                <div className="space-y-5">
+                                    {historyEntries.map((entry, index) => (
+                                        <div key={entry.id} className="flex gap-4">
+                                            <div className="flex flex-col items-center pt-1">
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary bg-primary/10 text-primary shadow-sm">
+                                                    <Clock3 className="h-4 w-4" />
+                                                </div>
+                                                {index < historyEntries.length - 1 && (
+                                                    <div className="min-h-12 w-px flex-1 bg-gradient-to-b from-primary/40 to-border" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 rounded-xl border border-border/70 bg-background p-4 shadow-sm">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <StatusBadge status={entry.status} />
+                                                </div>
+
+                                                <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Clock3 className="h-3.5 w-3.5" />
+                                                        {formatDateWithTime(entry.date_acted)}
+                                                    </span>
+                                                    <span>By: {entry.acted_by_name || "System"}</span>
+                                                </div>
+
+                                                {entry.remarks && (
+                                                    <div className="mt-3 rounded-lg bg-muted/40 p-3 text-sm">
+                                                        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                            Remarks
+                                                        </div>
+                                                        <div dangerouslySetInnerHTML={{ __html: entry.remarks }} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                    No submission history found for this RTO.
+                                </div>
+                            )}
+                        </ScrollArea>
+                    </div>
+                </SheetContent>
+            </Sheet>
         </div>
     )
 }
 
 export default Rto
-
-
-

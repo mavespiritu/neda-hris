@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+﻿import { useState, useEffect } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -28,8 +28,7 @@ const MultipleComboBox = ({
   ref,
   width,
   labelWidth,
-  className
-  ,
+  className,
   renderLabel,
 }) => {
   const [open, setOpen] = useState(false)
@@ -39,6 +38,12 @@ const MultipleComboBox = ({
   useEffect(() => {
     setSelectedValues(value)
   }, [value])
+
+  useEffect(() => {
+    if (!open) {
+      setInputValue("")
+    }
+  }, [open])
 
   const toggleSelection = (currentValue) => {
     const updatedValues = selectedValues.includes(currentValue)
@@ -71,7 +76,7 @@ const MultipleComboBox = ({
       const selectedItem = items.find((item) => item.value === selectedValues[0])
       return {
         text: selectedItem ? (renderLabel ? renderLabel(selectedItem) : selectedItem.label) : (placeholder || `Choose ${name}...`),
-        isPlaceholder: !selectedItem
+        isPlaceholder: !selectedItem,
       }
     }
 
@@ -93,22 +98,22 @@ const MultipleComboBox = ({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "justify-between w-full",
+              "h-auto min-h-10 w-full items-start justify-between whitespace-normal break-words text-left",
               invalidMessage && "border-red-500",
               isPlaceholder && "text-gray-400"
             )}
           >
-            {buttonLabel}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <span className={cn("min-w-0 flex-1 pr-2", labelWidth || "w-full")}>{buttonLabel}</span>
+            <ChevronsUpDown className="ml-2 mt-0.5 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className={cn("p-0 w-full", width)}>
+        <PopoverContent className={cn("w-full p-0", width)}>
           <Command>
             <CommandInput
               placeholder="Type to search..."
               onValueChange={setInputValue}
               value={inputValue}
-              className="ring-0 border-0 outline-none focus:ring-0 focus:border-0 focus:outline-none"
+              className="ring-0 border-0 outline-none focus:border-0 focus:outline-none focus:ring-0"
             />
             <CommandList>
               <CommandItem

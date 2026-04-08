@@ -21,7 +21,7 @@ const Form = ({ mode, data, onClose, open }) => {
     reset,
     errors,
   } = useForm({
-    program: "",
+    category: "",
     description: "",
   })
 
@@ -29,7 +29,7 @@ const Form = ({ mode, data, onClose, open }) => {
     if (isEdit && data) {
       setData({
         id: data.id || null,
-        program: data.program || "",
+        category: data.category || "",
         description: data.description || "",
       })
     } else {
@@ -41,7 +41,7 @@ const Form = ({ mode, data, onClose, open }) => {
     e.preventDefault()
 
     if (isEdit) {
-      put(route("performance.programs.update", data.id), {
+      put(route("performance.categories.update", data.id), {
         onSuccess: () => {
           onClose()
           reset()
@@ -51,7 +51,7 @@ const Form = ({ mode, data, onClose, open }) => {
       return
     }
 
-    post(route("performance.programs.store"), {
+    post(route("performance.categories.store"), {
       onSuccess: () => {
         onClose()
         reset()
@@ -64,7 +64,7 @@ const Form = ({ mode, data, onClose, open }) => {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Program" : "Add Program"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Category" : "Add Category"}</DialogTitle>
           <DialogDescription className="text-justify">
             Fill-up all required fields.
           </DialogDescription>
@@ -72,15 +72,15 @@ const Form = ({ mode, data, onClose, open }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <Label>Program</Label>
+            <Label>Category</Label>
             <TextInput
-              id="program"
-              name="program"
-              value={formData.program}
-              onChange={(e) => setData("program", e.target.value)}
-              isInvalid={errors.program}
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={(e) => setData("category", e.target.value)}
+              isInvalid={errors.category}
             />
-            {errors.program && <p className="text-xs text-red-500">{errors.program}</p>}
+            {errors.category && <p className="text-xs text-red-500">{errors.category}</p>}
           </div>
 
           <div className="space-y-1">

@@ -16,9 +16,15 @@ const Filter = ({
   divisions,
   showStaffFilter = true,
   showDivisionFilter = true,
+  showStatusFilter = true,
 }) => {
 
-  const emptyInitialValues = { emp_id: "", division_id: "", date: "", status: "" }
+  const emptyInitialValues = {
+    emp_id: "",
+    division_id: "",
+    date: "",
+    status: "",
+  }
   const firstOpenRef = useRef(true) // track first open
 
   const { data, setData } = useForm({
@@ -101,17 +107,19 @@ const Filter = ({
               onDateChange={(date) => setData("date", date)}
             />
           </div>
-          <div className="space-y-1">
-            <Label>Status</Label>
-            <SingleComboBox
-              items={statuses}
-              onChange={(value) => setData("status", value)}
-              placeholder="Select status"
-              name="status"
-              id="status"
-              value={data.status}
-            />
-          </div>
+          {showStatusFilter && (
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <SingleComboBox
+                items={statuses}
+                onChange={(value) => setData("status", value)}
+                placeholder="Select status"
+                name="status"
+                id="status"
+                value={data.status}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <DialogClose asChild>

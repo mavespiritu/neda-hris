@@ -12,18 +12,21 @@ const Filter = ({
   onApply,
   initialValues,
   employees,
+  statuses,
   divisions,
   showStaffFilter = true,
   showDivisionFilter = true,
+  showStatusFilter = true,
 }) => {
 
-  const emptyInitialValues = { emp_id: "", division_id: "", date: "" }
+  const emptyInitialValues = { emp_id: "", division_id: "", date: "", status: "" }
   const firstOpenRef = useRef(true) // track first open
 
   const { data, setData } = useForm({
     emp_id: initialValues?.emp_id || "",
     division_id: initialValues?.division_id || "",
     date: initialValues?.date || "",
+    status: initialValues?.status || "",
   })
 
   useEffect(() => {
@@ -88,6 +91,19 @@ const Filter = ({
                 name="division"
                 id="division"
                 value={data.division_id}
+              />
+            </div>
+          )}
+          {showStatusFilter && (
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <SingleComboBox
+                items={statuses}
+                onChange={(value) => setData("status", value)}
+                placeholder="Select status"
+                name="status"
+                id="status"
+                value={data.status}
               />
             </div>
           )}

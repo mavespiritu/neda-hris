@@ -12,10 +12,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Notifications\Concerns\BuildsRaaEmailPayload;
 
 class NotifyStaffOfRaaApproval extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, BuildsRaaEmailPayload;
 
     private $payload;
 
@@ -54,32 +55,14 @@ class NotifyStaffOfRaaApproval extends Notification implements ShouldQueue
             ->where('id', $raa->rto_id)
             ->first();
 
-        $outputs = $conn2->table('flexi_target')
-            ->where('rto_id', $rto->id)
-            ->get();
-
-        $outputIds = $outputs->pluck('id');
-
-        $accomplishments = $conn2->table('flexi_accomplishment')
-        ->whereIn('target_id', $outputIds)
-        ->select('id', 'accomplishment', 'remarks', 'rto_id', 'raa_id', 'target_id')
-        ->get();
-
-        $accomplishmentsByTarget = $accomplishments->groupBy('target_id');
-
-        foreach ($outputs as $output) {
-            $accs = $accomplishmentsByTarget->get($output->id, collect());
-
-            $output->accomplishments = $accs;
-        }
+        $outputs = $this->buildRaaOutputs((int) $rto->id);
 
         $sender = $conn3->table('tblemployee')
         ->where('emp_id', $this->payload['approver_id'])
         ->first();
 
         $senderSalutation = $sender->gender == 'Male' ? 'Mr.' : 'Ms.';
-        $senderMiddleInitial = $sender->mname != '' ? strtoupper(substr($sender->mname, 0, 1)).'.' : '';
-        $senderName = $senderMiddleInitial != '' ? $senderSalutation.' '.$sender->fname.' '.$senderMiddleInitial.' '.$sender->lname : $senderSalutation.' '.$sender->fname.' '.$sender->lname;
+        $senderName = $senderSalutation.' '.$this->formatEmployeeName($sender->fname, $sender->mname, $sender->lname);
 
         $rtoDate = Carbon::parse($rto->date)->format('F j, Y');
 

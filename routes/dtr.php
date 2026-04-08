@@ -39,6 +39,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::post('/rto/{id}/approve', [RtoController::class, 'approve'])->name('rto.approve');
     Route::post('/rto/{id}/disapprove', [RtoController::class, 'disapprove'])->name('rto.disapprove');
     Route::post('/rto/{id}/return', [RtoController::class, 'return'])->name('rto.return');
+    Route::get('/rto/{id}/history', [RtoController::class, 'history'])->name('rto.history');
     Route::get('/rto/{id}/report', [RtoController::class, 'generate'])
      ->name('rto.generate');
 
@@ -54,6 +55,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::post('/raa/{id}/approve', [RaaController::class, 'approve'])->name('raa.approve');
     Route::post('/raa/{id}/disapprove', [RaaController::class, 'disapprove'])->name('raa.disapprove');
     Route::post('/raa/{id}/return', [RaaController::class, 'return'])->name('raa.return');
+    Route::get('/raa/{id}/history', [RaaController::class, 'history'])->name('raa.history');
     Route::get('/raa/{id}/report', [RaaController::class, 'generate'])
      ->name('raa.generate');
 

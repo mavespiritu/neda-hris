@@ -20,7 +20,13 @@ export const getRecruitment = (payload) => {
     return axios.get(url, {params: {...payload}})
 }
 
+export const getGroups = (payload) => {
+    const url = route('settings.groups.index')
+    return axios.get(url, {params: {...payload}})
+}
+
 export const getCgaSubmissionSchedules = (payload) => {
     const url = route('settings.cga.submission-schedules')
     return axios.get(url, {params: {...payload}})
 }
+

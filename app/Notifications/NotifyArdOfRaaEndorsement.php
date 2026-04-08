@@ -12,10 +12,11 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Notifications\Concerns\BuildsRaaEmailPayload;
 
 class NotifyArdOfRaaEndorsement extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, BuildsRaaEmailPayload;
 
     private $payload;
 
@@ -54,24 +55,7 @@ class NotifyArdOfRaaEndorsement extends Notification implements ShouldQueue
             ->where('id', $raa->rto_id)
             ->first();
 
-        $outputs = $conn2->table('flexi_target')
-            ->where('rto_id', $rto->id)
-            ->get();
-
-        $outputIds = $outputs->pluck('id');
-
-        $accomplishments = $conn2->table('flexi_accomplishment')
-        ->whereIn('target_id', $outputIds)
-        ->select('id', 'accomplishment', 'remarks', 'rto_id', 'raa_id', 'target_id')
-        ->get();
-
-        $accomplishmentsByTarget = $accomplishments->groupBy('target_id');
-
-        foreach ($outputs as $output) {
-            $accs = $accomplishmentsByTarget->get($output->id, collect());
-
-            $output->accomplishments = $accs;
-        }
+        $outputs = $this->buildRaaOutputs((int) $rto->id);
 
         $sender = $conn3->table('tblemployee')
         ->where('emp_id', $this->payload['endorser_id'])
@@ -82,12 +66,10 @@ class NotifyArdOfRaaEndorsement extends Notification implements ShouldQueue
         ->first();
 
         $senderSalutation = $sender->gender == 'Male' ? 'Mr.' : 'Ms.';
-        $senderMiddleInitial = $sender->mname != '' ? strtoupper(substr($sender->mname, 0, 1)).'.' : '';
-        $senderName = $senderMiddleInitial != '' ? $senderSalutation.' '.$sender->fname.' '.$senderMiddleInitial.' '.$sender->lname : $senderSalutation.' '.$sender->fname.' '.$sender->lname;
+        $senderName = $senderSalutation.' '.$this->formatEmployeeName($sender->fname, $sender->mname, $sender->lname);
 
         $staffSalutation = $staff->gender == 'Male' ? 'Mr.' : 'Ms.';
-        $staffMiddleInitial = $staff->mname != '' ? strtoupper(substr($staff->mname, 0, 1)).'.' : '';
-        $staffName = $staffMiddleInitial != '' ? $staffSalutation.' '.$staff->fname.' '.$staffMiddleInitial.' '.$staff->lname : $staffSalutation.' '.$staff->fname.' '.$staff->lname;
+        $staffName = $staffSalutation.' '.$this->formatEmployeeName($staff->fname, $staff->mname, $staff->lname);
 
         $rtoDate = Carbon::parse($rto->date)->format('F j, Y');
 

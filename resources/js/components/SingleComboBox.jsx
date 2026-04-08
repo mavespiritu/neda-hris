@@ -30,6 +30,9 @@ const SingleComboBox = ({
   disabled,
   loading = false,
   renderLabel, // optional custom renderer for item label
+  side = "bottom",
+  align = "center",
+  contentClassName = "",
 }) => {
   const [open, setOpen] = useState(false)
   const [selectedValue, setSelectedValue] = useState(value)
@@ -67,14 +70,14 @@ const SingleComboBox = ({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={`justify-between w-full relative ${invalidMessage ? "border-red-500" : ""}`}
+            className={`justify-between w-full relative h-auto min-h-10 items-start ${invalidMessage ? "border-red-500" : ""}`}
             onClick={() => !disabled && !loading && setOpen((prev) => !prev)}
             disabled={disabled || loading}
           >
             <span
-              className={`text-left pr-2 flex items-center gap-2 ${
-                labelWidth || "w-[380px]"
-              } truncate overflow-hidden whitespace-nowrap ${
+              className={`flex min-w-0 flex-1 items-center gap-2 pr-2 text-left whitespace-normal break-words ${
+                labelWidth || "w-full"
+              } ${
                 !selectedValue ? "text-gray-400" : ""
               }`}
             >
@@ -94,8 +97,8 @@ const SingleComboBox = ({
         </PopoverTrigger>
 
         {!disabled && !loading && (
-          <PopoverContent className={cn("p-0 w-[420px]", width)}>
-            <Command>
+        <PopoverContent side={side} align={align} className={cn("p-0 w-[420px]", width, contentClassName)}>
+          <Command>
               <CommandInput
                 placeholder="Type to search..."
                 className="ring-0 border-0 outline-none focus:ring-0 focus:border-0 focus:outline-none"

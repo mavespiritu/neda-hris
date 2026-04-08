@@ -83,6 +83,7 @@ export default function useCrudTable({
     enableRowSelection,
     enableGenerateReport,
     canModify,
+    rowActions,
   } = options
 
   const {
@@ -362,6 +363,7 @@ export default function useCrudTable({
           resolveAbility(enableGenerateReport, row) &&
           !!generateReportEndpoint &&
           (!row.original.isLocked || canModify)
+        const extraRowActions = typeof rowActions === "function" ? rowActions(row) : []
 
         return (
           <TableRow
@@ -413,6 +415,20 @@ export default function useCrudTable({
                                 <Printer className="mr-2 h-4 w-4" /> Print
                               </DropdownMenuItem>
                             )}
+                            {extraRowActions.length > 0 && <DropdownMenuSeparator />}
+                            {extraRowActions.map((action, index) => (
+                              <DropdownMenuItem
+                                key={`${action.label}-${index}`}
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  action.onClick?.()
+                                }}
+                                className={action.className}
+                              >
+                                {action.icon}
+                                {action.label}
+                              </DropdownMenuItem>
+                            ))}
                             {canRowEdit && (
                               <DropdownMenuItem
                                 onSelect={(e) => {
@@ -474,6 +490,18 @@ export default function useCrudTable({
                             <Printer className="h-4 w-4" />
                           </Button>
                         )}
+                        {extraRowActions.map((action, index) => (
+                          <Button
+                            key={`${action.label}-${index}`}
+                            variant={action.variant || "ghost"}
+                            size="icon"
+                            className={cn("h-7 w-7 p-0", action.className)}
+                            title={action.label}
+                            onClick={action.onClick}
+                          >
+                            {action.icon}
+                          </Button>
+                        ))}
                         {canRowEdit &&
                           (editEndpoint ? (
                             <Button
@@ -550,6 +578,7 @@ export default function useCrudTable({
       handleEdit,
       handleView,
       resolveAbility,
+      rowActions,
       viewEndpoint,
     ]
   )

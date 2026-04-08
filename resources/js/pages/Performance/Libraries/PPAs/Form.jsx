@@ -1,9 +1,8 @@
-import { useEffect } from "react"
+﻿import { useEffect } from "react"
 import { useForm } from "@inertiajs/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import TextInput from "@/components/TextInput"
-import TextArea from "@/components/TextArea"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -21,16 +20,16 @@ const Form = ({ mode, data, onClose, open }) => {
     reset,
     errors,
   } = useForm({
-    activity: "",
-    description: "",
+    short_code: "",
+    title: "",
   })
 
   useEffect(() => {
     if (isEdit && data) {
       setData({
         id: data.id || null,
-        activity: data.activity || "",
-        description: data.description || "",
+        short_code: data.short_code || "",
+        title: data.title || data.activity || "",
       })
     } else {
       reset()
@@ -60,11 +59,15 @@ const Form = ({ mode, data, onClose, open }) => {
     })
   }
 
+  const labelPreview = formData.short_code?.trim()
+    ? `${formData.short_code.trim()} - ${formData.title.trim()}`.trim()
+    : formData.title.trim()
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit PAP / Activity" : "Add PAP / Activity"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit MFO/PAP" : "Add MFO/PAP"}</DialogTitle>
           <DialogDescription className="text-justify">
             Fill-up all required fields.
           </DialogDescription>
@@ -72,27 +75,33 @@ const Form = ({ mode, data, onClose, open }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <Label>PAP / Activity</Label>
+            <Label htmlFor="short_code">Short Code</Label>
             <TextInput
-              id="activity"
-              name="activity"
-              value={formData.activity}
-              onChange={(e) => setData("activity", e.target.value)}
-              isInvalid={errors.activity}
+              id="short_code"
+              name="short_code"
+              value={formData.short_code}
+              onChange={(e) => setData("short_code", e.target.value)}
+              isInvalid={errors.short_code}
+              placeholder="Optional short code"
             />
-            {errors.activity && <p className="text-xs text-red-500">{errors.activity}</p>}
+            {errors.short_code && <p className="text-xs text-red-500">{errors.short_code}</p>}
           </div>
 
           <div className="space-y-1">
-            <Label>Description</Label>
-            <TextArea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={(e) => setData("description", e.target.value)}
-              invalidMessage={errors.description}
+            <Label htmlFor="title">Title</Label>
+            <TextInput
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={(e) => setData("title", e.target.value)}
+              isInvalid={errors.title}
+              placeholder="Enter the MFO/PAP title"
             />
-            {errors.description && <p className="text-xs text-red-500">{errors.description}</p>}
+            {errors.title && <p className="text-xs text-red-500">{errors.title}</p>}
+          </div>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <span className="font-semibold text-slate-700">Label Preview:</span> {labelPreview || "-"}
           </div>
 
           <div className="flex justify-end gap-2">

@@ -3,10 +3,11 @@ import { useEffect, useState } from "react"
 import { Head } from "@inertiajs/react"
 import { useHasRole } from "@/hooks/useAuth"
 import { useLocalStorage } from "@/hooks/useLocalStorage"
-import Programs from "./Programs"
-import MFOs from "./MFOs"
+import Categories from "./Categories"
 import PPAs from "./PPAs"
+import Activities from "./Activities"
 import SuccessIndicators from "./SuccessIndicators"
+import Ratings from "./Ratings"
 
 const breadcrumbItems = [
   { label: "Home", href: "/" },
@@ -14,17 +15,34 @@ const breadcrumbItems = [
   { label: "Libraries", href: route("performance.libraries") },
 ]
 
-const menuItems = ["Programs", "MFOs", "Success Indicators", "PAPs / Activities"]
+const menuItems = ["Categories", "MFO/PAP", "Activities/Outputs", "Success Indicators", "Ratings"]
 
 export default function Libraries() {
   const canViewPage = useHasRole(["HRIS_HR", "HRIS_Administrator"])
-  const [currentTab, setCurrentTab] = useLocalStorage("HRIS_Performance_Libraries_tab", "Programs")
+  const [currentTab, setCurrentTab] = useLocalStorage("HRIS_Performance_Libraries_tab", "Categories")
   const [isOpen, setIsOpen] = useState(false)
-  const activeTab = currentTab === "PPAs" ? "PAPs / Activities" : currentTab
+  const activeTab =
+    currentTab === "PPAs" || currentTab === "PAPs / Activities" || currentTab === "PAPs"
+      ? "MFO/PAP"
+      : currentTab === "Activities"
+        ? "Activities/Outputs"
+        : menuItems.includes(currentTab)
+          ? currentTab
+          : "Categories"
 
   useEffect(() => {
-    if (currentTab === "PPAs") {
-      setCurrentTab("PAPs / Activities")
+    if (currentTab === "PPAs" || currentTab === "PAPs / Activities" || currentTab === "PAPs") {
+      setCurrentTab("MFO/PAP")
+      return
+    }
+
+    if (currentTab === "Activities") {
+      setCurrentTab("Activities/Outputs")
+      return
+    }
+
+    if (!menuItems.includes(currentTab)) {
+      setCurrentTab("Categories")
     }
   }, [currentTab, setCurrentTab])
 
@@ -94,14 +112,13 @@ export default function Libraries() {
         </div>
 
         <div className="flex-1 pb-6">
-          {activeTab === "Programs" && <Programs />}
-          {activeTab === "MFOs" && <MFOs />}
+          {activeTab === "Categories" && <Categories />}
+          {activeTab === "MFO/PAP" && <PPAs />}
+          {activeTab === "Activities/Outputs" && <Activities />}
           {activeTab === "Success Indicators" && <SuccessIndicators />}
-          {activeTab === "PAPs / Activities" && <PPAs />}
+          {activeTab === "Ratings" && <Ratings />}
         </div>
       </div>
     </div>
   )
 }
-
-

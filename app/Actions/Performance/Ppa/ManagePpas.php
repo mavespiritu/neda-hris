@@ -2,7 +2,7 @@
 
 namespace App\Actions\Performance\Ppa;
 
-use App\Models\PerformanceLibraryItem;
+use App\Models\PerformancePap;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -10,8 +10,6 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class ManagePpas
 {
     use AsAction;
-
-    private const ITEM_TYPE = 'PAP';
 
     public function authorize(Request $request): bool
     {
@@ -24,25 +22,25 @@ class ManagePpas
         Gate::forUser($request->user())->authorize('libraries', 'performance');
         $perPage = max(1, min(1000, (int) $request->input('per_page', 20)));
 
-        $query = PerformanceLibraryItem::query()
-            ->select([
-                'id',
-                'title as activity',
-                'description',
-                'created_at',
-                'updated_at',
-            ])
-            ->where('item_type', self::ITEM_TYPE)
-            ->latest('id');
+        $query = PerformancePap::query()
+            ->with(['identifier.subProgram.program'])
+            ->select(['id', 'identifier_id', 'short_code', 'title'])
+            ->orderBy('title')
+            ->orderBy('id');
 
         if ($search = trim((string) $request->input('search', ''))) {
             $query->where(function ($builder) use ($search) {
-                $builder->where('title', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $builder->where('short_code', 'like', "%{$search}%")
+                    ->orWhere('title', 'like', "%{$search}%");
             });
         }
 
-        return response()->json($query->paginate($perPage)->withQueryString());
+        $pagination = $query->paginate($perPage)->withQueryString();
+        $pagination->setCollection(
+            $pagination->getCollection()->map(fn (PerformancePap $record) => $this->formatRecord($record))
+        );
+
+        return response()->json($pagination);
     }
 
     public function store(Request $request)
@@ -50,31 +48,40 @@ class ManagePpas
         Gate::forUser($request->user())->authorize('libraries', 'performance');
 
         $data = $request->validate([
-            'activity' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+            'short_code' => ['nullable', 'string', 'max:100'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'activity' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $exists = PerformanceLibraryItem::query()
-            ->where('item_type', self::ITEM_TYPE)
-            ->whereRaw('LOWER(TRIM(title)) = ?', [strtolower(trim($data['activity']))])
+        $shortCode = trim((string) ($data['short_code'] ?? ''));
+        $title = trim((string) ($data['title'] ?? $data['activity'] ?? ''));
+
+        if ($title === '') {
+            return $this->errorResponse($request, 'Please provide a title for the MFO/PAP.', 'title');
+        }
+
+        $exists = PerformancePap::query()
+            ->whereRaw("LOWER(TRIM(COALESCE(short_code, ''))) = ?", [strtolower($shortCode)])
+            ->whereRaw('LOWER(TRIM(title)) = ?', [strtolower($title)])
             ->exists();
 
         if ($exists) {
-            return response()->json([
-                'message' => 'This PAP already exists.',
-                'errors' => [
-                    'activity' => ['This PAP already exists.'],
-                ],
-            ], 422);
+            return $this->errorResponse($request, 'This MFO/PAP already exists.', 'title');
         }
 
-        PerformanceLibraryItem::create([
-            'item_type' => self::ITEM_TYPE,
-            'title' => $data['activity'],
-            'description' => $data['description'] ?? null,
+        $record = PerformancePap::create([
+            'short_code' => $shortCode !== '' ? $shortCode : null,
+            'title' => $title,
         ]);
 
-        return response()->json(['message' => 'PAP saved successfully.']);
+        return $this->successResponse($request, 'MFO/PAP saved successfully.', [
+            'id' => $record->id,
+            'short_code' => $record->short_code,
+            'title' => $record->title,
+            'label' => $record->label,
+            'activity' => $record->activity,
+            'program_title' => $record->program_title,
+        ]);
     }
 
     public function update(Request $request, int $id)
@@ -82,47 +89,44 @@ class ManagePpas
         Gate::forUser($request->user())->authorize('libraries', 'performance');
 
         $data = $request->validate([
-            'activity' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+            'short_code' => ['nullable', 'string', 'max:100'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'activity' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $record = PerformanceLibraryItem::query()
-            ->where('item_type', self::ITEM_TYPE)
-            ->findOrFail($id);
+        $record = PerformancePap::query()->findOrFail($id);
+        $shortCode = trim((string) ($data['short_code'] ?? ''));
+        $title = trim((string) ($data['title'] ?? $data['activity'] ?? ''));
 
-        $exists = PerformanceLibraryItem::query()
-            ->where('item_type', self::ITEM_TYPE)
+        if ($title === '') {
+            return $this->errorResponse($request, 'Please provide a title for the MFO/PAP.', 'title');
+        }
+
+        $exists = PerformancePap::query()
             ->where('id', '!=', $id)
-            ->whereRaw('LOWER(TRIM(title)) = ?', [strtolower(trim($data['activity']))])
+            ->whereRaw("LOWER(TRIM(COALESCE(short_code, ''))) = ?", [strtolower($shortCode)])
+            ->whereRaw('LOWER(TRIM(title)) = ?', [strtolower($title)])
             ->exists();
 
         if ($exists) {
-            return response()->json([
-                'message' => 'This PAP already exists.',
-                'errors' => [
-                    'activity' => ['This PAP already exists.'],
-                ],
-            ], 422);
+            return $this->errorResponse($request, 'This MFO/PAP already exists.', 'title');
         }
 
         $record->update([
-            'title' => $data['activity'],
-            'description' => $data['description'] ?? null,
+            'short_code' => $shortCode !== '' ? $shortCode : null,
+            'title' => $title,
         ]);
 
-        return response()->json(['message' => 'PAP updated successfully.']);
+        return $this->successResponse($request, 'MFO/PAP updated successfully.');
     }
 
-    public function destroy(int $id)
+    public function destroy(Request $request, int $id)
     {
         Gate::authorize('libraries', 'performance');
 
-        PerformanceLibraryItem::query()
-            ->where('item_type', self::ITEM_TYPE)
-            ->where('id', $id)
-            ->delete();
+        PerformancePap::query()->where('id', $id)->delete();
 
-        return response()->json(['message' => 'PAP deleted successfully.']);
+        return $this->successResponse($request, 'MFO/PAP deleted successfully.');
     }
 
     public function bulkDestroy(Request $request)
@@ -135,11 +139,47 @@ class ManagePpas
             ->values()
             ->all();
 
-        PerformanceLibraryItem::query()
-            ->where('item_type', self::ITEM_TYPE)
-            ->whereIn('id', $ids)
-            ->delete();
+        PerformancePap::query()->whereIn('id', $ids)->delete();
 
-        return response()->json(['message' => 'Selected PAPs deleted successfully.']);
+        return $this->successResponse($request, 'Selected MFO/PAP items deleted successfully.');
+    }
+
+    private function formatRecord(PerformancePap $record): array
+    {
+        return [
+            'id' => $record->id,
+            'short_code' => $record->short_code,
+            'title' => $record->title,
+            'label' => $record->label,
+            'activity' => $record->activity,
+            'program_title' => $record->program_title,
+        ];
+    }
+
+    private function successResponse(Request $request, string $message, ?array $data = null)
+    {
+        if ($request->header('X-Inertia')) {
+            return redirect()->back();
+        }
+
+        return response()->json(array_filter([
+            'message' => $message,
+            'data' => $data,
+        ], fn ($value) => $value !== null));
+    }
+
+    private function errorResponse(Request $request, string $message, string $field)
+    {
+        if ($request->header('X-Inertia')) {
+            return back()->withErrors([$field => $message]);
+        }
+
+        return response()->json([
+            'message' => $message,
+            'errors' => [
+                $field => [$message],
+            ],
+        ], 422);
     }
 }
+

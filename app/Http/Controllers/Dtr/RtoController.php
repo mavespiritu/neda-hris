@@ -20,6 +20,7 @@ use App\Notifications\CompetenciesForReviewSubmitted;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use App\Notifications\NotifyArdOfRtoEndorsement;
+use App\Notifications\NotifySupervisorOfRtoSubmission;
 use App\Notifications\NotifyStaffOfRtoApproval;
 use App\States\Rto\Approved;
 use App\States\Rto\Disapproved;
@@ -34,6 +35,29 @@ use Illuminate\Support\Facades\Gate;
 
 class RtoController extends Controller
 {
+    private function formatEmployeeName(?string $fname, ?string $mname, ?string $lname): string
+    {
+        $first = trim((string) $fname);
+        $middle = trim((string) $mname);
+        $last = trim((string) $lname);
+
+        $parts = [];
+
+        if ($first !== '') {
+            $parts[] = $first;
+        }
+
+        if ($middle !== '') {
+            $parts[] = mb_strtoupper(mb_substr($middle, 0, 1)) . '.';
+        }
+
+        if ($last !== '') {
+            $parts[] = $last;
+        }
+
+        return trim(preg_replace('/\s+/', ' ', implode(' ', $parts)));
+    }
+
     public function index(Request $request)
     {
         $conn2 = DB::connection('mysql2'); 
@@ -59,7 +83,7 @@ class RtoController extends Controller
         $employeesQuery = $conn3->table('tblemployee')
             ->select([
                 'emp_id',
-                DB::raw('concat(lname, ", ", fname, " ", mname) as name'),
+                DB::raw("CONCAT(fname, ' ', IF(mname IS NOT NULL AND TRIM(mname) <> '', CONCAT(LEFT(TRIM(mname), 1), '. '), ''), lname) as name"),
                 'division_id'
             ])
             ->whereIn('emp_id', $visibleEmployeeIdsQuery)
@@ -76,7 +100,7 @@ class RtoController extends Controller
         $allEmployees = $conn3->table('tblemployee')
             ->select([
                 'emp_id',
-                DB::raw('concat(lname, ", ", fname, " ", mname) as name')
+                DB::raw("CONCAT(fname, ' ', IF(mname IS NOT NULL AND TRIM(mname) <> '', CONCAT(LEFT(TRIM(mname), 1), '. '), ''), lname) as name")
             ])
             ->get()
             ->keyBy('emp_id');
@@ -160,7 +184,8 @@ class RtoController extends Controller
         $histories = $conn2->table('submission_history')
             ->where('model', 'RTO')
             ->whereIn('model_id', $targetIds)
-            ->orderBy('date_acted', 'desc')
+            ->orderByDesc('date_acted')
+            ->orderByDesc('id')
             ->get()
             ->groupBy('model_id');
 
@@ -220,6 +245,74 @@ class RtoController extends Controller
                 'targets'   => $targets,
                 'filters'   => $request->only(['emp_id', 'division_id', 'date', 'status', 'scope', 'sort', 'direction', 'search']),
             ],
+        ]);
+    }
+
+    public function history($id)
+    {
+        $conn2 = DB::connection('mysql2');
+        $conn3 = DB::connection('mysql3');
+
+        $rto = $conn2->table('flexi_rto')
+            ->select(['id', 'emp_id', 'date'])
+            ->where('id', $id)
+            ->first();
+
+        if (! $rto) {
+            abort(404, 'RTO not found');
+        }
+
+        $histories = $conn2->table('submission_history as sh')
+            ->select([
+                'sh.id',
+                'sh.status',
+                'sh.acted_by',
+                'sh.date_acted',
+                'sh.remarks',
+            ])
+            ->where('sh.model', 'RTO')
+            ->where('sh.model_id', $id)
+            ->orderByDesc('sh.date_acted')
+            ->orderByDesc('sh.id')
+            ->get();
+
+        $employeeIds = $histories
+            ->pluck('acted_by')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $employees = collect();
+
+        if (! empty($employeeIds)) {
+            $employees = $conn3->table('tblemployee')
+                ->select(['emp_id', 'lname', 'fname', 'mname'])
+                ->whereIn('emp_id', $employeeIds)
+                ->get()
+                ->keyBy('emp_id');
+        }
+
+        $payload = $histories->map(function ($item) use ($employees) {
+            $employee = $employees->get($item->acted_by);
+
+            $name = $employee
+                ? $this->formatEmployeeName($employee->fname ?? null, $employee->mname ?? null, $employee->lname ?? null)
+                : 'System';
+
+            return [
+                'id' => $item->id,
+                'status' => $item->status,
+                'acted_by' => $item->acted_by,
+                'acted_by_name' => $name,
+                'date_acted' => $item->date_acted,
+                'remarks' => $item->remarks,
+            ];
+        })->values();
+
+        return response()->json([
+            'rto' => $rto,
+            'histories' => $payload,
         ]);
     }
 
@@ -301,12 +394,25 @@ class RtoController extends Controller
                 'date_acted' => now(),
             ]);
 
+            if ($request->boolean('submit_after_save')) {
+                $rto = Rto::query()->lockForUpdate()->find($rtoId);
+
+                if (! $rto) {
+                    throw new \RuntimeException('RTO not found after save.');
+                }
+
+                $this->submitRtoModel($rto);
+                $this->dispatchSubmitRtoNotification($rto);
+            }
+
             $conn2->commit();
 
             return back()->with([
                 'status'  => 'success',
                 'title'   => 'Success!',
-                'message' => 'Target outputs saved successfully.',
+                'message' => $request->boolean('submit_after_save')
+                    ? 'Target outputs saved and submitted successfully.'
+                    : 'Target outputs saved successfully.',
             ]);
         } catch (\Exception $e) {
             Log::error('Store Error: ' . $e->getMessage());
@@ -413,12 +519,25 @@ class RtoController extends Controller
                 }
             }
 
+            if ($request->boolean('submit_after_save')) {
+                $rtoModel = Rto::query()->lockForUpdate()->find($id);
+
+                if (! $rtoModel) {
+                    throw new \RuntimeException('RTO not found after update.');
+                }
+
+                $this->submitRtoModel($rtoModel);
+                $this->dispatchSubmitRtoNotification($rtoModel);
+            }
+
             $conn2->commit();
 
             return back()->with([
                 'status'  => 'success',
                 'title'   => 'Updated!',
-                'message' => 'Target outputs updated successfully.',
+                'message' => $request->boolean('submit_after_save')
+                    ? 'Target outputs updated and submitted successfully.'
+                    : 'Target outputs updated successfully.',
             ]);
         } catch (\Exception $e) {
             Log::error('Update Error: ' . $e->getMessage());
@@ -522,20 +641,7 @@ class RtoController extends Controller
                     abort(404, 'RTO not found');
                 }
 
-                if ($rto->state instanceof Returned || $rto->state instanceof NeedsRevision) {
-                    $targetLabel = trim((string) $rto->rto_return_to_state);
-
-                    if ($targetLabel === '') {
-                        throw new \RuntimeException('Return target is missing. Cannot resubmit.');
-                    }
-
-                    $rto->state->transitionTo(Resubmitted::class, auth()->user()->ipms_id);
-                    $rto->refresh();
-                    $rto->state->transitionTo($this->rtoTargetStateClass($targetLabel), auth()->user()->ipms_id);
-                    return;
-                }
-
-                $rto->state->transitionTo(Submitted::class, auth()->user()->ipms_id);
+                $this->submitRtoModel($rto);
             });
         } catch (\Exception $e) {
             Log::error('Error submitting RTO: ' . $e->getMessage());
@@ -545,6 +651,89 @@ class RtoController extends Controller
                 'title' => 'Uh oh!',
                 'message' => 'An error occurred while submitting RTO. Please try again.'
             ]);
+        }
+    }
+
+    private function submitRtoModel(Rto $rto): void
+    {
+        if ($rto->state instanceof Returned || $rto->state instanceof NeedsRevision) {
+            $targetLabel = trim((string) $rto->rto_return_to_state);
+
+            if ($targetLabel === '') {
+                throw new \RuntimeException('Return target is missing. Cannot resubmit.');
+            }
+
+            $rto->state->transitionTo(Resubmitted::class, auth()->user()->ipms_id);
+            $rto->refresh();
+            $rto->state->transitionTo($this->rtoTargetStateClass($targetLabel), auth()->user()->ipms_id);
+
+            return;
+        }
+
+        $rto->state->transitionTo(Submitted::class, auth()->user()->ipms_id);
+    }
+
+    private function dispatchSubmitRtoNotification(Rto $rto): void
+    {
+        $conn3 = DB::connection('mysql3');
+        $submitter = auth()->user();
+
+        $staff = $conn3->table('tblemployee')
+            ->where('emp_id', $rto->emp_id)
+            ->first();
+
+        if (! $staff) {
+            throw new \RuntimeException('Staff record not found.');
+        }
+
+        $submitterRoles = method_exists($submitter, 'getAllRolesRecursive')
+            ? $submitter->getAllRolesRecursive()->pluck('name')->values()->all()
+            : $submitter->roles->pluck('name')->values()->all();
+
+        $skipEndorsement = $submitter->hasAnyRole(['HRIS_DC', 'HRIS_ARD']);
+
+        if ($skipEndorsement) {
+            $approvalRoles = [];
+
+            if (in_array('HRIS_ARD', $submitterRoles, true)) {
+                $approvalRoles[] = 'HRIS_RD';
+            }
+
+            if (in_array('HRIS_DC', $submitterRoles, true)) {
+                $approvalRoles[] = 'HRIS_ARD';
+            }
+
+            $approvalRoles = array_values(array_unique($approvalRoles));
+
+            $approvers = User::whereHas('roles', function ($query) use ($approvalRoles) {
+                $query->whereIn('name', $approvalRoles);
+            })->get();
+
+            if ($approvers->isNotEmpty()) {
+                Notification::send($approvers, new NotifyArdOfRtoEndorsement([
+                    'rto_id' => $rto->id,
+                    'submitter_email' => $submitter->email,
+                    'endorser_id' => $submitter->ipms_id,
+                ]));
+            } else {
+                Log::warning("No approval users found for direct RTO approval. Roles: " . implode(',', $approvalRoles) . ". RTO ID: {$rto->id}");
+            }
+
+            return;
+        }
+
+        $approvers = User::whereHas('roles', function ($query) {
+                $query->whereIn('name', ['HRIS_ADC', 'HRIS_DC']);
+            })
+            ->where('division', $staff->division_id)
+            ->get();
+
+        if ($approvers->isNotEmpty()) {
+            Notification::send($approvers, new NotifySupervisorOfRtoSubmission([
+                'rto_id' => $rto->id,
+            ]));
+        } else {
+            Log::warning("No supervisors found for division: {$staff->division_id}. RTO ID: {$rto->id}");
         }
     }
     public function endorse($id)
@@ -1053,12 +1242,6 @@ class RtoController extends Controller
         return $pdf->download("{$today}_RTO_{$rtoDate}.pdf");
     }
 }
-
-
-
-
-
-
 
 
 

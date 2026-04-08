@@ -30,15 +30,7 @@ const Form = ({ mode, data, onClose, open, employees }) => {
     {'value': 'Other', 'label': 'Another Fixed Place'},
   ]
 
-  const {
-    data: formData,
-    setData,
-    post,
-    put,
-    processing,
-    reset,
-    errors,
-  } = useForm({
+  const form = useForm({
     emp_id: "",
     date: "",
     type: "",
@@ -46,6 +38,13 @@ const Form = ({ mode, data, onClose, open, employees }) => {
     outputs: [{ id: null, output: "" }],
     removedOutputs: [],
   })
+  const {
+    data: formData,
+    setData,
+    processing,
+    reset,
+    errors,
+  } = form
 
   // initialize when editing
   useEffect(() => {
@@ -61,7 +60,7 @@ const Form = ({ mode, data, onClose, open, employees }) => {
               id: o.id || null,
               output: o.output || "",
             }))
-          : [{ id: null, value: "" }],
+          : [{ id: null, output: "" }],
         removedOutputs: [],
       })
     } else {
@@ -97,31 +96,39 @@ const Form = ({ mode, data, onClose, open, employees }) => {
     setData("outputs", updated)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e, submitAfterSave = false) => {
     e.preventDefault()
 
+    const submitLabel = submitAfterSave
+      ? (isEdit ? "updated and submitted" : "saved and submitted")
+      : (isEdit ? "updated" : "saved")
+
+    const submitWithMode = (requestFn) =>
+      requestFn({
+        onSuccess: () => {
+          onClose()
+          reset()
+          toast({
+            title: "Success!",
+            description: `The outputs were ${submitLabel} successfully.`,
+          })
+        },
+      })
+
     if (isEdit) {
-      put(route("rto.update", data.id), {
-        onSuccess: () => {
-          onClose()
-          reset()
-          toast({
-            title: "Success!",
-            description: "The outputs were updated successfully.",
-          })
-        },
-      })
+      form.transform((current) => ({
+        ...current,
+        submit_after_save: submitAfterSave,
+      }))
+
+      submitWithMode((options) => form.put(route("rto.update", data.id), options))
     } else {
-      post(route("rto.store"), {
-        onSuccess: () => {
-          onClose()
-          reset()
-          toast({
-            title: "Success!",
-            description: "The outputs were saved successfully.",
-          })
-        },
-      })
+      form.transform((current) => ({
+        ...current,
+        submit_after_save: submitAfterSave,
+      }))
+
+      submitWithMode((options) => form.post(route("rto.store"), options))
     }
   }
 
@@ -238,22 +245,41 @@ const Form = ({ mode, data, onClose, open, employees }) => {
             </Button>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <DialogClose asChild>
               <Button type="button" variant="ghost">
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={processing}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={processing}
+              onClick={(e) => handleSubmit(e, false)}
+            >
               {processing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEdit ? "Updating..." : "Saving..."}
+                  {isEdit ? "Saving draft..." : "Saving draft..."}
+                </>
+              ) : (
+                isEdit ? "Update Draft" : "Save as Draft"
+              )}
+            </Button>
+            <Button
+              type="button"
+              disabled={processing}
+              onClick={(e) => handleSubmit(e, true)}
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEdit ? "Submitting..." : "Saving and submitting..."}
                 </>
               ) : isEdit ? (
-                "Update"
+                "Update & Submit"
               ) : (
-                "Save"
+                "Save & Submit"
               )}
             </Button>
           </div>
