@@ -68,6 +68,7 @@ const Raa = () => {
 
     const { auth: { user }, data: { targets, employees, divisions, dates, statuses, filters: serverFilters } } = usePage().props
     const activeRoles = user?.roles || []
+    const hasHrRole = activeRoles.includes("HRIS_HR")
 
     const canUseOwnershipTabs =
         activeRoles.some((role) => ["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"].includes(role))
@@ -78,8 +79,8 @@ const Raa = () => {
     const canOverrideRowActions = activeRoles.some((role) => ["HRIS_HR", "HRIS_ARD"].includes(role))
     const canMutateByStatus = useCallback((row) => {
         const status = row.original.raa_status
-        return ["Draft", "Returned", "Needs Revision"].includes(status)
-    }, [])
+        return hasHrRole || ["Draft", "Returned", "Needs Revision", null].includes(status)
+    }, [hasHrRole])
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
@@ -289,6 +290,7 @@ const Raa = () => {
             const approvalTargetRoles = row.original.approval_target_roles || []
             const endorsementTargetRoles = row.original.endorsement_target_roles || []
             const isOwnRequest = String(row.original.emp_id ?? row.original.rto_emp_id ?? "") === String(props.auth.user?.ipms_id ?? "")
+            const canHrOverrideWorkflow = roles.includes("HRIS_HR")
 
             // Check if there are any accomplishments encoded
             const hasAccomplishments = outputs.some(output => (output.accomplishments || []).length > 0)
@@ -300,20 +302,20 @@ const Raa = () => {
             }
 
             if (!isOwnRequest) {
-                if (status === "Submitted" && skipEndorsement && approvalTargetRoles.some(role => roles.includes(role))) {
+                if (status === "Submitted" && skipEndorsement && (canHrOverrideWorkflow || approvalTargetRoles.some(role => roles.includes(role)))) {
                     actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                     actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
-                } else if (status === "Submitted" && !skipEndorsement && roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r))) {
+                } else if (status === "Submitted" && !skipEndorsement && (canHrOverrideWorkflow || roles.some(r => ["HRIS_ADC", "HRIS_DC"].includes(r)))) {
                     actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                 }
-                if (status === "Endorsed" && endorsementTargetRoles.some(role => roles.includes(role))) {
+                if (status === "Endorsed" && (canHrOverrideWorkflow || endorsementTargetRoles.some(role => roles.includes(role)))) {
                     actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                     actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
                 }
-                if (["Approved", "Disapproved"].includes(status) && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
+                if (["Approved", "Disapproved"].includes(status) && (canHrOverrideWorkflow || roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r)))) {
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                 }
             }
@@ -425,7 +427,7 @@ const Raa = () => {
             enableEdit: canMutateByStatus,
             enableView: false,
             enableViewAsLink: false,
-            enableDelete: false, 
+            enableDelete: canMutateByStatus,
             enableBulkDelete: false,
             enableSearching: true,
             enableFiltering: true,
@@ -436,6 +438,7 @@ const Raa = () => {
         },
         endpoints: {
             editEndpoint: (id) => route('raa.edit', id),
+            deleteEndpoint: (id) => route('raa.destroy', id),
             generateReportEndpoint: (id) => route('raa.generate', id),
         },
         filterChips: activeFilterChips,
