@@ -240,6 +240,8 @@ const Raa = () => {
             const status = row.original.raa_status
             const outputs = row.original.outputs || []
             const skipEndorsement = !!row.original.skip_endorsement
+            const approvalTargetRoles = row.original.approval_target_roles || []
+            const endorsementTargetRoles = row.original.endorsement_target_roles || []
             const isOwnRequest = String(row.original.emp_id ?? row.original.rto_emp_id ?? "") === String(props.auth.user?.ipms_id ?? "")
 
             // Check if there are any accomplishments encoded
@@ -252,7 +254,7 @@ const Raa = () => {
             }
 
             if (!isOwnRequest) {
-                if (status === "Submitted" && skipEndorsement && roles.some(r => ["HRIS_ARD", "HRIS_RD"].includes(r))) {
+                if (status === "Submitted" && skipEndorsement && approvalTargetRoles.some(role => roles.includes(role))) {
                     actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                     actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
@@ -260,7 +262,7 @@ const Raa = () => {
                     actions.push({ label: "Endorse", icon: <FileCheck className="h-2 w-2" /> })
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                 }
-                if (status === "Endorsed" && roles.some(r => ["HRIS_ARD", "HRIS_RD", "HRIS_HR"].includes(r))) {
+                if (status === "Endorsed" && endorsementTargetRoles.some(role => roles.includes(role))) {
                     actions.push({ label: "Approve", icon: <CheckCircle className="h-2 w-2" /> })
                     actions.push({ label: "Needs Revision", icon: <Undo2 className="h-2 w-2" /> })
                     actions.push({ label: "Disapprove", icon: <XCircle className="h-2 w-2" /> })
@@ -676,4 +678,7 @@ const Raa = () => {
 }
 
 export default Raa
+
+
+
 

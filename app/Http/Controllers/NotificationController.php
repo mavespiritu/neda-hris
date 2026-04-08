@@ -712,11 +712,26 @@ class NotificationController extends Controller
 
             $submitter = auth()->user();
 
+            $submitterRoles = method_exists($submitter, 'getAllRolesRecursive')
+                ? $submitter->getAllRolesRecursive()->pluck('name')->values()->all()
+                : $submitter->roles->pluck('name')->values()->all();
             $skipEndorsement = $submitter->hasAnyRole(['HRIS_DC', 'HRIS_ARD']);
 
             if ($skipEndorsement) {
-                $approvers = User::whereHas('roles', function ($query) {
-                        $query->where('name', 'HRIS_ARD');
+                $approvalRoles = [];
+
+                if (in_array('HRIS_ARD', $submitterRoles, true)) {
+                    $approvalRoles[] = 'HRIS_RD';
+                }
+
+                if (in_array('HRIS_DC', $submitterRoles, true)) {
+                    $approvalRoles[] = 'HRIS_ARD';
+                }
+
+                $approvalRoles = array_values(array_unique($approvalRoles));
+
+                $approvers = User::whereHas('roles', function ($query) use ($approvalRoles) {
+                        $query->whereIn('name', $approvalRoles);
                     })
                     ->get();
 
@@ -729,7 +744,7 @@ class NotificationController extends Controller
                 if ($approvers->isNotEmpty()) {
                     Notification::send($approvers, new NotifyArdOfRaaEndorsement($payload));
                 } else {
-                    Log::warning("No HRIS_ARD users found for direct approval. RAA ID: {$raa->id}");
+                    Log::warning("No approval users found for direct RAA approval. Roles: " . implode(',', $approvalRoles) . ". RAA ID: {$raa->id}");
                 }
             } else {
                 $approvers = User::whereHas('roles', function ($query) {
@@ -1165,5 +1180,6 @@ class NotificationController extends Controller
         }    
     }
 }
+
 
 

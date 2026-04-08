@@ -215,6 +215,8 @@ class RaaController extends Controller
             $item->raa_acted_by_name = $allEmployees[$item->raa_acted_by]->name ?? null;
             $item->submitter_roles   = $submitterRolesById->get((string) $item->emp_id, []);
             $item->skip_endorsement  = collect($item->submitter_roles)->intersect(['HRIS_DC', 'HRIS_ARD'])->isNotEmpty();
+            $item->approval_target_roles = collect($item->submitter_roles)->intersect(['HRIS_ARD'])->isNotEmpty() ? ['HRIS_RD'] : (collect($item->submitter_roles)->intersect(['HRIS_DC'])->isNotEmpty() ? ['HRIS_ARD'] : []);
+            $item->endorsement_target_roles = $item->skip_endorsement ? [] : ['HRIS_ARD'];
 
             $item->outputs = $conn2->table('flexi_target')
                 ->where('rto_id', $item->id)

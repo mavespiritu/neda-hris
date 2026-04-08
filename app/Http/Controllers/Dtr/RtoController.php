@@ -179,6 +179,8 @@ class RtoController extends Controller
             $item->employee_name = $employees[$item->emp_id]->name ?? null;
             $item->submitter_roles = $submitterRolesById->get((string) $item->emp_id, []);
             $item->skip_endorsement = collect($item->submitter_roles)->intersect(['HRIS_DC', 'HRIS_ARD'])->isNotEmpty();
+            $item->approval_target_roles = collect($item->submitter_roles)->intersect(['HRIS_ARD'])->isNotEmpty() ? ['HRIS_RD'] : (collect($item->submitter_roles)->intersect(['HRIS_DC'])->isNotEmpty() ? ['HRIS_ARD'] : []);
+            $item->endorsement_target_roles = $item->skip_endorsement ? [] : ['HRIS_ARD'];
 
             $latestHistory = $histories[$item->id][0] ?? null;
             if ($latestHistory) {
