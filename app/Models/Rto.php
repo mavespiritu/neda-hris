@@ -30,20 +30,20 @@ class Rto extends Model
     public function getStateAttribute()
     {
         $rawState = $this->getRawOriginal('rto_state');
-        $state = $this->rto_state;
 
-        if ($rawState !== null && $rawState !== Draft::class) {
-            return $state;
+        if ($rawState === null) {
+            return $this->bootstrapStateFromHistory() ?? new Draft($this);
         }
 
-        $fallback = $this->bootstrapStateFromHistory();
-
-        if ($fallback) {
-            $this->setAttribute('rto_state', $fallback);
-            return $this->rto_state;
+        if ($rawState === Draft::class) {
+            return $this->bootstrapStateFromHistory() ?? new Draft($this);
         }
 
-        return $state;
+        if (is_string($rawState) && class_exists($rawState)) {
+            return new $rawState($this);
+        }
+
+        return $this->bootstrapStateFromHistory() ?? new Draft($this);
     }
 
     public function setStateAttribute($value): void

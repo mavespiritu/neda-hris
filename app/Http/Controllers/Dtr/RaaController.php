@@ -517,15 +517,18 @@ class RaaController extends Controller
         try {
             $conn2->beginTransaction();
 
-            // Insert/update RAA header
-            $conn2->table('flexi_raa')->updateOrInsert(
-                ['rto_id' => $id],
-                ['rto_id' => $id, 'created_by' => auth()->user()->ipms_id, 'created_at' => now(), 'raa_state' => Draft::class]
-            );
+            $raa = Raa::query()->where('rto_id', $id)->first();
 
-            $raaId = $conn2->table('flexi_raa')
-                ->where('rto_id', $id)
-                ->value('id');
+            if (! $raa) {
+                $raa = new Raa();
+                $raa->rto_id = $id;
+                $raa->created_by = auth()->user()->ipms_id;
+                $raa->created_at = now();
+                $raa->raa_state = new Draft($raa);
+                $raa->save();
+            }
+
+            $raaId = $raa->id;
 
             foreach ($request->outputs as $output) {
                 foreach ($output['accomplishments'] as $accomplishment) {
@@ -1395,8 +1398,6 @@ class RaaController extends Controller
         return $pdf->download("{$today}_RAA_{$rtoDate}.pdf");
     }
 }
-
-
 
 
 

@@ -44,6 +44,7 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
   }) => {
 
   const { user, isApplicant } = useUser() 
+  console.log(user)
   const { post } =  useForm()
   const { onlineUserIds } = useMessengerShared()
 

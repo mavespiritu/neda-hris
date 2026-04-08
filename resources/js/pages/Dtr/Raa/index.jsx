@@ -1,6 +1,5 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useMemo, useCallback } from "react"
-import { useHasRole } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuGroup } from "@/components/ui/dropdown-menu"
 import {
@@ -68,15 +67,15 @@ const Raa = () => {
     const { toast } = useToast()
 
     const { auth: { user }, data: { targets, employees, divisions, dates, statuses, filters: serverFilters } } = usePage().props
+    const activeRoles = user?.roles || []
 
     const canUseOwnershipTabs =
-        useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"]) &&
-        !useHasRole("HRIS_Staff")
+        activeRoles.some((role) => ["HRIS_HR", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD"].includes(role))
     const canFilterByStaff = canUseOwnershipTabs
-    const canFilterByDivision = useHasRole(["HRIS_HR", "HRIS_RD", "HRIS_ARD"])
-    const canFilterByStatus = useHasRole(["HRIS_HR", "HRIS_RD", "HRIS_ARD"])
-    const canSelectStaff = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
-    const canOverrideRowActions = useHasRole(["HRIS_HR", "HRIS_ARD"])
+    const canFilterByDivision = activeRoles.some((role) => ["HRIS_HR", "HRIS_RD", "HRIS_ARD"].includes(role))
+    const canFilterByStatus = activeRoles.some((role) => ["HRIS_HR", "HRIS_RD", "HRIS_ARD"].includes(role))
+    const canSelectStaff = activeRoles.some((role) => ["HRIS_HR", "HRIS_DC", "HRIS_ADC"].includes(role))
+    const canOverrideRowActions = activeRoles.some((role) => ["HRIS_HR", "HRIS_ARD"].includes(role))
     const canMutateByStatus = useCallback((row) => {
         const status = row.original.raa_status
         return ["Draft", "Returned", "Needs Revision"].includes(status)
@@ -283,7 +282,7 @@ const Raa = () => {
             header: "Actions",
             cell: ({ row }) => {
             const { props } = usePage()
-            const roles = props.auth.user?.roles || [] 
+            const roles = props.auth.user?.roles || []
             const status = row.original.raa_status
             const outputs = row.original.outputs || []
             const skipEndorsement = !!row.original.skip_endorsement

@@ -100,6 +100,7 @@ require __DIR__ . '/dtr.php';
 require __DIR__ . '/employees.php';
 require __DIR__ . '/notifications.php';
 require __DIR__ . '/settings.php';
+require __DIR__ . '/access-control.php';
 
 require __DIR__ . '/applicant.php';
 require __DIR__ . '/applicants.php';
