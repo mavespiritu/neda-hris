@@ -65,13 +65,13 @@ class Rto extends Model
             ->value('status');
 
         return match ($status) {
-            'Draft' => new Draft($this),
-            'Submitted' => new Submitted($this),
-            'Endorsed' => new Endorsed($this),
-            'Approved' => new Approved($this),
-            'Disapproved' => new Disapproved($this),
-            'Returned', 'Needs Revision' => new Returned($this),
-            'Resubmitted' => new Resubmitted($this),
+            'Draft' => $this->makeState(Draft::class),
+            'Submitted' => $this->makeState(Submitted::class),
+            'Endorsed' => $this->makeState(Endorsed::class),
+            'Approved' => $this->makeState(Approved::class),
+            'Disapproved' => $this->makeState(Disapproved::class),
+            'Returned', 'Needs Revision' => $this->makeState(Returned::class),
+            'Resubmitted' => $this->makeState(Resubmitted::class),
             default => null,
         };
     }
