@@ -32,18 +32,18 @@ class Raa extends Model
         $rawState = $this->getRawOriginal('raa_state');
 
         if ($rawState === null) {
-            return $this->bootstrapStateFromHistory() ?? new Draft($this);
+            return $this->bootstrapStateFromHistory() ?? $this->makeState(Draft::class);
         }
 
         if ($rawState === Draft::class) {
-            return $this->bootstrapStateFromHistory() ?? new Draft($this);
+            return $this->bootstrapStateFromHistory() ?? $this->makeState(Draft::class);
         }
 
         if (is_string($rawState) && class_exists($rawState)) {
-            return new $rawState($this);
+            return $this->makeState($rawState);
         }
 
-        return $this->bootstrapStateFromHistory() ?? new Draft($this);
+        return $this->bootstrapStateFromHistory() ?? $this->makeState(Draft::class);
     }
 
     public function setStateAttribute($value): void
@@ -74,5 +74,14 @@ class Raa extends Model
             'Resubmitted' => new Resubmitted($this),
             default => null,
         };
+    }
+
+    private function makeState(string $stateClass): RaaState
+    {
+        /** @var RaaState $state */
+        $state = new $stateClass($this);
+        $state->setField('raa_state');
+
+        return $state;
     }
 }
