@@ -5,7 +5,6 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Symfony\Component\HttpFoundation\Response;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\AccessControl;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -26,12 +25,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'messenger.staff' => \App\Http\Middleware\EnsureMessengerAccess::class,
-            //'access.control' => \App\Http\Middleware\AccessControl::class,
-        ]);
-
-        $middleware->web(append: [
-            HandleInertiaRequests::class,
-            AccessControl::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

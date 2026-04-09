@@ -15,7 +15,6 @@ use Illuminate\Foundation\Application;
 use App\Http\Controllers\Dtr\RtoController;
 use App\Http\Controllers\Dtr\RaaController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Middleware\AccessControl;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 

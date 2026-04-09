@@ -1374,7 +1374,7 @@ class JobsController extends Controller
         }
     }
 
-    public function getRequirements($hashedId)
+    public function getRequirements($hashedId, Request $request)
     {
         $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
@@ -1419,8 +1419,6 @@ class JobsController extends Controller
             abort(404, 'Job not found');
         }
 
-        $activeEditRequest = $this->getActiveEditRequest($application);
-
         $educationReq = $conn2->table('recruitment_requirements')
         ->where('connected_to', 'Educational Background')
         ->first();
@@ -1437,10 +1435,12 @@ class JobsController extends Controller
         ->where('connected_to', 'Work Experience')
         ->first();
 
-        $educations = $this->fetchEducationalBackgroundFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
-        $eligibilities = $this->fetchCivilServiceEligibilityFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
-        $learnings = $this->fetchLearningAndDevelopmentFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
-        $works = $this->fetchWorkExperienceFiles($applicant, $vacancy->id, $request['type'] ?? 'manual');
+        $applicationType = $request->input('type', $application->type ?? 'manual');
+
+        $educations = $this->fetchEducationalBackgroundFiles($applicant, $vacancy->id);
+        $eligibilities = $this->fetchCivilServiceEligibilityFiles($applicant, $vacancy->id, $applicationType);
+        $learnings = $this->fetchLearningAndDevelopmentFiles($applicant, $vacancy->id);
+        $works = $this->fetchWorkExperienceFiles($applicant, $vacancy->id, $applicationType);
 
         $requirements = $conn2->table('vacancy_requirements')
         ->select([
@@ -1468,7 +1468,7 @@ class JobsController extends Controller
             $workReq,
             $works,
         ) {
-            $req->files = $this->fetchRequirementFiles($applicant->id, $vacancy->id, $req, $application->type ?? 'manual');
+            $req->files = $this->fetchRequirementFiles($applicant->id, $vacancy->id, $req, $applicationType);
 
             $req->subItems = [];
 

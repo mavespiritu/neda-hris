@@ -212,19 +212,6 @@ const AppSidebar = () => {
       icon: Cog,
       roles: ['HRIS_Staff']
     },
-    {
-      title: "Administrator",
-      url: "#",
-      icon: UserRoundCog,
-      roles: ['SSO_Administrator'],
-      submenu: [
-        { title: 'Users', url: '/access-control/users', roles: ['SSO_Administrator'], icon: UserRoundCog },
-        { title: 'Roles', url: '/access-control/roles', roles: ['SSO_Administrator'], icon: UserRoundCog },
-        { title: 'Permissions', url: '/access-control/permissions', roles: ['SSO_Administrator'], icon: UserRoundCog },
-        { title: 'Pages', url: '/access-control/pages', roles: ['SSO_Administrator'], icon: UserRoundCog },
-        { title: 'Scope', url: '/access-control/scope', roles: ['SSO_Administrator'], icon: UserRoundCog },
-      ],
-    },
   ]
 
   const isVisible = (item) => {

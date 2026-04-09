@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { Files, Upload, Paperclip, Trash2, Loader2, CircleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,7 +30,7 @@ import Attachment from "@/components/Attachment"
 import { router } from "@inertiajs/react"
 import { useToast } from "@/hooks/use-toast"
 
-const ChooseDocuments = ({ job, applicant, submittedProfileReview = null, isReopenedSubmission = false }) => {
+const ChooseDocuments = ({ job, applicant }) => {
 
   const { toast } = useToast()
 
@@ -38,21 +38,6 @@ const ChooseDocuments = ({ job, applicant, submittedProfileReview = null, isReop
   const [open, setOpen] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const { requirements, fetchRequirements } = store()
-
-  const normalizeText = (value) =>
-    String(value ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-
-  const normalizeDate = (value) => String(value ?? "").trim().slice(0, 10)
-
-  const normalizeAmount = (value) => {
-    if (value === null || value === undefined || value === "") return ""
-
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed.toFixed(2) : normalizeText(value)
-  }
 
   const deleteAttachment = (fileId, requirementId) => {
     
@@ -80,122 +65,7 @@ const ChooseDocuments = ({ job, applicant, submittedProfileReview = null, isReop
     fetchRequirements(job.hashed_id)
   }, [])
 
-  const displayRequirements = useMemo(() => {
-    if (!isReopenedSubmission || !submittedProfileReview) {
-      return requirements.data || []
-    }
-
-    const snapshotEducation = [
-      ...(submittedProfileReview?.educationalBackground?.vocational || []),
-      ...(submittedProfileReview?.educationalBackground?.college || []),
-      ...(submittedProfileReview?.educationalBackground?.graduate || []),
-    ]
-
-    const snapshotEligibility = submittedProfileReview?.civilServiceEligibility || []
-    const snapshotLearning = submittedProfileReview?.learningAndDevelopment || []
-    const snapshotWork = submittedProfileReview?.workExperience || []
-
-    return (requirements.data || []).map((req) => {
-      const liveSubItems = req.subItems || []
-
-      if (req.connected_to === "Educational Background") {
-        return {
-          ...req,
-          subItems: snapshotEducation.map((item) => {
-            const matched = liveSubItems.find((sub) =>
-              normalizeText(sub.level) === normalizeText(item.level) &&
-              normalizeText(sub.school) === normalizeText(item.school) &&
-              normalizeText(sub.course) === normalizeText(item.course) &&
-              normalizeText(sub.year_graduated || sub.to_year) === normalizeText(item.year_graduated || item.to_year)
-            ) || liveSubItems.find((sub) =>
-              normalizeText(sub.school) === normalizeText(item.school) &&
-              normalizeText(sub.course) === normalizeText(item.course)
-            )
-
-            return {
-              ...item,
-              id: matched?.id ?? item.id ?? null,
-              files: matched?.files || [],
-            }
-          }),
-        }
-      }
-
-      if (req.connected_to === "Civil Service Eligibility") {
-        return {
-          ...req,
-          subItems: snapshotEligibility.map((item) => {
-            const matched = liveSubItems.find((sub) =>
-              normalizeText(sub.eligibility) === normalizeText(item.eligibility) &&
-              normalizeDate(sub.exam_date) === normalizeDate(item.exam_date)
-            ) || liveSubItems.find((sub) =>
-              normalizeText(sub.eligibility) === normalizeText(item.eligibility)
-            )
-
-            return {
-              ...item,
-              id: matched?.id ?? item.id ?? null,
-              files: matched?.files || [],
-            }
-          }),
-        }
-      }
-
-      if (req.connected_to === "Learning and Development") {
-        return {
-          ...req,
-          subItems: snapshotLearning.map((item) => {
-            const matched = liveSubItems.find((sub) =>
-              normalizeText(sub.seminar_title) === normalizeText(item.seminar_title) &&
-              normalizeDate(sub.from_date) === normalizeDate(item.from_date)
-            ) || liveSubItems.find((sub) =>
-              normalizeText(sub.seminar_title) === normalizeText(item.seminar_title)
-            )
-
-            return {
-              ...item,
-              id: matched?.id ?? item.id ?? null,
-              files: matched?.files || [],
-            }
-          }),
-        }
-      }
-
-      if (req.connected_to === "Work Experience") {
-        return {
-          ...req,
-          subItems: snapshotWork.map((item) => {
-            const matched = liveSubItems.find((sub) =>
-              normalizeText(sub.agency) === normalizeText(item.agency) &&
-              normalizeText(sub.position) === normalizeText(item.position) &&
-              normalizeDate(sub.from_date) === normalizeDate(item.from_date) &&
-              normalizeDate(sub.to_date) === normalizeDate(item.to_date) &&
-              normalizeAmount(sub.monthly_salary) === normalizeAmount(item.monthly_salary)
-            ) || liveSubItems.find((sub) =>
-              normalizeText(sub.agency) === normalizeText(item.agency) &&
-              normalizeText(sub.position) === normalizeText(item.position) &&
-              normalizeDate(sub.from_date) === normalizeDate(item.from_date)
-            ) || liveSubItems.find((sub) =>
-              normalizeText(sub.agency) === normalizeText(item.agency) &&
-              normalizeText(sub.position) === normalizeText(item.position) &&
-              normalizeDate(sub.to_date) === normalizeDate(item.to_date)
-            ) || liveSubItems.find((sub) =>
-              normalizeText(sub.agency) === normalizeText(item.agency) &&
-              normalizeText(sub.position) === normalizeText(item.position)
-            )
-
-            return {
-              ...item,
-              id: matched?.id ?? item.id ?? null,
-              files: matched?.files || [],
-            }
-          }),
-        }
-      }
-
-      return req
-    })
-  }, [isReopenedSubmission, submittedProfileReview, requirements.data])
+  const displayRequirements = requirements.data || []
 
   return (
     <div className="border rounded-lg p-4 flex flex-col gap-4">
