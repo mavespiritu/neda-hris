@@ -1459,6 +1459,7 @@ class JobsController extends Controller
             $applicant,
             $vacancy,
             $application,
+            $applicationType,
             $educationReq,
             $educations,
             $eligibilityReq,
