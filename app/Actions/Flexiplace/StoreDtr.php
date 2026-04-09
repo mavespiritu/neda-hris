@@ -31,6 +31,7 @@ class StoreDtr
     {
         Validator::make($request->all(), $this->rules())->validate();
 
+        $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
         $empId = $request->user()->ipms_id ?? null;
         $today = Carbon::today();
@@ -39,7 +40,7 @@ class StoreDtr
         $logType = $request->input('logType');
         $timeNow = Carbon::now();
         $session = in_array($logType, ['amIn', 'amOut'], true) ? 'AM' : 'PM';
-        $approvedRto = $conn3->table('flexi_rto')
+        $approvedRto = $conn2->table('flexi_rto')
             ->where('emp_id', $empId)
             ->whereDate('date', $today->format('Y-m-d'))
             ->whereExists(function ($query) {
@@ -217,4 +218,3 @@ class StoreDtr
         }
     }
 }
-
