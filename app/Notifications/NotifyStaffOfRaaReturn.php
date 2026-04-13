@@ -69,7 +69,7 @@ class NotifyStaffOfRaaReturn extends Notification implements ShouldQueue
         try {
             $mail = (new MailMessage)
                     ->subject('(DEPDev RO1 HRIS) Your RAA for flexiplace arrangement on '.$rtoDate.' needs revision')
-                    ->markdown('emails.raa-return', [
+                    ->view('emails.raa-return', [
                         'senderName' => $senderName,
                         'rto' => $rto,
                         'outputs' => $outputs,
@@ -101,3 +101,4 @@ class NotifyStaffOfRaaReturn extends Notification implements ShouldQueue
         ];
     }
 }
+

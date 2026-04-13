@@ -98,7 +98,7 @@ class NotifyArdOfRaaEndorsement extends Notification implements ShouldQueue
         try {
             $mail = (new MailMessage)
                     ->subject('(DEPDev RO1 HRIS) Endorsement of RAA for flexiplace arrangement of '.$staffName.' on '.$rtoDate)
-                    ->markdown('emails.raa-endorsement', [
+                    ->view('emails.raa-endorsement', [
                         'senderName' => $senderName,
                         'staffName' => $staffName,
                         'rto' => $rto,
@@ -131,3 +131,4 @@ class NotifyArdOfRaaEndorsement extends Notification implements ShouldQueue
         ];
     }
 }
+

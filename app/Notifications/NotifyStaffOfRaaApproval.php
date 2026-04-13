@@ -69,7 +69,7 @@ class NotifyStaffOfRaaApproval extends Notification implements ShouldQueue
         try {
             $mail = (new MailMessage)
                     ->subject('(DEPDev RO1 HRIS) Your RAA for flexiplace arrangement on '.$rtoDate.' has been approved')
-                    ->markdown('emails.raa-approval', [
+                    ->view('emails.raa-approval', [
                         'senderName' => $senderName,
                         'rto' => $rto,
                         'outputs' => $outputs,
@@ -100,3 +100,4 @@ class NotifyStaffOfRaaApproval extends Notification implements ShouldQueue
         ];
     }
 }
+

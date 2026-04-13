@@ -91,7 +91,7 @@ class NotifySupervisorOfRaaSubmission extends Notification implements ShouldQueu
         try {
             return (new MailMessage)
                     ->subject('(DEPDev RO1 HRIS) Submission of RAA for flexiplace arrangement of '.$name.' on '.$rtoDate)
-                    ->markdown('emails.raa-submission', [
+                    ->view('emails.raa-submission', [
                         'sender' => $sender,
                         'rto' => $rto,
                         'outputs' => $outputs,
@@ -117,3 +117,4 @@ class NotifySupervisorOfRaaSubmission extends Notification implements ShouldQueu
         ];
     }
 }
+
