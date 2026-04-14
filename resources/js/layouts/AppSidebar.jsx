@@ -1,12 +1,11 @@
-﻿import React from "react"
+import React from "react"
+import { ChevronRight, Folder } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubItem,
   SidebarMenuButton,
   SidebarGroup,
   SidebarGroupContent,
@@ -14,52 +13,6 @@ import {
   SidebarHeader,
   useSidebar
 } from "@/components/ui/sidebar"
-
-import {
-  BarChart,
-  Notebook,
-  Clock,
-  Lightbulb,
-  Cog,
-  UserRoundCog,
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  UserRound,
-  UsersRound,
-  Home,
-  ClipboardList,
-  BriefcaseBusiness,
-  Search,
-  ChartNoAxesCombined,
-  Settings2,
-  History,
-  Building,
-  Pin,
-  Handshake,
-  FolderArchive,
-  IdCard,
-  Brain,
-  Send,
-  GitCompare,
-  CalendarCheck,
-  Target,
-  Trophy,
-  Files,
-  ClipboardPenLine,
-  NotebookPen,
-  Users,
-  Briefcase,
-  CalendarDays,
-  CalendarRange,
-  CalendarPlus,
-  PlaneTakeoff,
-  Backpack,
-  Bus,
-  Tags,
-  Logs,
-  Mails
-} from "lucide-react"
 
 import { Link, usePage } from '@inertiajs/react'
 
@@ -69,158 +22,50 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 
-import { useHasRole, useHasPermission } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
+import { sidebarItems } from "./sidebarItems"
 
 const AppSidebar = () => {
   const { url } = usePage()
   const { open } = useSidebar()
+  const user = useAuth()
+  const userRoles = user?.roles ?? []
+  const userPermissions = user?.permissions ?? []
 
-  const items = [
-    {
-      title: "Home",
-      url: "/dashboard",
-      icon: Home,
-    },
-    {
-      title: "My Profile",
-      url: "/my-profile",
-      icon: UserRound,
-    },
-    {
-      title: "My Applications",
-      url: "/my-applications",
-      icon: ClipboardPenLine,
-    },
-    {
-      title: "Careers",
-      url: "/jobs",
-      icon: NotebookPen,
-    },
-    /* {
-      title: "Search Jobs",
-      url: "/jobs",
-      icon: Search,
-    }, */
-    /* {
-      title: "Leaves",
-      url: "#",
-      icon: CalendarDays,
-      roles: ['HRIS_Staff'],
-      submenu: [
-        { title: 'Add New', url: '/leaves/create', roles: ['HRIS_Staff'], icon: CalendarPlus },
-        { title: 'Applications', url: '/leaves', roles: ['HRIS_Staff', 'HRIS_HR'], icon: CalendarRange },
-      ],
-    }, */
-    {
-      title: "Performance",
-      url: "#",
-      icon: ChartNoAxesCombined,
-      roles: ['HRIS_Staff', 'HRIS_DC', 'HRIS_ADC', 'HRIS_RD', 'HRIS_ARD', 'HRIS_HR', 'HRIS_Administrator'],
-      submenu: [
-        { title: 'Emails', url: '/emails', roles: ['HRIS_Staff', 'HRIS_DC', 'HRIS_ADC', 'HRIS_RD', 'HRIS_ARD', 'HRIS_HR', 'HRIS_Administrator'], icon: Mails },
-        { title: 'OPCR', url: '/opcrs', roles: ['HRIS_DC', 'HRIS_RD', 'HRIS_ARD'], icon: Building },
-        { title: 'DPCR', url: '/dpcrs', roles: ['HRIS_DC', 'HRIS_ADC'], icon: UsersRound },
-        { title: 'IPCR', url: '/ipcrs', roles: ['HRIS_Staff'], icon: UserRound },
-        { title: 'Libraries', url: '/performance/libraries', roles: ['HRIS_HR', 'HRIS_Administrator'], icon: FolderArchive },
-      ],
-    },
-    {
-      title: "Recruitment",
-      url: "#",
-      icon: BriefcaseBusiness,
-      roles: ['HRIS_HR', 'HRIS_DC', 'HRIS_ADC'],
-      submenu: [
-        { title: 'Applicants', url: '/applicants', roles: ['HRIS_HR', 'HRIS_DC'], icon: Users },
-        { title: 'Applications', url: '/applications', roles: ['HRIS_HR', 'HRIS_DC'], icon: Briefcase },
-        { title: 'Vacancies', url: '/vacancies', roles: ['HRIS_HR', 'HRIS_DC'], icon: ClipboardList },
-        { title: 'Publications', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Pin },
-        /* { title: 'Positions', url: '/vacancies', roles: ['HRIS_HR'], icon: IdCard },
-        { title: 'Onboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Handshake },
-        { title: 'Offboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: FolderArchive }, */
-      ],
-    },
-    /* {
-      title: "Selection",
-      url: "#",
-      icon: BriefcaseBusiness,
-      roles: ['HRIS_HR'],
-      submenu: [
-        { title: 'Positions', url: '/vacancies', roles: ['HRIS_HR'], icon: IdCard },
-        { title: 'Vacancies', url: '/vacancies', roles: ['HRIS_HR'], icon: ClipboardList },
-        { title: 'Publications', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Pin },
-        { title: 'Onboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Handshake },
-        { title: 'Offboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: FolderArchive },
-      ],
-    },
-    {
-      title: "Placement",
-      url: "#",
-      icon: BriefcaseBusiness,
-      roles: ['HRIS_HR'],
-      submenu: [
-        { title: 'Onboarding', url: '/publications', icon: Folder, roles: ['HRIS_HR'], icon: Handshake },
-      ],
-    },
-    {
-      title: "Personal Data Sheet",
-      url: "#",
-      icon: Notebook,
-      roles: ['HRIS_Staff'],
-      submenu: [
-        { title: 'My PDS', url: '/my-pds', roles: ['HRIS_Staff'] },
-        { title: 'Staff PDS', url: '/staff-pds', roles: ['HRIS_HR'] },
-        { title: 'Staff 201', url: '/staff-201', roles: ['HRIS_HR'] },
-      ],
-    }, */
-    {
-      title: "Travels",
-      url: "#",
-      icon: PlaneTakeoff,
-      roles: ['HRIS_Staff'],
-      submenu: [
-        { title: 'Travel Requests', url: '/travel-requests', roles: ['HRIS_Staff'], icon: Backpack },
-        { title: 'Trip Tickets', url: '/trip-tickets', roles: ['HRIS_PRU'], icon: Tags },
-      ],
-    },
-    {
-      title: "Flexiplace",
-      url: "#",
-      icon: History,
-      roles: ['HRIS_Staff'],
-      submenu: [
-        { title: 'RTO', url: '/rto', roles: ['HRIS_Staff'], icon: Target },
-        { title: 'DTR', url: '/fwa', roles: ['HRIS_Staff'], icon: History },
-        { title: 'RAA', url: '/raa', roles: ['HRIS_Staff'], icon: Trophy },
-        { title: 'Reports', url: '/fwa/reports', roles: ['HRIS_HR'], icon: Files },
-      ],
-    },
-    {
-      title: "Competencies",
-      url: "#",
-      icon: Lightbulb,
-      roles: ['HRIS_Staff'],
-      submenu: [
-        { title: 'Gap Analysis', url: '/cga', roles: ['HRIS_Staff'], icon: Brain },
-        { title: 'Submissions', url: '/cga/review', roles: ['HRIS_HR', 'HRIS_DC'], icon: Send },
-        /* { title: 'Comparisons', url: '/compare-cga', roles: ['HRIS_HR', 'HRIS_DC'], icon: GitCompare }, */
-        { title: 'Libraries', url: '/cga/libraries', roles: ['HRIS_HR'], icon: Settings2 },
-      ],
-    },
-    {
-      title: "Settings",
-      url: '/settings',
-      icon: Cog,
-      roles: ['HRIS_Staff']
-    },
-  ]
+  const items = sidebarItems
+  const canAccess = (item) => {
+    const hasRoles = Array.isArray(item.roles) && item.roles.length > 0
+    const hasPermissions = Array.isArray(item.permissions) && item.permissions.length > 0
 
-  const isVisible = (item) => {
-    const hasRole = item.roles ? item.roles.some((role) => useHasRole(role)) : true
-    const hasPermission = item.permissions
-      ? item.permissions.some((permission) => useHasPermission(permission))
-      : true
-    return hasRole && hasPermission
+    const roleMatch = hasRoles
+      ? item.roles.some((role) => userRoles.includes(role))
+      : false
+    const permissionMatch = hasPermissions
+      ? item.permissions.some((permission) => userPermissions.includes(permission))
+      : false
+
+    if (hasRoles && hasPermissions) {
+      return roleMatch || permissionMatch
+    }
+
+    if (hasRoles) {
+      return roleMatch
+    }
+
+    if (hasPermissions) {
+      return permissionMatch
+    }
+
+    return true
   }
+
+  const visibleItems = items.filter((item) => {
+    if (canAccess(item)) {
+      return true
+    }
+
+    return item.submenu?.some(canAccess) ?? false
+  })
 
   const isActivePath = (currentUrl, targetUrl) => {
     if (!targetUrl) return false
@@ -236,8 +81,7 @@ const AppSidebar = () => {
           <SidebarGroupLabel className="font-semibold">MAIN MENU</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items
-                .filter(isVisible)
+              {visibleItems
                 .map((item) => {
                   const isActive = item.submenu?.some((subitem) => isActivePath(url, subitem.url))
                   return (
@@ -256,7 +100,7 @@ const AppSidebar = () => {
                             </SidebarMenuButton>
                           </CollapsibleTrigger>
                         ) : (
-                          // 🔥 FIX: Make entire row clickable
+                          // ?? FIX: Make entire row clickable
                           <SidebarMenuButton asChild title={!open ? item.title : undefined}>
                             <Link
                               href={item.url}
@@ -275,9 +119,9 @@ const AppSidebar = () => {
                           <CollapsibleContent>
                             <SidebarMenuSub>
                               {item.submenu
-                                .filter(isVisible)
+                                .filter(canAccess)
                                 .map((subitem) => (
-                                  // 🔥 FIX: Make submenu row clickable
+                                  // ?? FIX: Make submenu row clickable
                                   <SidebarMenuButton
                                     key={subitem.title}
                                     asChild
@@ -317,3 +161,6 @@ const AppSidebar = () => {
 }
 
 export default AppSidebar
+
+
+

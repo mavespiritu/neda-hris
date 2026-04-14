@@ -2,12 +2,12 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use App\Traits\BuildsEmployeeNameMap;
 use App\Traits\UsesMessengerRedisCache;
 use Illuminate\Http\Request;
-use Inertia\Middleware;
-use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -37,7 +37,7 @@ class HandleInertiaRequests extends Middleware
     {
         $authUser = Auth::guard('web')->user() ?? Auth::guard('applicant')->user();
         $messengerUsers = function () use ($authUser) {
-            if (!$authUser || blank($authUser->ipms_id ?? null)) {
+            if (! $authUser || blank($authUser->ipms_id ?? null)) {
                 return [];
             }
 
@@ -67,19 +67,12 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => fn () => $authUser ? array_merge(
-                $authUser->only(['id', 'name', 'email', 'last_name', 'first_name', 'middle_name', 'ipms_id','email_verified_at']),
-                $authUser instanceof User ? [
+                    $authUser->only(['id', 'name', 'email', 'last_name', 'first_name', 'middle_name', 'ipms_id', 'email_verified_at']),
+                    $authUser instanceof User ? [
                         'roles' => $authUser->getAllRolesRecursive()->pluck('name')->toArray(),
-                        'direct_roles' => $authUser->getRoleNames()->values()->toArray(),
-                        'primary_role' => $authUser->getRoleNames()
-                            ->sortByDesc(fn ($role) => config('roles.priorities.' . $role, 0))
-                            ->values()
-                            ->first(),
                         'permissions' => $authUser->getAllPermissionsRecursive()->pluck('name')->toArray(),
                     ] : [
                         'roles' => [],
-                        'direct_roles' => [],
-                        'primary_role' => null,
                         'permissions' => [],
                     ]
                 ) : null,
@@ -89,7 +82,7 @@ class HandleInertiaRequests extends Middleware
                 // Get all flashed session data
                 $flashed = $request->session()->get('_flash.old', []);
 
-                // Laravel doesn’t store flash keys directly; we get values manually
+                // Laravel doesn\'t store flash keys directly; we get values manually
                 $all = collect($request->session()->all())
                     ->only($flashed)
                     ->toArray();

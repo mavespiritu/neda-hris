@@ -4,7 +4,6 @@ namespace App\Actions\Vacancies;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -15,7 +14,7 @@ class ListVacancy
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('list', 'vacancies');
+            && $request->user()->can('HRIS_recruitment.vacancies.page.view');
     }
 
     public function asController(Request $request)

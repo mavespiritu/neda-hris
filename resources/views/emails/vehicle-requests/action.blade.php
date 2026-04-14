@@ -54,9 +54,10 @@
 
             @if($required === 'approve' && !empty($review))
             @php
-                use Illuminate\Support\Str;
                 $rec = $review->recommendation ?? null;
-                $label = $rec ? Str::replaceEnd('ed', 'e', $rec) . ' for Vehicle Provision' : '-';
+                $label = $rec
+                    ? \Illuminate\Support\Str::replaceEnd('ed', 'e', $rec) . ' for Vehicle Provision'
+                    : '-';
             @endphp
                 <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;margin-bottom:16px;">
                     <tr>

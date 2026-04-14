@@ -1,21 +1,10 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import axios from "axios"
 import { router, usePage } from "@inertiajs/react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Paperclip } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatFullName, formatDate } from "@/lib/utils.jsx"
 import { useToast } from "@/hooks/use-toast"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import DatePicker from "@/components/DatePicker"
-import TextInput from "@/components/TextInput"
-import SingleComboBox from "@/components/SingleComboBox"
 import {
   Table,
   TableBody,
@@ -25,6 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { store } from "../Applicants/store"
+import { useHasPermission } from "@/hooks/useAuth"
+import ExamResultDialog from "./ExamResultDialog"
+import RankResultDialog from "./RankResultDialog"
+import AttachmentPreviewDialog from "@/components/AttachmentPreviewDialog"
 
 const statusClassName = (status) => {
   if (status === "Passed") return "text-green-600"
@@ -34,13 +27,6 @@ const statusClassName = (status) => {
 }
 
 const statusLabel = (status) => status || "Not Started"
-
-const resultStatuses = [
-  { label: "Passed", value: "Passed" },
-  { label: "Failed", value: "Failed" },
-  { label: "Did Not Attend", value: "Did Not Attend" },
-  { label: "Pending", value: "Pending" },
-]
 
 const sortApplicantsByRank = (rows) => {
   return [...rows].sort((a, b) => {
@@ -80,6 +66,8 @@ const AssessmentTab = () => {
     date_conducted: "",
     status: "",
     score: "",
+    attachment: null,
+    removeFiles: [],
   })
   const [examErrors, setExamErrors] = useState({})
   const [isSavingExam, setIsSavingExam] = useState(false)
@@ -93,12 +81,28 @@ const AssessmentTab = () => {
   })
   const [rankErrors, setRankErrors] = useState({})
   const [isSavingRank, setIsSavingRank] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState(null)
+  const [previewTitle, setPreviewTitle] = useState("")
+
+  const canViewSecretariatAssessment = useHasPermission("HRIS_recruitment.vacancies.assessment.secretariat.view")
+  const canViewHRMPSBAssessment = useHasPermission("HRIS_recruitment.vacancies.assessment.hrmpsb.view")
+  const canLogSkillsTestResult = useHasPermission("HRIS_recruitment.vacancies.assessment.skills-test.log")
+  const canLogDpeTestResult = useHasPermission("HRIS_recruitment.vacancies.assessment.dpe-test.log")
+  const canRankApplicants = useHasPermission("HRIS_recruitment.vacancies.assessment.applicants.rank")
 
   useEffect(() => {
     fetchApplicants(vacancy.id)
   }, [vacancy.id])
 
   const rows = sortApplicantsByRank(applicants.data?.data || [])
+
+  const selectedExamAttachment = useMemo(() => {
+    if (!examDialog.applicant || !examDialog.testType) return null
+
+    return examDialog.testType === "Skill Test"
+      ? examDialog.applicant.skill_test_attachment
+      : examDialog.applicant.dpe_attachment
+  }, [examDialog.applicant, examDialog.testType])
 
   const openExamDialog = (applicant, testType) => {
     const isSkillTest = testType === "Skill Test"
@@ -114,6 +118,8 @@ const AssessmentTab = () => {
       score: isSkillTest
         ? (applicant.skill_test_score ?? "")
         : (applicant.dpe_score ?? ""),
+      attachment: null,
+      removeFiles: [],
     })
     setExamDialog({
       open: true,
@@ -135,6 +141,8 @@ const AssessmentTab = () => {
       date_conducted: "",
       status: "",
       score: "",
+      attachment: null,
+      removeFiles: [],
     })
   }
 
@@ -164,6 +172,13 @@ const AssessmentTab = () => {
     })
   }
 
+  const openAttachmentPreview = (attachment, title) => {
+    if (!attachment) return
+
+    setPreviewAttachment(attachment)
+    setPreviewTitle(title || attachment.filename || attachment.name || "Attachment")
+  }
+
   const saveExamResult = async () => {
     if (!examDialog.applicant || !examDialog.testType) return
 
@@ -171,17 +186,26 @@ const AssessmentTab = () => {
     setExamErrors({})
 
     try {
+      const submission = new FormData()
+      submission.append("test_type", examDialog.testType)
+      submission.append("date_conducted", examForm.date_conducted)
+      submission.append("status", examForm.status)
+      submission.append("score", examForm.score === "" ? "" : examForm.score)
+
+      examForm.removeFiles.forEach((fileId) => {
+        submission.append("removeFiles[]", fileId)
+      })
+
+      if (examForm.attachment) {
+        submission.append("attachment", examForm.attachment)
+      }
+
       await axios.post(
         route("vacancies.applicants.exam-result.store", {
           vacancy: vacancy.id,
           application: examDialog.applicant.id,
         }),
-        {
-          test_type: examDialog.testType,
-          date_conducted: examForm.date_conducted,
-          status: examForm.status,
-          score: examForm.score === "" ? null : examForm.score,
-        }
+        submission
       )
 
       toast({
@@ -249,7 +273,7 @@ const AssessmentTab = () => {
         </p>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted">
@@ -281,20 +305,34 @@ const AssessmentTab = () => {
                       <span>{formatFullName(applicant.name)}</span>
                       <span className="text-xs">{applicant.email_address || "-"}</span>
                     </div>
-                    </TableCell>
+                  </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
-                      onClick={() =>
-                        router.visit(
-                          route("vacancies.applicants.secretariat-assessment", {
-                            vacancy: vacancy.id,
-                            application: applicant.id,
-                          })
-                        )
-                      }
-                    >
+                    {canViewSecretariatAssessment ? (
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        className="w-fit rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
+                        onClick={() =>
+                          router.visit(
+                            route("vacancies.applicants.secretariat-assessment", {
+                              vacancy: vacancy.id,
+                              application: applicant.id,
+                            })
+                          )
+                        }
+                      >
+                        <div className="flex flex-col">
+                          <span className={statusClassName(applicant.secretariat_assessment_status)}>
+                            {statusLabel(applicant.secretariat_assessment_status)}
+                          </span>
+                          {applicant.secretariat_assessed_at && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(applicant.secretariat_assessed_at)}
+                            </span>
+                          )}
+                        </div>
+                      </Button>
+                    ) : (
                       <div className="flex flex-col">
                         <span className={statusClassName(applicant.secretariat_assessment_status)}>
                           {statusLabel(applicant.secretariat_assessment_status)}
@@ -305,12 +343,13 @@ const AssessmentTab = () => {
                           </span>
                         )}
                       </div>
-                    </button>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
-                      className="w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-fit rounded-md px-2 py-1 text-left transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() =>
                         router.visit(
                           route("vacancies.applicants.hrmpsb-assessment", {
@@ -331,66 +370,153 @@ const AssessmentTab = () => {
                           </span>
                         )}
                       </div>
-                    </button>
+                    </Button>
                   </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
-                      onClick={() => openExamDialog(applicant, "Skill Test")}
-                    >
-                      <div className="flex flex-col">
-                        <span className={statusClassName(applicant.skill_test_result)}>
-                          {statusLabel(applicant.skill_test_result)}
-                        </span>
-                        {applicant.skill_test_score && (
-                          <span className="text-xs text-muted-foreground">
-                            Score: {applicant.skill_test_score}
+                    <div className="flex flex-col items-start">
+                      {canViewHRMPSBAssessment ? (
+                        <Button
+                          variant="ghost"
+                          type="button"
+                          className="w-fit rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
+                          onClick={() => openExamDialog(applicant, "Skill Test")}
+                        >
+                          <div className="flex flex-col">
+                            <span className={statusClassName(applicant.skill_test_result)}>
+                              {statusLabel(applicant.skill_test_result)}
+                            </span>
+                            {applicant.skill_test_score && (
+                              <span className="text-xs text-muted-foreground">
+                                Score: {applicant.skill_test_score}
+                              </span>
+                            )}
+                            {applicant.skill_test_date_conducted && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(applicant.skill_test_date_conducted)}
+                              </span>
+                            )}
+                          </div>
+                        </Button>
+                      ) : (
+                        <div className="flex flex-col">
+                          <span className={statusClassName(applicant.skill_test_result)}>
+                            {statusLabel(applicant.skill_test_result)}
                           </span>
-                        )}
-                        {applicant.skill_test_date_conducted && (
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(applicant.skill_test_date_conducted)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
+                          {applicant.skill_test_score && (
+                            <span className="text-xs text-muted-foreground">
+                              Score: {applicant.skill_test_score}
+                            </span>
+                          )}
+                          {applicant.skill_test_date_conducted && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(applicant.skill_test_date_conducted)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {applicant.skill_test_attachment && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0 text-xs text-primary"
+                            onClick={() =>
+                              openAttachmentPreview(
+                                applicant.skill_test_attachment,
+                                applicant.skill_test_attachment.name || "Skill Test Attachment"
+                              )
+                            }
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            {applicant.skill_test_attachment.name || "Attachment"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
-                      onClick={() => openExamDialog(applicant, "DPE")}
-                    >
-                      <div className="flex flex-col">
-                        <span className={statusClassName(applicant.dpe_result)}>
-                          {statusLabel(applicant.dpe_result)}
-                        </span>
-                        {applicant.dpe_score && (
-                          <span className="text-xs text-muted-foreground">
-                            Score: {applicant.dpe_score}
+                    <div className="flex flex-col items-start">
+                      {canLogDpeTestResult || canLogSkillsTestResult ? (
+                        <Button
+                          variant="ghost"
+                          type="button"
+                          className="w-fit rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
+                          onClick={() => openExamDialog(applicant, "DPE")}
+                        >
+                          <div className="flex flex-col">
+                            <span className={statusClassName(applicant.dpe_result)}>
+                              {statusLabel(applicant.dpe_result)}
+                            </span>
+                            {applicant.dpe_score && (
+                              <span className="text-xs text-muted-foreground">
+                                Score: {applicant.dpe_score}
+                              </span>
+                            )}
+                            {applicant.dpe_date_conducted && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(applicant.dpe_date_conducted)}
+                              </span>
+                            )}
+                          </div>
+                        </Button>
+                      ) : (
+                        <div className="flex flex-col">
+                          <span className={statusClassName(applicant.dpe_result)}>
+                            {statusLabel(applicant.dpe_result)}
                           </span>
-                        )}
-                        {applicant.dpe_date_conducted && (
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(applicant.dpe_date_conducted)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
+                          {applicant.dpe_score && (
+                            <span className="text-xs text-muted-foreground">
+                              Score: {applicant.dpe_score}
+                            </span>
+                          )}
+                          {applicant.dpe_date_conducted && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(applicant.dpe_date_conducted)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {applicant.dpe_attachment && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0 text-xs text-primary"
+                            onClick={() =>
+                              openAttachmentPreview(
+                                applicant.dpe_attachment,
+                                applicant.dpe_attachment.name || "DPE Attachment"
+                              )
+                            }
+                          >
+                            <Paperclip className="h-3 w-3" />
+                            {applicant.dpe_attachment.name || "Attachment"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <button
-                      type="button"
-                      className="inline-flex rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
-                      onClick={() => openRankDialog(applicant)}
-                    >
+                    {canRankApplicants ? (
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        className="inline-flex w-fit rounded-md px-2 py-1 text-left transition-colors hover:bg-muted"
+                        onClick={() => openRankDialog(applicant)}
+                      >
+                        <div className="flex flex-col">
+                          <span className={applicant.rank ? "text-foreground" : "text-muted-foreground"}>
+                            {applicant.rank || "Not Set"}
+                          </span>
+                        </div>
+                      </Button>
+                    ) : (
                       <div className="flex flex-col">
                         <span className={applicant.rank ? "text-foreground" : "text-muted-foreground"}>
                           {applicant.rank || "Not Set"}
                         </span>
                       </div>
-                    </button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -404,122 +530,53 @@ const AssessmentTab = () => {
           </TableBody>
         </Table>
       </div>
-
-      <Dialog open={examDialog.open} onOpenChange={closeExamDialog}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {examDialog.testType || "Exam"} Result
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div>
-              <Label>Applicant</Label>
-              <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                {formatFullName(examDialog.applicant?.name) || "-"}
-              </div>
-            </div>
-
-            <div>
-              <Label>Date Conducted</Label>
-              <DatePicker
-                value={examForm.date_conducted}
-                onDateChange={(value) => setExamForm((prev) => ({ ...prev, date_conducted: value || "" }))}
-                invalidMessage={examErrors.date_conducted}
-              />
-            </div>
-
-            <div>
-              <Label>Status</Label>
-              <SingleComboBox
-                items={resultStatuses}
-                name="status"
-                value={examForm.status}
-                onChange={(value) => setExamForm((prev) => ({ ...prev, status: value || "" }))}
-                placeholder="Select status"
-                width="w-full"
-                className="w-full"
-                labelWidth="w-full"
-                invalidMessage={examErrors.status}
-              />
-              {examErrors.status && (
-                <p className="mt-1 text-xs text-red-500">{examErrors.status}</p>
-              )}
-            </div>
-
-            <div>
-              <Label>Score</Label>
-              <TextInput
-                value={examForm.score}
-                onChange={(e) => setExamForm((prev) => ({ ...prev, score: e.target.value }))}
-                isInvalid={!!examErrors.score}
-              />
-              {examErrors.score && (
-                <p className="mt-1 text-xs text-red-500">{examErrors.score}</p>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => closeExamDialog(false)} disabled={isSavingExam}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={saveExamResult} disabled={isSavingExam}>
-              {isSavingExam && <Loader2 className="h-4 w-4 animate-spin" />}
-              Save Result
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={rankDialog.open} onOpenChange={closeRankDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rank Result</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div>
-              <Label>Applicant</Label>
-              <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                {formatFullName(rankDialog.applicant?.name) || "-"}
-              </div>
-            </div>
-
-            <div>
-              <Label>Rank</Label>
-              <TextInput
-                value={rankForm.rank}
-                onChange={(e) => setRankForm((prev) => ({ ...prev, rank: e.target.value }))}
-                isInvalid={!!rankErrors.rank}
-              />
-              {rankErrors.rank && (
-                <p className="mt-1 text-xs text-red-500">{rankErrors.rank}</p>
-              )}
-            </div>
-
-            <div>
-              <Label>Date Ranked</Label>
-              <DatePicker
-                value={rankForm.date_ranked}
-                onDateChange={(value) => setRankForm((prev) => ({ ...prev, date_ranked: value || "" }))}
-                invalidMessage={rankErrors.date_ranked}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => closeRankDialog(false)} disabled={isSavingRank}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={saveRankResult} disabled={isSavingRank}>
-              {isSavingRank && <Loader2 className="h-4 w-4 animate-spin" />}
-              Save Rank
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ExamResultDialog
+        open={examDialog.open}
+        onOpenChange={closeExamDialog}
+        applicant={examDialog.applicant}
+        testType={examDialog.testType}
+        form={examForm}
+        existingAttachment={selectedExamAttachment}
+        errors={examErrors}
+        isSaving={isSavingExam}
+        onSave={saveExamResult}
+        onChange={(field, value) => setExamForm((prev) => ({ ...prev, [field]: value }))}
+        onAttachmentChange={(file) =>
+          setExamForm((prev) => ({
+            ...prev,
+            attachment: file,
+            removeFiles: [],
+          }))
+        }
+        onRemoveAttachment={(fileId) =>
+          setExamForm((prev) => ({
+            ...prev,
+            removeFiles: fileId ? [fileId] : [],
+            attachment: null,
+          }))
+        }
+      />
+      <RankResultDialog
+        open={rankDialog.open}
+        onOpenChange={closeRankDialog}
+        applicant={rankDialog.applicant}
+        form={rankForm}
+        errors={rankErrors}
+        isSaving={isSavingRank}
+        onSave={saveRankResult}
+        onChange={(field, value) => setRankForm((prev) => ({ ...prev, [field]: value }))}
+      />
+      <AttachmentPreviewDialog
+        open={Boolean(previewAttachment)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewAttachment(null)
+            setPreviewTitle("")
+          }
+        }}
+        file={previewAttachment}
+        title={previewTitle}
+      />
     </div>
   )
 }

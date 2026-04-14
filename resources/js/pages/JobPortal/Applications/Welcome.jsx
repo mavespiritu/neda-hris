@@ -11,38 +11,33 @@ const Welcome = () => {
   return (
     <Card>
         <CardHeader>
-            <CardTitle className="leading-tight text-lg">Welcome to the DEPDev RO1 HRIS!</CardTitle>
+            <CardTitle className="leading-tight text-lg">Welcome to the DEPDev RO1 Job Portal</CardTitle>
         </CardHeader>
         <CardContent className="text-sm">
-            <p className="mb-8">Thanks for exploring DEPDev RO1 career opportunities!</p>
+            <p className="mb-8">Thanks for exploring career opportunities!</p>
             <p className="mb-8">This is your personal candidate home page. From here, you can track the progress of your application, see next steps in the process and keep your contact details and account settings up to date. </p>
             <h1 className="text-lg font-semibold">About Us</h1>
             <div className="flex justify-center">
                 <img src="/images/logo.png" alt="NEDA Logo" className="h-[300px] max-h-[50%] w-auto p-4 object-contain" />
             </div>
             <h1 className="text-normal font-semibold mb-4">Vision</h1>
-            <p className="mb-8">We are recognized as the leading gender-responsive development catalyst in Region 1 with the grace of the Divine Providence. </p>
+            <p className="mb-8">DEPDev RO1: The region's trusted, people-first, and future-ready strategic development compass guided by the Divine Providence. </p>
             <h1 className="text-normal font-semibold mb-4">Mission</h1>
-            <p className="mb-8">We commit to provide gender-responsive services to produce the Region 1 development plans and all its implementing policies, investment programs and activities, and to oversee and track its implementation and report the results to all stakeholders in contribution to regional and national development. </p>
+            <p className="mb-8">We serve as Region 1's strategic development compass, advancing continuing, integrated, and coordinated evidence-based planning, investment programming and budgeting, monitoring and evaluation, research and advocacy, and administrative services delivered through pioneering technology in an environment of creativity, harmony, and inclusion.</p>
             <h1 className="text-normal font-semibold mb-4">Quality Policy</h1>
-            <p className="mb-4">We, commit to orchestrate regional development through effective services and innovative quality products to meet planned organizational objectives and respond to the dynamic needs of our stakeholders. </p>
-            <p className="mb-4">To uphold this, we bind ourselves to:</p>
+            <p className="mb-4"><span className="font-bold">iNICE</span> - <span className="font-bold">iN</span>novativeness, <span className="font-bold">I</span>ntegrity, <span className="font-bold">C</span>ompassion, <span className="font-bold">E</span>xcellence</p>
             <div className="flex flex-col gap-4 mb-4">
-                <p className="flex items-center">
-                    <span className="h-2 w-2 bg-black rounded-full mr-4 p-1"></span>
-                    Continually improve products and services to ensure a high level of satisfaction for our customers;
+                <p>
+                    <span className="font-bold underline">Innovativeness</span> - DEPDev RO1 fosters new ideas, technologies, and methods to improve DEPDev's expanded mandate.
                 </p>
-                <p className="flex items-center">
-                    <span className="h-2 w-2 bg-black rounded-full mr-4 p-1"></span>
-                    Adhere to statutory and regulatory requirements in the performance of our functions;
+                <p>
+                    <span className="font-bold underline">Integrity</span> - DEPDev RO1 upholds the highest ethical standards in the formulation and review of plans and policies, ensuring honesty, impartiality, and trustworthiness in all actions and recommendations.
                 </p>
-                <p className="flex items-center">
-                    <span className="h-2 w-2 bg-black rounded-full mr-4 p-1"></span>
-                    Continually improve the effectiveness of our quality management system aligned with international standards;
+                <p>
+                    <span className="font-bold underline">Compassion</span> - DEPDev RO1 demonstrates genuine care for people and communities by formulating responsive and proactive policies, plans, programs and actions that uplift lives, especially the underserved, while honoring the dignity of every individual.
                 </p>
-                <p className="flex items-center">
-                    <span className="h-2 w-2 bg-black rounded-full mr-4 p-1"></span>
-                    Maintain a dynamic organization with highly motivated and competent men and women committed to good governance.
+                <p>
+                    <span className="font-bold underline">Excellence</span> - DEPDev RO1 employs evidence-based planning methods, robust data analysis, and continuous improvement to raise the quality and effectiveness of government development outcomes.
                 </p>
             </div>
             <p className="mb-4">For more information, visit our{' '}

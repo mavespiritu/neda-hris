@@ -1,23 +1,25 @@
 <?php
 
+use App\Actions\Vacancies\DownloadApplicantRequirements;
+use App\Actions\Vacancies\ListApplicants;
 use App\Actions\Vacancies\ShowApplicantAssessment;
 use App\Actions\Vacancies\ShowApplicantHrmpsbAssessment;
+use App\Actions\Vacancies\ShowApplicantPds;
+use App\Actions\Vacancies\ShowApplicantQualifications;
+use App\Actions\Vacancies\ShowApplicantRequirements;
 use App\Actions\Vacancies\StoreApplicantAssessment;
-use App\Actions\Vacancies\StoreApplicantExamResult;
 use App\Actions\Vacancies\StoreApplicantAssessmentOverride;
 use App\Actions\Vacancies\StoreApplicantEditRequest;
+use App\Actions\Vacancies\StoreApplicantExamResult;
 use App\Actions\Vacancies\StoreApplicantRankingResult;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-use App\Http\Controllers\Vacancies\ApplicantsController;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
-    Route::get('/vacancy-applicants/{id}', [ApplicantsController::class, 'index'])->name('vacancies.applicants.index');
-    Route::get('/vacancy-applicants-pds/{id}', [ApplicantsController::class, 'getPds'])->name('vacancies.applicants.pds');
-    Route::get('/vacancy-applicants-requirements/{id}', [ApplicantsController::class, 'getRequirements'])->name('vacancies.applicants.requirements');
-    Route::get('/vacancy-applicants-qualifications/{id}', [ApplicantsController::class, 'getQualifications'])->name('vacancies.applicants.qualifications');
-    Route::get('/vacancy-applicants-requirements/{id}/download', [ApplicantsController::class, 'downloadRequirements'])->name('vacancies.applicants.requirements.download');
+    Route::get('/vacancy-applicants/{id}', ListApplicants::class)->name('vacancies.applicants.index');
+    Route::get('/vacancy-applicants-pds/{id}', ShowApplicantPds::class)->name('vacancies.applicants.pds');
+    Route::get('/vacancy-applicants-requirements/{id}', ShowApplicantRequirements::class)->name('vacancies.applicants.requirements');
+    Route::get('/vacancy-applicants-qualifications/{id}', ShowApplicantQualifications::class)->name('vacancies.applicants.qualifications');
+    Route::get('/vacancy-applicants-requirements/{id}/download', DownloadApplicantRequirements::class)->name('vacancies.applicants.requirements.download');
     Route::get('/vacancies/{vacancy}/applicants/{application}/assessment', ShowApplicantAssessment::class)->name('vacancies.applicants.assessment');
     Route::get('/vacancies/{vacancy}/applicants/{application}/secretariat-assessment', ShowApplicantAssessment::class)->name('vacancies.applicants.secretariat-assessment');
     Route::get('/vacancies/{vacancy}/applicants/{application}/hrmpsb-assessment', ShowApplicantHrmpsbAssessment::class)->name('vacancies.applicants.hrmpsb-assessment');

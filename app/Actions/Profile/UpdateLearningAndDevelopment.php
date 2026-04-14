@@ -6,7 +6,6 @@ use App\Services\Profile\ProfileContextResolver;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Illuminate\Support\Facades\Gate;
 
 class UpdateLearningAndDevelopment
 {
@@ -55,22 +54,26 @@ class UpdateLearningAndDevelopment
 
             $data = $request->validated();
 
-            $updated = $conn->table('applicant_learning')
-                ->join('applicant', 'applicant.id', '=', 'applicant_learning.applicant_id')
-                ->where('applicant_learning.id', $id)
-                ->where('applicant.user_id', $user->id)
-                ->where('applicant.type', $type)
+            $recordExists = $conn->table('applicant_learning as al')
+                ->join('applicant as a', 'a.id', '=', 'al.applicant_id')
+                ->where('al.id', $id)
+                ->where('a.user_id', $user->id)
+                ->where('a.type', $type)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_learning')
+                ->where('id', $id)
                 ->update([
                     'seminar_title' => $data['seminar_title'],
                     'from_date' => $data['from_date'],
                     'to_date' => $data['to_date'],
                     'hours' => $data['hours'],
                     'participation' => $data['participation'],
-                    'applicant_learning.type' => $data['type'],
+                    'type' => $data['type'],
                     'conducted_by' => $data['conducted_by'],
                 ]);
-
-            abort_unless($updated, 404);
 
             return response()->json([
                 'status' => 'success',
@@ -78,7 +81,11 @@ class UpdateLearningAndDevelopment
                 'message' => 'Learning and development updated successfully.',
             ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update learning and development: ' . $e->getMessage());
+            Log::error('Failed to update learning and development', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
                 'status' => 'error',

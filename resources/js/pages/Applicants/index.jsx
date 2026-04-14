@@ -1,6 +1,6 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasRole, useHasPermission } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import {
     Dialog,
@@ -49,7 +49,8 @@ const Applicants = () => {
     }
   }, [flash])
 
-    const canSelectApplicant = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
+    const canEditApplicant = useHasPermission("HRIS_recruitment.applicants.update")
+    const canDeleteApplicant = useHasPermission("HRIS_recruitment.applicants.delete")
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
@@ -107,19 +108,18 @@ const Applicants = () => {
         filters,
         options: {
             enableAdd: true,
-            enableEdit: true,
+            enableEdit: canEditApplicant,
             enableView: false,
-            enableViewAsLink: true,
-            enableDelete: true, 
-            enableBulkDelete: true,
+            enableViewAsLink: false,
+            enableDelete: canDeleteApplicant,
+            enableBulkDelete: canDeleteApplicant,
             enableSearching: true,
             enableFiltering: true,
-            enableRowSelection: row => !row.original.isLocked || canSelectApplicant,
+            enableRowSelection: row => canDeleteApplicant,
             enableGenerateReport: false,
-            canModify: canSelectApplicant
         },
         endpoints: {
-            viewEndpoint: (id) => route('applicants.show', id),
+            //viewEndpoint: (id) => route('applicants.show', id),
             addEndpoint: route('applicants.create'),
             editEndpoint: (id) => route('applicants.edit', id),
             deleteEndpoint: (id) => route('applicants.destroy', id),
@@ -157,4 +157,5 @@ const Applicants = () => {
 }
 
 export default Applicants
+
 

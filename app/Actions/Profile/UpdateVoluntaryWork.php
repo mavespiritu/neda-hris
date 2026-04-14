@@ -6,7 +6,6 @@ use App\Services\Profile\ProfileContextResolver;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Illuminate\Support\Facades\Gate;
 
 class UpdateVoluntaryWork
 {
@@ -77,11 +76,17 @@ class UpdateVoluntaryWork
 
             $data = $request->validated();
 
-            $updated = $conn->table('applicant_voluntary_work')
-                ->join('applicant', 'applicant.id', '=', 'applicant_voluntary_work.applicant_id')
-                ->where('applicant_voluntary_work.id', $id)
-                ->where('applicant.user_id', $user->id)
-                ->where('applicant.type', $type)
+            $recordExists = $conn->table('applicant_voluntary_work as vw')
+                ->join('applicant as a', 'a.id', '=', 'vw.applicant_id')
+                ->where('vw.id', $id)
+                ->where('a.user_id', $user->id)
+                ->where('a.type', $type)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_voluntary_work')
+                ->where('id', $id)
                 ->update([
                     'org_name' => $data['org_name'],
                     'org_address' => $data['org_address'],
@@ -92,15 +97,17 @@ class UpdateVoluntaryWork
                     'isPresent' => $data['isPresent'] ?? null,
                 ]);
 
-            abort_unless($updated, 404);
-
             return response()->json([
                 'status' => 'success',
                 'title' => 'Success!',
                 'message' => 'Voluntary work updated successfully.',
             ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update voluntary work: ' . $e->getMessage());
+            Log::error('Failed to update voluntary work', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
                 'status' => 'error',

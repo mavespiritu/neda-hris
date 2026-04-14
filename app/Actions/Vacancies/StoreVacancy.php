@@ -19,7 +19,7 @@ class StoreVacancy
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('create', 'vacancies');
+            && $request->user()->can('HRIS_recruitment.vacancies.create');
     }
 
     public function rules(): array

@@ -18,7 +18,7 @@ class UpdateVacancy
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('edit', 'vacancies');
+            && $request->user()->can('HRIS_recruitment.vacancies.update');
     }
 
     public function rules(): array

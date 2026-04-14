@@ -6,7 +6,6 @@ use App\Traits\CopiesApplicationData;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -19,7 +18,7 @@ class StoreApplication
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('create', 'applications');
+            && $request->user()->can('HRIS_recruitment.applications.create');
     }
 
     public function rules(): array

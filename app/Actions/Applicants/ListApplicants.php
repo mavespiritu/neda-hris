@@ -4,7 +4,6 @@ namespace App\Actions\Applicants;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -15,7 +14,7 @@ class ListApplicants
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('list', 'applicants');
+            && $request->user()->can('HRIS_recruitment.applicants.page.view');
     }
 
     public function asController(Request $request)
@@ -26,15 +25,21 @@ class ListApplicants
         $direction = strtolower($request->get('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         $search = $request->input('search', '');
 
+        $nameExpression = "CONCAT(
+            a.last_name,
+            IF(a.ext_name IS NOT NULL AND a.ext_name != '', CONCAT(' ', a.ext_name), ''),
+            ', ',
+            a.first_name,
+            IF(
+                a.middle_name IS NOT NULL
+                AND LOWER(TRIM(a.middle_name)) NOT IN ('n/a', 'na', ''),
+                CONCAT(' ', LEFT(a.middle_name, 1), '.'),
+                ''
+            )
+        )";
+
         $sortable = [
-            'name' => DB::raw("CONCAT(
-                a.last_name,
-                IF(a.ext_name IS NOT NULL AND a.ext_name != '', CONCAT(' ', a.ext_name), ''),
-                ', ',
-                a.first_name,
-                ' ',
-                IFNULL(CONCAT(LEFT(a.middle_name, 1), '.'), '')
-            )"),
+            'name' => DB::raw($nameExpression),
             'birth_date' => DB::raw('birth_date'),
             'email_address' => DB::raw('email_address'),
             'mobile_no' => DB::raw('mobile_no'),
@@ -55,14 +60,7 @@ class ListApplicants
         $applicantsQuery = $conn->table('applicant as a')
             ->select([
                 'a.*',
-                DB::raw("CONCAT(
-                    a.last_name,
-                    IF(a.ext_name IS NOT NULL AND a.ext_name != '', CONCAT(' ', a.ext_name), ''),
-                    ', ',
-                    a.first_name,
-                    ' ',
-                    IFNULL(CONCAT(LEFT(a.middle_name, 1), '.'), '')
-                ) AS name"),
+                DB::raw($nameExpression . ' AS name'),
             ]);
 
         foreach ($filterable as $param => $column) {

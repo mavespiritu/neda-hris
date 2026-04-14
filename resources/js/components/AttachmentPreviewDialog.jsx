@@ -1,18 +1,23 @@
-import { useMemo, useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+﻿import { useMemo, useState } from "react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ExternalLink, RotateCw } from "lucide-react"
 
 const previewableImageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "svg"]
 
 const getFileUrl = (file) => {
+  if (!file) return ""
+
+  if (file.preview_url) return file.preview_url
+  if (file.id) return route("files.preview", file.id)
+
   const filePath = file?.path || file?.filepath || ""
 
   if (!filePath) return ""
   if (/^https?:\/\//i.test(filePath)) return filePath
   if (filePath.startsWith("/storage/")) return filePath
 
-  return `/storage/${filePath.replace(/^\/+/, "")}`
+  return "/storage/" + filePath.replace(/^\/+/, "")
 }
 
 const getExtension = (file) => {
@@ -50,11 +55,14 @@ const AttachmentPreviewDialog = ({ open, onOpenChange, file, title }) => {
     onOpenChange(nextOpen)
   }
 
+
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{title || file?.filename || file?.name || "Attachment Preview"}</DialogTitle>
+          <DialogDescription>Preview the attachment before opening it.</DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center justify-end gap-2">

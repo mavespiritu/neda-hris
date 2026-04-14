@@ -19,7 +19,8 @@ class EditCivilServiceEligibility
 
     public function authorize(ActionRequest $request): bool
     {
-        return $request->user() !== null;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.applicants.update');
     }
 
     public function asController(ActionRequest $request, int $applicantId, int $id)

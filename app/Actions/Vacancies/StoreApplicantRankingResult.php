@@ -12,16 +12,8 @@ class StoreApplicantRankingResult
 
     public function authorize(Request $request): bool
     {
-        $user = $request->user();
-
-        if (! $user) {
-            return false;
-        }
-
-        $allowedRoles = ['HRIS_HR', 'HRIS_RD', 'HRIS_ARD'];
-        $userRoles = $user->roles->pluck('name')->toArray();
-
-        return (bool) array_intersect($allowedRoles, $userRoles);
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.vacancies.assessment.applicants.rank');
     }
 
     public function asController(Request $request, int $vacancy, int $application)

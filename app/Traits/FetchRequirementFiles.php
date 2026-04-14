@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Traits;
+
 use Illuminate\Support\Facades\DB;
 
 trait FetchRequirementFiles
@@ -9,24 +10,29 @@ trait FetchRequirementFiles
     {
         $conn = DB::connection('mysql');
 
-        // requirements for this applicant + vacancy
-        $requirements = $conn->table('application_requirement')
-        ->where('applicant_id', $applicantId)
-        ->where('vacancy_id', $vacancyId)
-        ->where('requirement_id', $req->requirement_id)
-        ->where('requirement', $req->requirement)
-        ->get();
+        $requirementId = $this->scalarValue($req->requirement_id ?? $req->id ?? null);
+        $requirementName = $this->scalarValue($req->requirement ?? $req->name ?? null);
 
-        //dd($requirements);
+        if ($requirementId === '' || $requirementName === '') {
+            return collect();
+        }
+
+        $requirements = $conn->table('application_requirement')
+            ->where('applicant_id', $applicantId)
+            ->where('vacancy_id', $vacancyId)
+            ->where('requirement_id', $requirementId)
+            ->where('requirement', $requirementName)
+            ->get();
 
         if ($requirements->isEmpty()) {
             return collect();
         }
 
-        // check if current vacancy already has files
         $currentFiles = $requirements->flatMap(function ($requirement) use ($conn, $vacancyId) {
+            $requirementLabel = $this->scalarValue($requirement->requirement ?? null);
+
             return $conn->table('file')
-                ->where('model', 'Vacancy_'.$vacancyId.'_'.$requirement->requirement)
+                ->where('model', 'Vacancy_' . $vacancyId . '_' . $requirementLabel)
                 ->where('itemId', $requirement->id)
                 ->get();
         });
@@ -39,7 +45,6 @@ trait FetchRequirementFiles
             return collect();
         }
 
-        // if reuse and no current files, look for latest submitted application
         if ($type === 'reuse') {
             $latestApp = $conn->table('application')
                 ->where('user_id', auth()->id())
@@ -51,13 +56,15 @@ trait FetchRequirementFiles
                 $latestRequirements = $conn->table('application_requirement')
                     ->where('applicant_id', $applicantId)
                     ->where('vacancy_id', $latestApp->vacancy_id)
-                    ->where('requirement_id', $req->requirement_id)
-                    ->where('requirement', $req->requirement)
+                    ->where('requirement_id', $requirementId)
+                    ->where('requirement', $requirementName)
                     ->get();
 
                 return $latestRequirements->flatMap(function ($requirement) use ($conn, $latestApp) {
+                    $requirementLabel = $this->scalarValue($requirement->requirement ?? null);
+
                     return $conn->table('file')
-                        ->where('model', 'Vacancy_' . $latestApp->vacancy_id . '_' . $requirement->requirement)
+                        ->where('model', 'Vacancy_' . $latestApp->vacancy_id . '_' . $requirementLabel)
                         ->where('itemId', $requirement->id)
                         ->get();
                 });
@@ -65,5 +72,30 @@ trait FetchRequirementFiles
         }
 
         return collect();
+    }
+
+    protected function scalarValue(mixed $value): string
+    {
+        if (is_object($value)) {
+            foreach (['requirement', 'name', 'value', 'label'] as $key) {
+                if (isset($value->{$key}) && ! is_object($value->{$key}) && ! is_array($value->{$key})) {
+                    return trim((string) $value->{$key});
+                }
+            }
+
+            return '';
+        }
+
+        if (is_array($value)) {
+            foreach (['requirement', 'name', 'value', 'label'] as $key) {
+                if (array_key_exists($key, $value) && ! is_object($value[$key]) && ! is_array($value[$key])) {
+                    return trim((string) $value[$key]);
+                }
+            }
+
+            return '';
+        }
+
+        return trim((string) $value);
     }
 }

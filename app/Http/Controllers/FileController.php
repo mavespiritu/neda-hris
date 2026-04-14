@@ -15,20 +15,37 @@ class FileController extends Controller
 {
     public function download($id)
     {
+        return $this->serveFile($id, true);
+    }
+
+    public function preview($id)
+    {
+        return $this->serveFile($id, false);
+    }
+
+    private function serveFile($id, bool $download)
+    {
         $conn2 = DB::connection('mysql2');
 
         $file = $conn2->table('file')->find($id);
 
-        if (!$file) {
+        if (! $file) {
             abort(404, 'File not found.');
         }
 
-        if (Storage::disk('private')->exists($file->path)) {
-            return Storage::disk('private')->download($file->path, $file->name);
-        }
+        foreach (['private', 'public'] as $diskName) {
+            $disk = Storage::disk($diskName);
 
-        if (Storage::disk('public')->exists($file->path)) {
-            return Storage::disk('public')->download($file->path, $file->name);
+            if (! $disk->exists($file->path)) {
+                continue;
+            }
+
+            $headers = [
+                'Content-Type' => $file->mime ?: $disk->mimeType($file->path),
+                'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . addslashes($file->name) . '"',
+            ];
+
+            return $disk->response($file->path, $file->name, $headers);
         }
 
         abort(404, 'File missing in storage.');

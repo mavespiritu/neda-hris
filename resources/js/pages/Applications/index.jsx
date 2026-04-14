@@ -1,6 +1,6 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasPermission } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import {
     Dialog,
@@ -30,6 +30,9 @@ const breadcrumbItems = [
 const Applications = () => {
 
     const { toast } = useToast()
+    const canCreateApplication = useHasPermission("HRIS_recruitment.applications.create")
+    const canEditApplication = useHasPermission("HRIS_recruitment.applications.update")
+    const canDeleteApplication = useHasPermission("HRIS_recruitment.applications.delete")
 
     const appointmentStatuses = useMemo(() => [
         { label: 'Permanent', value: 'Permanent'},
@@ -49,7 +52,7 @@ const Applications = () => {
         { value: 'PFPD', label: 'Policy Formulation and Planning Division'},
     ], [])
 
-    const { auth: { user }, data: { applications } } = usePage().props
+    const { data: { applications } } = usePage().props
 
     const handleAction = (action, row) => {
         setConfirmAction(action)
@@ -118,17 +121,16 @@ const Applications = () => {
         initialData: applications,
         filters,
         options: {
-            enableAdd: true,
-            enableEdit: true,
+            enableAdd: canCreateApplication,
+            enableEdit: canEditApplication,
             enableView: false,
-            enableViewAsLink: true,
-            enableDelete: true, 
-            enableBulkDelete: true,
+            enableViewAsLink: false,
+            enableDelete: canDeleteApplication,
+            enableBulkDelete: canDeleteApplication,
             enableSearching: true,
             enableFiltering: true,
             enableRowSelection: row => !row.original.isLocked,
             enableGenerateReport: true,
-            canModify: true
         },
         endpoints: {
             viewEndpoint: (id) => route('applications.show', id),
@@ -174,4 +176,6 @@ const Applications = () => {
 }
 
 export default Applications
+
+
 

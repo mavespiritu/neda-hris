@@ -43,7 +43,7 @@ const JobDescription = ({action, job, latestApp}) => {
         <SheetHeader>
             <SheetTitle className="flex flex-col gap-1 mb-4">
                 <h3 className="text-2xl font-semibold">
-                {job.position_description}{" "}
+                {job.position_description ?? job.position}{" "}
                 {job.appointment_status === "Permanent" && `(${job.item_no})`}
                 </h3>
                 <span className="text-lg font-normal mb-4">{job.division_name ?? ""}</span>

@@ -4,7 +4,6 @@ namespace App\Actions\Vacancies;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -15,11 +14,12 @@ class ShowVacancy
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('list', 'vacancies');
+            && $request->user()->can('HRIS_recruitment.vacancies.view');
     }
 
     public function asController(int $id, Request $request)
     {
+        $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
@@ -37,6 +37,24 @@ class ShowVacancy
         if (! $vacancy) {
             abort(404, 'Vacancy not found.');
         }
+
+        $requirementsCount = $conn2->table('vacancy_requirements')
+            ->where('vacancy_id', $id)
+            ->count();
+
+        $applicantsCount = $conn->query()
+            ->fromSub(
+                $conn->table('application as a')
+                    ->where('a.vacancy_id', $id)
+                    ->where('a.status', 'Submitted')
+                    ->select('a.user_id')
+                    ->groupBy('a.user_id'),
+                'unique_applicants'
+            )
+            ->count();
+
+        $vacancy->requirements_count = (int) $requirementsCount;
+        $vacancy->applicants_count = (int) $applicantsCount;
 
         $competencies = $conn2->table('vacancy_competencies as vc')
             ->leftJoin('competency as c', 'vc.competency_id', '=', 'c.comp_id')

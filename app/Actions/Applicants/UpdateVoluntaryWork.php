@@ -18,7 +18,8 @@ class UpdateVoluntaryWork
 
     public function authorize(ActionRequest $request): bool
     {
-        return $request->user() !== null;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.applicants.update');
     }
 
     public function rules(): array
@@ -63,7 +64,14 @@ class UpdateVoluntaryWork
             $data = $request->validated();
             $cleanedHours = preg_replace('/[^0-9.]/', '', (string) ($data['hours'] ?? ''));
 
-            $updated = $conn->table('applicant_voluntary_work')
+            $recordExists = $conn->table('applicant_voluntary_work')
+                ->where('applicant_id', $applicantId)
+                ->where('id', $id)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_voluntary_work')
                 ->where('applicant_id', $applicantId)
                 ->where('id', $id)
                 ->update([
@@ -76,13 +84,21 @@ class UpdateVoluntaryWork
                     'isPresent' => filter_var($data['isPresent'] ?? false, FILTER_VALIDATE_BOOLEAN) ? 1 : 0,
                 ]);
 
-            abort_unless($updated, 404);
             $this->stepUpdater->markComplete($conn, $applicantId, 'voluntaryWork');
 
-            return response()->json(['status' => 'success','title' => 'Success!','message' => 'Voluntary work updated successfully.']);
+            return response()->json([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Voluntary work updated successfully.',
+            ]);
         } catch (\Throwable $e) {
             Log::error('Failed to update applicant voluntary work: ' . $e->getMessage());
-            return response()->json(['status' => 'error','title' => 'Uh oh! Something went wrong.','message' => 'An error occurred while updating the record.'], 500);
+
+            return response()->json([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while updating the record.',
+            ], 500);
         }
     }
 }

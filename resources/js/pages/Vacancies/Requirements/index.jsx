@@ -4,7 +4,7 @@ import { usePage } from '@inertiajs/react'
 import { useState, useEffect, useMemo } from "react"
 import Form from "./Form"
 import Filter from "./Filter"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasRole, useHasPermission } from "@/hooks/useAuth"
 import { store } from './store'
 import { Loader2 } from "lucide-react"
 
@@ -25,7 +25,9 @@ const Requirements = () => {
             fetchRequirements(vacancy.id)
         }, [])
     
-        const canModify = useHasRole(["HRIS_HR"])
+        const canCreateRequirement = useHasPermission("HRIS_recruitment.vacancies.requirements.create")
+        const canEditRequirement = useHasPermission("HRIS_recruitment.vacancies.requirements.update")
+        const canDeleteRequirement = useHasPermission("HRIS_recruitment.vacancies.requirements.delete")
     
         const columns = useMemo(() => [
             {
@@ -60,16 +62,15 @@ const Requirements = () => {
                 }))
             },
             options: {
-                enableAdd: true,
-                enableEdit: true,
+                enableAdd: canCreateRequirement,
+                enableEdit: canEditRequirement,
                 enableView: false,
                 enableViewAsLink: false,
-                enableDelete: true, 
-                enableBulkDelete: true,
+                enableDelete: canDeleteRequirement, 
+                enableBulkDelete: canDeleteRequirement,
                 enableSearching: true,
                 enableFiltering: false,
-                enableRowSelection: true,
-                canModify,
+                enableRowSelection: canDeleteRequirement,
             },
             endpoints: {
                 deleteEndpoint: (id) => route('vacancy-requirements.destroy', id),

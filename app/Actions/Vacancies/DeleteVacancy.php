@@ -4,7 +4,6 @@ namespace App\Actions\Vacancies;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -15,7 +14,7 @@ class DeleteVacancy
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('delete', 'vacancies');
+            && $request->user()->can('HRIS_recruitment.vacancies.delete');
     }
 
     public function asController(int $id)

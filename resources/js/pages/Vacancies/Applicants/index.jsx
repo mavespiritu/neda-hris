@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { useHasPermission } from "@/hooks/useAuth"
 
 const Applicants = () => {
   const { vacancy } = usePage().props
@@ -43,11 +44,13 @@ const Applicants = () => {
   const [editRequestRemarks, setEditRequestRemarks] = useState("")
   const [isSavingEditRequest, setIsSavingEditRequest] = useState(false)
 
+  const canDownloadDocuments = useHasPermission("HRIS_recruitment.vacancies.applicants.documents.download")
+  const canReturnApplication = useHasPermission("HRIS_recruitment.vacancies.applicants.application.return")
+
   const handleDownloadDocuments = () => {
-    if (!selectedApplicant) return
+    if (!selectedApplicant || !canDownloadDocuments) return
 
     setIsDownloading(true)
-
     window.location.href = route(
       'vacancies.applicants.requirements.download',
       selectedApplicant.id
@@ -256,17 +259,17 @@ const Applicants = () => {
                   <h2 className="text-lg font-semibold">
                     {formatFullName(selectedApplicant.name)}
                   </h2>
-                  <Button
+                  {canDownloadDocuments && <Button
                     variant="outline"
                     size="sm"
-                    disabled={isDownloading}
-                    onClick={() => setShowConfirm(true)}
+                    disabled={isDownloading || !canDownloadDocuments}
+                    onClick={() => canDownloadDocuments && setShowConfirm(true)}
                     className="flex items-center gap-2"
                   >
                     {isDownloading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Preparing ZIP…
+                        Preparing ZIP...
                       </>
                     ) : (
                       <>
@@ -278,7 +281,7 @@ const Applicants = () => {
                         }'s Documents`}
                       </>
                     )}
-                  </Button>
+                  </Button>}
                 </div>
 
                 <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
@@ -303,7 +306,7 @@ const Applicants = () => {
                         onClick={handleDownloadDocuments}
                         disabled={isDownloading}
                       >
-                        {isDownloading ? "Downloading…" : "Confirm"}
+                        {isDownloading ? "Downloading..." : "Confirm"}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -388,13 +391,13 @@ const Applicants = () => {
                     )}
                   </div>
 
-                  <Button
+                  {canReturnApplication && <Button
                     type="button"
                     onClick={() => setShowEditRequestDialog(true)}
                     disabled={!canOpenEditRequest}
                   >
                     Allow Applicant to Edit Submission
-                  </Button>
+                  </Button>}
                 </div>
               </div>
 
@@ -555,3 +558,4 @@ const Applicants = () => {
 }
 
 export default Applicants
+

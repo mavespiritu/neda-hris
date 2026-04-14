@@ -5,7 +5,6 @@ namespace App\Actions\Vacancies;
 use App\Services\Vacancies\VacancyFormBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -20,7 +19,7 @@ class EditVacancy
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('edit', 'vacancies');
+            && $request->user()->can('HRIS_recruitment.vacancies.update');
     }
 
     public function asController(int $id)

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import PageTitle from "@/components/PageTitle"
 import { usePage, Link, router } from "@inertiajs/react"
 import { store } from "../store"
+import JobDescription from "../JobDescription"
 import { formatDate } from "@/lib/utils.jsx"
 import {
   Card,
@@ -42,6 +43,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover"
+import { Sheet } from "@/components/ui/sheet"
 import { MoreHorizontal, CircleAlert, TriangleAlert, CircleCheck } from "lucide-react"
 import Welcome from "./Welcome"
 import PaginationControls from "@/components/PaginationControls"
@@ -57,7 +59,7 @@ const Applications = () => {
     per_page: perPage,
   } = applications
 
-  const { setSelectedApplication } = store()
+  const { selectedApplication, setSelectedApplication } = store()
 
   const [showFlash, setShowFlash] = useState(!!flash?.status)
 
@@ -80,6 +82,8 @@ const Applications = () => {
     )
   }
 
+  console.log(selectedApplication)
+
   const renderTable = (apps, label) => (
     <Card className="border-none shadow-none">
       <CardContent className="p-0">
@@ -99,13 +103,21 @@ const Applications = () => {
               {apps.map((app) => (
                 <TableRow
                   key={app.id}
-                  className="cursor-pointer [&>td]:py-2"
-                  onClick={() => setSelectedApplication(app)}
+                  className="[&>td]:py-2"
                 >
                   <TableCell className="font-medium text-blue-600">
-                    {app.appointment_status === "Permanent"
-                      ? `${app.reference_no}-${app.item_no}`
-                      : `${app.reference_no}-${app.position}`}
+                    <button
+                      type="button"
+                      className="hover:underline cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedApplication(app)
+                      }}
+                    >
+                      {app.appointment_status === "Permanent"
+                        ? `${app.reference_no}-${app.item_no}`
+                        : `${app.reference_no}-${app.position}`}
+                    </button>
                   </TableCell>
                   <TableCell>{app.position}</TableCell>
                   <TableCell className="capitalize">
@@ -140,12 +152,14 @@ const Applications = () => {
                         <PopoverContent align="end" className="w-48 p-2">
                           {app.latest_status === "Draft" ? (
                             <>
-                              <button
-                                onClick={() => router.post(route("jobs.store", { hashedId: app.hashed_id }))} 
-                                className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100"
-                              >
-                                Continue Application
-                              </button>
+                              {app.can_edit_submission && (
+                                <button
+                                  onClick={() => router.post(route("jobs.store", { hashedId: app.hashed_id }))}
+                                  className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100"
+                                >
+                                  Continue Application
+                                </button>
+                              )}
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button className="w-full text-left px-3 py-2 rounded-md text-sm text-red-600 hover:bg-red-50">
@@ -275,16 +289,16 @@ const Applications = () => {
             </div>
           )}
           <Tabs defaultValue="active" className="w-full">
-            <TabsList className="w-full flex gap-4 justify-start bg-white border-b">
+            <TabsList className="w-full flex gap-4 justify-start bg-white border-b rounded-none p-0 h-auto">
               <TabsTrigger
                 value="active"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-black data-[state=active]:text-black"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-2 text-sm font-medium text-blue-500 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-black-700 data-[state=active]:shadow-none"
               >
                 Active ({activeApps.length})
               </TabsTrigger>
               <TabsTrigger
                 value="inactive"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-black data-[state=active]:text-black"
+                className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-2 text-sm font-medium text-blue-500 shadow-none data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:text-black-700 data-[state=active]:shadow-none"
               >
                 Inactive ({inactiveApps.length})
               </TabsTrigger>
@@ -297,6 +311,11 @@ const Applications = () => {
               {renderTable(inactiveApps, "Inactive")}
             </TabsContent>
           </Tabs>
+          {selectedApplication && (
+            <Sheet open={!!selectedApplication} onOpenChange={(open) => { if (!open) setSelectedApplication(null) }}>
+              <JobDescription action="view" job={selectedApplication} />
+            </Sheet>
+          )}
         </div>
 
         <div className="hidden lg:block lg:basis-1/4">
@@ -308,3 +327,9 @@ const Applications = () => {
 }
 
 export default Applications
+
+
+
+
+
+

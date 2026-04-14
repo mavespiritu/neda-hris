@@ -273,7 +273,7 @@ const Home = () => {
                     </div>
 
                     <div className="flex justify-end md:col-span-3 gap-2 mt-2">
-                        {/* ✅ updated Clear button */}
+                        {/* ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ updated Clear button */}
                         <Button variant="outline" onClick={handleClearFilters}>Clear</Button>
                         <Button onClick={handleSearch}>Apply Filters</Button>
                     </div>
@@ -336,8 +336,7 @@ const Home = () => {
                 </CardContent>
                 <CardFooter>
                   <Sheet>
-                    <SheetTrigger className="w-full text-left"
-                    >
+                    <SheetTrigger asChild className="w-full text-left">
                       <Button size="lg" className="w-full bg-blue-700 hover:bg-blue-600">View Job Details</Button>
                     </SheetTrigger>
                     <JobDescription action="apply" job={job} latestApp={null} />
@@ -396,7 +395,6 @@ const Home = () => {
               <div className="space-y-1">
                 <div>
                   <Building className="w-4 h-4 inline-block mr-2 text-blue-200" />
-                  Guerrero Road, City of San Fernando, La Union
                 </div>
                 <div>
                   <Phone className="w-4 h-4 inline-block mr-2 text-blue-200" />
@@ -451,7 +449,7 @@ const Home = () => {
         </div>
 
         <div className="bg-[#002244] text-center text-xs py-3 border-t border-blue-800 text-white/60">
-          © {new Date().getFullYear()} DEPDev Regional Office I. All rights reserved. | v1.0.0
+          Ãƒâ€šÃ‚Â© {new Date().getFullYear()} DEPDev Regional Office I. All rights reserved. | v1.0.0
         </div>
       </footer>
       <ReportIssueButton />

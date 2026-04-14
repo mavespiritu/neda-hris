@@ -18,7 +18,8 @@ class UpdateWorkExperience
 
     public function authorize(ActionRequest $request): bool
     {
-        return $request->user() !== null;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.applicants.update');
     }
 
     public function rules(): array
@@ -60,7 +61,14 @@ class UpdateWorkExperience
             $conn = DB::connection('mysql');
             $data = $request->validated();
 
-            $updated = $conn->table('applicant_work_experience')
+            $recordExists = $conn->table('applicant_work_experience')
+                ->where('applicant_id', $applicantId)
+                ->where('id', $id)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_work_experience')
                 ->where('applicant_id', $applicantId)
                 ->where('id', $id)
                 ->update([
@@ -73,7 +81,6 @@ class UpdateWorkExperience
                     'isPresent' => filter_var($data['isPresent'] ?? false, FILTER_VALIDATE_BOOLEAN) ? 1 : 0,
                 ]);
 
-            abort_unless($updated, 404);
             $this->stepUpdater->markComplete($conn, $applicantId, 'workExperience');
 
             return response()->json([

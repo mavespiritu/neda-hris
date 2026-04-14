@@ -1,6 +1,6 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasRole, useHasPermission } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import {
     Dialog,
@@ -50,7 +50,10 @@ const Vacancies = () => {
 
     const { auth: { user }, data: { vacancies } } = usePage().props
 
-    const canSelectVacancy = useHasRole(["HRIS_HR", "HRIS_DC", "HRIS_ADC"])
+    const canViewVacancy = useHasPermission("HRIS_recruitment.vacancies.view")
+    const canCreateVacancy = useHasPermission("HRIS_recruitment.vacancies.create")
+    const canEditVacancy = useHasPermission("HRIS_recruitment.vacancies.update")
+    const canDeleteVacancy = useHasPermission("HRIS_recruitment.vacancies.delete")
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
@@ -281,17 +284,16 @@ const Vacancies = () => {
         initialData: vacancies,
         filters,
         options: {
-            enableAdd: true,
-            enableEdit: true,
+            enableAdd: canCreateVacancy,
+            enableEdit: canEditVacancy,
             enableView: false,
-            enableViewAsLink: true,
+            enableViewAsLink: canViewVacancy,
             enableDelete: true, 
             enableBulkDelete: true,
             enableSearching: true,
             enableFiltering: true,
-            enableRowSelection: row => !row.original.isLocked || canSelectVacancy,
+            enableRowSelection: row => canDeleteVacancy,
             enableGenerateReport: true,
-            canModify: canSelectVacancy
         },
         endpoints: {
             viewEndpoint: (id) => route('vacancies.show', id),

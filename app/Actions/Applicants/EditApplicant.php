@@ -4,7 +4,6 @@ namespace App\Actions\Applicants;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -15,7 +14,7 @@ class EditApplicant
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('edit', 'applicants');
+            && $request->user()->can('HRIS_recruitment.applicants.update');
     }
 
     public function asController(int $id)

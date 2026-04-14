@@ -25,7 +25,6 @@ export const useTable = ({
   const [isMounted, setIsMounted] = useState(false)
 
   const form = useForm({ ids: [] })
-
   const table = useReactTable({
     data,
     columns,

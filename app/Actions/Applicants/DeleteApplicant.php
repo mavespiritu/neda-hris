@@ -15,7 +15,7 @@ class DeleteApplicant
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('delete', 'applicants');
+            && $request->user()->can('HRIS_recruitment.applicants.delete');
     }
 
     public function asController(int $id)

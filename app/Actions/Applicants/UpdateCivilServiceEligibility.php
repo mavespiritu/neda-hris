@@ -19,7 +19,8 @@ class UpdateCivilServiceEligibility
 
     public function authorize(ActionRequest $request): bool
     {
-        return $request->user() !== null;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.applicants.update');
     }
 
     public function rules(): array
@@ -40,7 +41,14 @@ class UpdateCivilServiceEligibility
             $conn = DB::connection('mysql');
             $data = $request->validated();
 
-            $updated = $conn->table('applicant_eligibility')
+            $recordExists = $conn->table('applicant_eligibility')
+                ->where('applicant_id', $applicantId)
+                ->where('id', $id)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_eligibility')
                 ->where('applicant_id', $applicantId)
                 ->where('id', $id)
                 ->update([
@@ -51,8 +59,6 @@ class UpdateCivilServiceEligibility
                     'license_no' => $data['license_no'],
                     'validity_date' => $data['validity_date'] ?? null,
                 ]);
-
-            abort_unless($updated, 404);
 
             $this->stepUpdater->markComplete($conn, $applicantId, 'civilServiceEligibility');
 

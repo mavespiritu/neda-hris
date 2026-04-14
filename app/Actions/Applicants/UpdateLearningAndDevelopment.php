@@ -18,7 +18,8 @@ class UpdateLearningAndDevelopment
 
     public function authorize(ActionRequest $request): bool
     {
-        return $request->user() !== null;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.applicants.update');
     }
 
     public function rules(): array
@@ -51,7 +52,15 @@ class UpdateLearningAndDevelopment
             $conn = DB::connection('mysql');
             $data = $request->validated();
             $cleanedHours = preg_replace('/[^0-9.]/', '', (string) ($data['hours'] ?? ''));
-            $updated = $conn->table('applicant_learning')
+
+            $recordExists = $conn->table('applicant_learning')
+                ->where('applicant_id', $applicantId)
+                ->where('id', $id)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_learning')
                 ->where('applicant_id', $applicantId)
                 ->where('id', $id)
                 ->update([
@@ -63,12 +72,22 @@ class UpdateLearningAndDevelopment
                     'type' => $data['type'],
                     'conducted_by' => $data['conducted_by'],
                 ]);
-            abort_unless($updated, 404);
+
             $this->stepUpdater->markComplete($conn, $applicantId, 'learningAndDevelopment');
-            return response()->json(['status' => 'success','title' => 'Success!','message' => 'Learning and development updated successfully.']);
+
+            return response()->json([
+                'status' => 'success',
+                'title' => 'Success!',
+                'message' => 'Learning and development updated successfully.',
+            ]);
         } catch (\Throwable $e) {
             Log::error('Failed to update applicant learning and development: ' . $e->getMessage());
-            return response()->json(['status' => 'error','title' => 'Uh oh! Something went wrong.','message' => 'An error occurred while updating the record.'], 500);
+
+            return response()->json([
+                'status' => 'error',
+                'title' => 'Uh oh! Something went wrong.',
+                'message' => 'An error occurred while updating the record.',
+            ], 500);
         }
     }
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\FileController;
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
     Route::get('/files/{id}/download', [FileController::class, 'download'])->name('files.download');
+    Route::get('/files/{id}/preview', [FileController::class, 'preview'])->name('files.preview');
     
 });
 

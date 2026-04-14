@@ -20,7 +20,8 @@ class StorePersonalInformation
 
     public function authorize(ActionRequest $request): bool
     {
-        return $request->user() !== null;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_recruitment.applicants.create');
     }
 
     public function rules(): array

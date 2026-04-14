@@ -6,7 +6,6 @@ use App\Services\Profile\ProfileContextResolver;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
-use Illuminate\Support\Facades\Gate;
 
 class UpdateCivilServiceEligibility
 {
@@ -44,11 +43,17 @@ class UpdateCivilServiceEligibility
 
             $data = $request->validated();
 
-            $updated = $conn->table('applicant_eligibility')
-                ->join('applicant', 'applicant.id', '=', 'applicant_eligibility.applicant_id')
-                ->where('applicant_eligibility.id', $id)
-                ->where('applicant.user_id', $user->id)
-                ->where('applicant.type', $type)
+            $recordExists = $conn->table('applicant_eligibility as ae')
+                ->join('applicant as a', 'a.id', '=', 'ae.applicant_id')
+                ->where('ae.id', $id)
+                ->where('a.user_id', $user->id)
+                ->where('a.type', $type)
+                ->exists();
+
+            abort_unless($recordExists, 404);
+
+            $conn->table('applicant_eligibility')
+                ->where('id', $id)
                 ->update([
                     'eligibility' => $data['eligibility'],
                     'rating' => $data['rating'] ?? null,
@@ -58,15 +63,17 @@ class UpdateCivilServiceEligibility
                     'validity_date' => $data['validity_date'] ?? null,
                 ]);
 
-            abort_unless($updated, 404);
-
             return response()->json([
                 'status' => 'success',
                 'title' => 'Success!',
                 'message' => 'Civil service eligibility updated successfully.',
             ]);
         } catch (\Throwable $e) {
-            Log::error('Failed to update civil service eligibility: ' . $e->getMessage());
+            Log::error('Failed to update civil service eligibility', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
                 'status' => 'error',

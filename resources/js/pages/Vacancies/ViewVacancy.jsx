@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { usePage, Link, useForm } from "@inertiajs/react"
 import { ChevronLeft, ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu"
@@ -13,6 +13,7 @@ import BeiQuestions from "./BeiQuestions/index"
 import Assessment from "./Assessment/index"
 import { store } from "./store"
 import { useToast } from "@/hooks/use-toast"
+import { useHasPermission } from "@/hooks/useAuth"
 
 const ViewVacancy = () => {
   const { props, url } = usePage()
@@ -21,6 +22,13 @@ const ViewVacancy = () => {
   const { deleteVacancy } = store()
   const { toast } = useToast()
   const form = useForm()
+
+  const canViewVacancy = useHasPermission("HRIS_recruitment.vacancies.view")
+  const canViewRequirements = useHasPermission("HRIS_recruitment.vacancies.requirements.view")
+  const canViewApplicants = useHasPermission("HRIS_recruitment.vacancies.applicants.view")
+  const canViewAssessment = useHasPermission("HRIS_recruitment.vacancies.assessment.view")
+  const canEditVacancy = useHasPermission("HRIS_recruitment.vacancies.update")
+  const canDeleteVacancy = useHasPermission("HRIS_recruitment.vacancies.delete")
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -36,22 +44,32 @@ const ViewVacancy = () => {
     },
   ]
 
-  const menuItems = [
-    { key: "Details", label: "Vacancy Details" },
-    { key: "Requirements", label: "Requirements" },
-    { key: "Applicants", label: "Applicants" },
-    { key: "Assessment", label: "Assessment" },
-    { key: "BEI Questions", label: "BEI Questions" },
-  ]
-
-  const [currentTab, setCurrentTab] = useState(
-    menuItems.some((item) => item.key === initialTab) ? initialTab : "Details"
+  const menuItems = useMemo(
+    () => [
+      { key: "Details", label: "Vacancy Details", canAccess: canViewVacancy },
+      { key: "Requirements", label: `Requirements (${vacancy.requirements_count ?? 0})`, canAccess: canViewRequirements },
+      { key: "Applicants", label: `Applicants (${vacancy.applicants_count ?? 0})`, canAccess: canViewApplicants },
+      { key: "Assessment", label: "Assessment", canAccess: canViewAssessment },
+      { key: "BEI Questions", label: "BEI Questions", canAccess: canViewVacancy },
+    ],
+    [canViewVacancy, canViewRequirements, canViewApplicants, canViewAssessment, vacancy.requirements_count, vacancy.applicants_count]
   )
+
+  const visibleMenuItems = menuItems.filter((item) => item.canAccess)
+
+  const [currentTab, setCurrentTab] = useState(() => {
+    const initialVisible = visibleMenuItems.some((item) => item.key === initialTab)
+    return initialVisible ? initialTab : visibleMenuItems[0]?.key || "Details"
+  })
+
+  useEffect(() => {
+    if (!visibleMenuItems.some((item) => item.key === currentTab)) {
+      setCurrentTab(visibleMenuItems[0]?.key || "Details")
+    }
+  }, [currentTab, visibleMenuItems])
 
   return (
     <div className="h-full flex flex-col gap-2">
-
-      {/* Header Section */}
       <div className="flex justify-between items-center">
         <Link href={route("vacancies.index")} className="hidden md:block">
           <Button variant="ghost" size="sm" className="flex items-center">
@@ -60,7 +78,6 @@ const ViewVacancy = () => {
           </Button>
         </Link>
 
-        {/* More Actions */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="flex items-center">
@@ -71,53 +88,53 @@ const ViewVacancy = () => {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>This Vacancy</DropdownMenuLabel>
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Link
-                  href={route("vacancies.edit", vacancy.id)}
-                  className="flex justify-between w-full"
-                >
-                  <span>Edit</span>
-                  <Pencil className="h-4 w-4" />
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <div
-                    className="flex justify-between items-center px-2 py-1.5 text-sm text-destructive cursor-pointer hover:bg-destructive/10 rounded-sm"
-                    role="menuitem"
+              {canEditVacancy && (
+                <DropdownMenuItem>
+                  <Link
+                    href={route("vacancies.edit", vacancy.id)}
+                    className="flex justify-between w-full"
                   >
-                    <span>Delete</span>
-                    <Trash2 className="h-4 w-4" />
-                  </div>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete
-                      the vacancy.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-white hover:bg-destructive/90"
-                      onClick={() =>
-                        deleteVacancy({ id: vacancy.id, form, toast })
-                      }
+                    <span>Edit</span>
+                    <Pencil className="h-4 w-4" />
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canEditVacancy && canDeleteVacancy && <DropdownMenuSeparator />}
+              {canDeleteVacancy && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <div
+                      className="flex justify-between items-center px-2 py-1.5 text-sm text-destructive cursor-pointer hover:bg-destructive/10 rounded-sm"
+                      role="menuitem"
                     >
-                      Yes, delete it
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <span>Delete</span>
+                      <Trash2 className="h-4 w-4" />
+                    </div>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the vacancy.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                        onClick={() => deleteVacancy({ id: vacancy.id, form, toast })}
+                      >
+                        Yes, delete it
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Page Title */}
       <PageTitle
         pageTitle={`${vacancy.reference_no}: ${vacancy.position_description}${
           vacancy.appointment_status === "Permanent" && vacancy.item_no
@@ -128,10 +145,9 @@ const ViewVacancy = () => {
         breadcrumbItems={breadcrumbItems}
       />
 
-      {/* Horizontal Tab Menu */}
       <div className="border-b border-gray-200 mb-4">
         <div className="flex overflow-x-auto">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <button
               key={item.key}
               onClick={() => setCurrentTab(item.key)}
@@ -147,7 +163,6 @@ const ViewVacancy = () => {
         </div>
       </div>
 
-      {/* Tab Content */}
       <div className="flex-1">
         <ScrollArea className="h-full border rounded-lg p-4">
           {currentTab === "Details" && <VacancyInfo />}

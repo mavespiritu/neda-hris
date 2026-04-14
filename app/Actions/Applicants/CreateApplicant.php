@@ -3,7 +3,6 @@
 namespace App\Actions\Applicants;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -14,7 +13,7 @@ class CreateApplicant
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('create', 'applicants');
+            && $request->user()->can('HRIS_recruitment.applicants.create');
     }
 
     public function asController()
