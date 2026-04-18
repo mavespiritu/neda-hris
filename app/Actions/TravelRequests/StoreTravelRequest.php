@@ -4,20 +4,21 @@ namespace App\Actions\TravelRequests;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Traits\AuthorizesTravelRequests;
 use App\Models\TravelRequest;
 use App\States\TravelRequest\Draft;
 
 class StoreTravelRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesTravelRequests;
 
     public function authorize(ActionRequest $request): bool
     {
-        return Gate::forUser($request->user())->allows('tr.create');
+        return $this->canCreateTravelRequest($request->user());
     }
 
     public function rules(): array

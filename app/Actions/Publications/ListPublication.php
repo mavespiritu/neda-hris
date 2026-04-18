@@ -5,7 +5,6 @@ namespace App\Actions\Publications;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -16,7 +15,7 @@ class ListPublication
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('list', 'publications');
+            && $request->user()->can('HRIS_recruitment.publications.page.view');
     }
 
     public function asController(Request $request)

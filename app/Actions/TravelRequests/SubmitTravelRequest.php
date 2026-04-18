@@ -7,20 +7,21 @@ use App\Actions\VehicleRequests\SubmitVehicleRequest;
 use App\States\TravelRequest\Draft;
 use App\States\TravelRequest\Submitted;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Traits\AuthorizesTravelRequests;
 use RuntimeException;
 
 class SubmitTravelRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesTravelRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('tr.submit', $id);
+        return $this->canSubmitTravelRequest($request->user(), $id);
     }
 
     public function handle(int $id, string $actorIpmsId): void
@@ -42,7 +43,7 @@ class SubmitTravelRequest
                 Draft::class,
                 Submitted::class,
                 $actorIpmsId,
-                false
+                true
             );
 
             if ($this->needsVehicle($travelRequest->isRequestingVehicle ?? null)) {
@@ -108,3 +109,4 @@ class SubmitTravelRequest
         $travelRequest->refresh();
     }
 }
+

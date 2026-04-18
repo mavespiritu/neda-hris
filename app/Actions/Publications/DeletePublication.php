@@ -16,7 +16,7 @@ class DeletePublication
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('delete', 'publications');
+            && $request->user()->can('HRIS_recruitment.publications.delete');
     }
 
     public function asController(int $id)

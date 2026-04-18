@@ -14,7 +14,7 @@ class ShowSettings
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('viewPage', 'settings');
+            && $request->user()->can('HRIS_settings.page.view');
     }
 
     public function asController()

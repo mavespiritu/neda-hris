@@ -20,7 +20,7 @@ class UpdatePublication
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('edit', 'publications');
+            && $request->user()->can('HRIS_recruitment.publications.update');
     }
 
     public function rules(): array

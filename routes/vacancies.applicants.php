@@ -7,6 +7,7 @@ use App\Actions\Vacancies\ShowApplicantHrmpsbAssessment;
 use App\Actions\Vacancies\ShowApplicantPds;
 use App\Actions\Vacancies\ShowApplicantQualifications;
 use App\Actions\Vacancies\ShowApplicantRequirements;
+use App\Actions\Vacancies\ShowVacancyApplicantSummary;
 use App\Actions\Vacancies\StoreApplicantAssessment;
 use App\Actions\Vacancies\StoreApplicantAssessmentOverride;
 use App\Actions\Vacancies\StoreApplicantEditRequest;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/vacancy-applicants/{id}', ListApplicants::class)->name('vacancies.applicants.index');
+    Route::get('/vacancies/{vacancy}/applicants-summary/{type}', ShowVacancyApplicantSummary::class)->name('vacancies.applicants.summary');
     Route::get('/vacancy-applicants-pds/{id}', ShowApplicantPds::class)->name('vacancies.applicants.pds');
     Route::get('/vacancy-applicants-requirements/{id}', ShowApplicantRequirements::class)->name('vacancies.applicants.requirements');
     Route::get('/vacancy-applicants-qualifications/{id}', ShowApplicantQualifications::class)->name('vacancies.applicants.qualifications');

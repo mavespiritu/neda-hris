@@ -4,7 +4,6 @@ namespace App\Actions\Publications;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -16,7 +15,7 @@ class BulkDeletePublication
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('delete', 'publications');
+            && $request->user()->can('HRIS_recruitment.publications.delete');
     }
 
     public function asController(Request $request)

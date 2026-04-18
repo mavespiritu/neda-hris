@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { usePage, Link, useForm } from "@inertiajs/react"
-import { ChevronLeft, ChevronDown, Pencil, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronDown, Pencil, Trash2, CircleAlert } from "lucide-react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,8 @@ const ViewVacancy = () => {
   const canViewAssessment = useHasPermission("HRIS_recruitment.vacancies.assessment.view")
   const canEditVacancy = useHasPermission("HRIS_recruitment.vacancies.update")
   const canDeleteVacancy = useHasPermission("HRIS_recruitment.vacancies.delete")
+  const canEditThisVacancy = canEditVacancy && Number(vacancy.applicants_count ?? 0) === 0
+  const canDeleteThisVacancy = canDeleteVacancy && Number(vacancy.applicants_count ?? 0) === 0
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -49,10 +51,10 @@ const ViewVacancy = () => {
       { key: "Details", label: "Vacancy Details", canAccess: canViewVacancy },
       { key: "Requirements", label: `Requirements (${vacancy.requirements_count ?? 0})`, canAccess: canViewRequirements },
       { key: "Applicants", label: `Applicants (${vacancy.applicants_count ?? 0})`, canAccess: canViewApplicants },
-      { key: "Assessment", label: "Assessment", canAccess: canViewAssessment },
+      { key: "Assessment", label: "Assessment", canAccess: canViewAssessment, attentionNeeded: Boolean(vacancy.assessment_attention_needed) },
       { key: "BEI Questions", label: "BEI Questions", canAccess: canViewVacancy },
     ],
-    [canViewVacancy, canViewRequirements, canViewApplicants, canViewAssessment, vacancy.requirements_count, vacancy.applicants_count]
+    [canViewVacancy, canViewRequirements, canViewApplicants, canViewAssessment, vacancy.requirements_count, vacancy.applicants_count, vacancy.assessment_attention_needed]
   )
 
   const visibleMenuItems = menuItems.filter((item) => item.canAccess)
@@ -88,7 +90,7 @@ const ViewVacancy = () => {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>This Vacancy</DropdownMenuLabel>
             <DropdownMenuGroup>
-              {canEditVacancy && (
+              {canEditThisVacancy && (
                 <DropdownMenuItem>
                   <Link
                     href={route("vacancies.edit", vacancy.id)}
@@ -99,8 +101,8 @@ const ViewVacancy = () => {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {canEditVacancy && canDeleteVacancy && <DropdownMenuSeparator />}
-              {canDeleteVacancy && (
+              {canEditThisVacancy && canDeleteThisVacancy && <DropdownMenuSeparator />}
+              {canDeleteThisVacancy && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <div
@@ -157,7 +159,12 @@ const ViewVacancy = () => {
                   : "text-gray-600 hover:text-blue-600 border-b-2 border-transparent"
               }`}
             >
-              {item.label}
+              <span className="relative inline-flex items-center gap-1.5 pr-4">
+                {item.label}
+                {item.key === "Assessment" && item.attentionNeeded && (
+                  <CircleAlert className="absolute -right-1 -top-1 h-4 w-4 text-red-500" aria-label="Assessment action needed" />
+                )}
+              </span>
             </button>
           ))}
         </div>
@@ -177,3 +184,12 @@ const ViewVacancy = () => {
 }
 
 export default ViewVacancy
+
+
+
+
+
+
+
+
+

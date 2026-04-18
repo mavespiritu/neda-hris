@@ -19,7 +19,7 @@ class CreatePublication
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('create', 'publications');
+            && $request->user()->can('HRIS_recruitment.publications.create');
     }
 
     public function asController()

@@ -5,6 +5,7 @@ namespace App\Actions\Vacancies;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ListApplicants
@@ -137,6 +138,7 @@ class ListApplicants
                 'path' => $skillAttachment->path,
                 'size' => $skillAttachment->size,
                 'mime' => $skillAttachment->mime,
+                'preview_url' => route('files.preview', $skillAttachment->id),
             ] : null;
             $applicant->dpe_result = $dpe->status ?? null;
             $applicant->dpe_date_conducted = $dpe->date_conducted ?? null;
@@ -147,6 +149,7 @@ class ListApplicants
                 'path' => $dpeAttachment->path,
                 'size' => $dpeAttachment->size,
                 'mime' => $dpeAttachment->mime,
+                'preview_url' => route('files.preview', $dpeAttachment->id),
             ] : null;
             $applicant->edit_request_status = $editRequest->status ?? null;
             $applicant->edit_request_remarks = $editRequest->remarks ?? null;

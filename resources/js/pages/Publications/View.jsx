@@ -1,13 +1,14 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasPermission, useHasRole } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm, Link } from "@inertiajs/react"
 import { Button } from "@/components/ui/button"
 import { formatDate, formatTime12 } from "@/lib/utils.jsx"
-import { ChevronLeft, ChevronDown, Pencil, Trash2, FileText, CheckCircle2, XCircle, Plus } from "lucide-react"
+import { ChevronLeft, ChevronDown, Pencil, Trash2, FileText, CheckCircle2, XCircle, Plus, Printer } from "lucide-react"
 import Form from "./Form"
 import RequestForm from './RequestForm'
 import VacancyForm from './VacancyForm'
+import CsForm from './CsForm'
 import useCrudTable from "@/hooks/useCrudTable"
 import { useToast } from "@/hooks/use-toast"
 import { Label } from "@/components/ui/label"
@@ -48,6 +49,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { usePrinter } from "@/hooks/usePrinter"
 
 const View = () => {
 
@@ -81,9 +83,52 @@ const View = () => {
         { value: 'PFPD', label: 'Policy Formulation and Planning Division'},
     ], [])
 
-    const { auth: { user }, data: { publication, vacancies } } = usePage().props
+    const { data } = usePage().props
+    const {
+        publication,
+        vacancies,
+        allVacancies = [],
+        signatoryName = "",
+        signatoryPosition = "",
+        agencyAddress = "",
+        requirements = [],
+    } = data
 
+    const { print } = usePrinter()
+    const canDownloadPublication = useHasPermission("HRIS_recruitment.publications.download")
+    const canPublishPublication = useHasPermission("HRIS_recruitment.publications.publish")
+    const canEditPublication = useHasPermission("HRIS_recruitment.publications.update")
+    const canDeletePublication = useHasPermission("HRIS_recruitment.publications.delete")
     const canSelectVacancy = useHasRole(["HRIS_HR"])
+    const isPublished = Number(publication.is_public) === 1
+    const deleteForm = useForm({})
+
+    const breadcrumbItems = [
+        { label: "Home", href: "/" },
+        { label: "Recruitment", href: "#" },
+        { label: "Publications", href: route("publications.index") },
+        {
+            label: `Publication No. ${publication.reference_no}`,
+            href: route("publications.show", publication.id),
+        },
+    ]
+
+    const handlePrintCsForm = () => {
+        print({
+            content: (
+                <CsForm
+                    publication={publication}
+                    vacancies={allVacancies.filter((vacancy) => vacancy.appointment_status === "Permanent")}
+                    signatoryName={signatoryName}
+                    signatoryPosition={signatoryPosition}
+                    agencyAddress={agencyAddress}
+                    requirements={requirements}
+                />
+            ),
+            paperSize: "legal",
+            orientation: "landscape",
+        })
+    }
 
     const columns = useMemo(() => [
         {
@@ -157,20 +202,23 @@ const View = () => {
         initialData: vacancies,
         filters,
         options: {
-            enableAdd: false,
-            enableEdit: false,
+            enableAdd: canEditPublication && !isPublished,
+            enableEdit: (row) => canSelectVacancy && !isPublished,
             enableView: false,
             enableViewAsLink: true,
-            enableDelete: true, 
-            enableBulkDelete: true,
+            enableDelete: (row) => canSelectVacancy && !isPublished, 
+            enableBulkDelete: canSelectVacancy && !isPublished,
             enableSearching: true,
             enableFiltering: false,
-            enableRowSelection: row => !row.original.isLocked || canSelectVacancy,
-            enableGenerateReport: true,
-            canModify: canSelectVacancy
+            enableRowSelection: row => !isPublished && (!row.original.isLocked || canSelectVacancy),
+            enableGenerateReport: !isPublished,
+            canModify: !isPublished && canSelectVacancy
         },
         endpoints: {
-            viewEndpoint: (row) => route('vacancies.show', {id: row.vacancy_id}),
+            viewEndpoint: (id) => {
+                const vacancyRow = vacancies.data?.find((item) => String(item.id) === String(id))
+                return route('vacancies.show', { id: vacancyRow?.vacancy_id ?? id })
+            },
             deleteEndpoint: (id) => route('publications.vacancies.destroy', id),
             //generateReportEndpoint: (id) => route('vacancies.generate', id),
             bulkDeleteEndpoint: route('publications.vacancies.bulk-destroy', publication.id),
@@ -179,8 +227,6 @@ const View = () => {
 
     return (
         <div className="h-full flex flex-col gap-2">
-            <Head title={`Publication No. ${publication.reference_no}`} />
-
             <div className="flex justify-between">
                 <Link
                     href={route('publications.index')}
@@ -210,55 +256,84 @@ const View = () => {
 
                         <PopoverContent align="end" className="w-56 p-2">
                             <div className="flex flex-col gap-1">
-                            {/* Edit */}
-                            <button
-                                className="flex justify-between items-center px-2 py-1.5 text-sm hover:bg-accent rounded-md"
-                                onClick={() => {
-                                setSelectedItem(publication)
-                                setIsFormOpen(true)
-                                }}
-                            >
-                                <span>Edit</span>
-                                <Pencil className="h-4 w-4" />
-                            </button>
-
-                            {/* Delete */}
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
+                            {canEditPublication && !isPublished && (
                                 <button
-                                    className="flex justify-between items-center px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 rounded-md"
+                                    className="flex justify-between items-center px-2 py-1.5 text-sm hover:bg-accent rounded-md"
+                                    onClick={() => {
+                                    setSelectedItem(publication)
+                                    setIsFormOpen(true)
+                                    }}
                                 >
-                                    <span>Delete</span>
-                                    <Trash2 className="h-4 w-4" />
+                                    <span>Edit</span>
+                                    <Pencil className="h-4 w-4" />
                                 </button>
-                                </AlertDialogTrigger>
+                            )}
 
-                                <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the publication request.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                    className="bg-destructive text-white hover:bg-destructive/90"
-                                    // onClick={() => deleteRequest({ id: publication.id, toast })}
+                            {canPublishPublication && (
+                                <button
+                                    className="flex justify-between items-center px-2 py-1.5 text-sm hover:bg-accent rounded-md"
+                                    onClick={() => toggleVisibility({ id: publication.id, toast })}
+                                >
+                                    <span>{isPublished ? "Unpublish" : "Publish"}</span>
+                                    {isPublished ? (
+                                        <XCircle className="h-4 w-4" />
+                                    ) : (
+                                        <CheckCircle2 className="h-4 w-4" />
+                                    )}
+                                </button>
+                            )}
+
+                            {canDownloadPublication && (
+                                <button
+                                    className="flex justify-between items-center px-2 py-1.5 text-sm hover:bg-accent rounded-md"
+                                    onClick={handlePrintCsForm}
+                                >
+                                    <span>Download CS Form</span>
+                                    <Printer className="h-4 w-4" />
+                                </button>
+                            )}
+
+                            {canDeletePublication && !isPublished && (
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <button
+                                        className="flex justify-between items-center px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10 rounded-md"
                                     >
-                                    Yes, delete it
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
+                                        <span>Delete</span>
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    </AlertDialogTrigger>
+
+                                    <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the publication request.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                        className="bg-destructive text-white hover:bg-destructive/90"
+                                        onClick={() => deleteRequest({ id: publication.id, form: deleteForm, toast })}
+                                        >
+                                        Yes, delete it
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            )}
                             </div>
                         </PopoverContent>
                     </Popover>
                 </div>
             </div>
-            <h1 className="text-xl font-semibold">
-                {`Publication No. ${publication.reference_no}`}
-            </h1>
+            <Head title={`Publication No. ${publication.reference_no}`} />
+            <PageTitle
+                pageTitle={`Publication No. ${publication.reference_no}`}
+                description="Manage publication details and vacant positions here."
+                breadcrumbItems={breadcrumbItems}
+            />
             <div className="flex flex-col md:flex-row md:flex-wrap lg:gap-12 gap-4 my-2">
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-center">
                     <Label className="text-muted-foreground">Reference No.</Label>
@@ -318,6 +393,7 @@ const View = () => {
                     className="flex items-center rounded-md disabled:opacity-50"
                     size="sm"
                     onClick={openVacancyForm}
+                    disabled={!canEditPublication || isPublished}
                 >
                     <Plus className="h-6 w-6" />
                     <span className="text-sm">Add Vacant Position</span>
@@ -343,4 +419,11 @@ const View = () => {
 }
 
 export default View
+
+
+
+
+
+
+
 

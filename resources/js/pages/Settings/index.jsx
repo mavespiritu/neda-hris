@@ -1,6 +1,6 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasRole, useHasPermission } from "@/hooks/useAuth"
 import Account from "./Account"
 import Organization from "./Organization"
 import Recruitment from "./Recruitment"
@@ -12,16 +12,16 @@ import { cn } from "@/lib/utils.jsx"
 
 const Settings = () => {
   /* -------------------- ROLE CHECKS (TOP LEVEL ONLY) -------------------- */
-  const canViewPage = useHasRole(["HRIS_Staff"])
+  const canViewPage = useHasPermission("HRIS_settings.page.view")
 
-  const canAccount = useHasRole(["HRIS_Staff"])
-  const canOrganization = useHasRole(["HRIS_HR", "HRIS_Administrator"])
-  const canRecruitment = useHasRole(["HRIS_HR", "HRIS_Administrator"])
-  const canCompetencies = useHasRole(["HRIS_HR", "HRIS_Administrator"])
-  const canGroups = useHasRole(["HRIS_HR", "HRIS_Administrator"])
-  const canTravelOrders = useHasRole(["HRIS_PRU", "HRIS_Administrator"])
-  const canNotifications = useHasRole(["HRIS_HR", "HRIS_Administrator"])
-  const canSignatories = useHasRole(["HRIS_Administrator"])
+  const canAccount = useHasPermission("HRIS_settings.account.view")
+  const canOrganization = useHasPermission("HRIS_settings.organization.view")
+  const canRecruitment = useHasPermission("HRIS_settings.recruitment.view")
+  const canCompetencies = useHasPermission("HRIS_settings.competencies.view")
+  const canGroups = useHasPermission("HRIS_settings.groups.view")
+  const canTravelOrders = useHasPermission("HRIS_settings.travels.view")
+  const canNotifications = useHasPermission("HRIS_settings.notifications.view")
+  const canSignatories = useHasPermission("HRIS_settings.signatories.view")
 
   /* -------------------- STATE -------------------- */
   const [currentTab, setCurrentTab] = useLocalStorage("HRIS_Settings_tab", "Account")

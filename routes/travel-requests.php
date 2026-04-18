@@ -9,11 +9,13 @@ use App\Actions\TravelRequests\EditTravelRequest;
 use App\Actions\TravelRequests\UpdateTravelRequest;
 use App\Actions\TravelRequests\ShowTravelRequest;
 use App\Actions\TravelRequests\GenerateTravelRequestReport;
+use App\Actions\TravelRequests\SignTravelRequestReport;
 use App\Actions\TravelRequests\SubmitTravelRequest;
 use App\Actions\TravelRequests\DeleteTravelRequest;
 use App\Actions\TravelRequests\BulkDeleteTravelRequests;
 use App\Actions\TravelRequests\ReturnTravelRequest;
 use App\Actions\TravelRequests\ResubmitTravelRequest;
+use App\Actions\TravelRequests\ResendTravelRequestNotification;
 use App\Actions\VehicleRequests\StoreVehicleExpense;
 use App\Actions\VehicleRequests\UpdateVehicleExpense;
 use App\Actions\VehicleRequests\DeleteVehicleExpense;
@@ -43,19 +45,21 @@ use App\Actions\TripTickets\CheckDriverSchedule;
 
 Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
 
-    Route::get('/travel-requests', ListTravelRequests::class)->name('travel-requests.index');
+    Route::get('/travel-requests', [ListTravelRequests::class, 'asController'])->name('travel-requests.index');
 
     Route::get('/travel-requests/create', CreateTravelRequest::class)->name('travel-requests.create');
     Route::post('/travel-requests/store', StoreTravelRequest::class)->name('travel-requests.store');
     Route::get('/travel-requests/{id}/edit', EditTravelRequest::class)->name('travel-requests.edit');
     Route::put('/travel-requests/{id}/update', UpdateTravelRequest::class)->name('travel-requests.update');
-    Route::get('/travel-requests/{id}', ShowTravelRequest::class)->name('travel-requests.show');
+    Route::get('/travel-requests/{id}', [ShowTravelRequest::class, 'asController'])->name('travel-requests.show');
     Route::delete('/travel-requests/{id}/destroy', DeleteTravelRequest::class)->name('travel-requests.destroy');
     Route::post('/travel-requests/bulk-destroy', BulkDeleteTravelRequests::class)->name('travel-requests.bulk-destroy');
     Route::get('/travel-requests/{id}/report', GenerateTravelRequestReport::class)->name('travel-requests.generate');
+    Route::post('/travel-requests/{id}/report/sign', SignTravelRequestReport::class)->name('travel-requests.report.sign');
     Route::post('/travel-requests/{id}/submit', SubmitTravelRequest::class)->name('travel-requests.submit');
     Route::post('/travel-requests/{id}/return', ReturnTravelRequest::class)->name('travel-requests.return');
     Route::post('/travel-requests/{id}/resubmit', ResubmitTravelRequest::class)->name('travel-requests.resubmit');
+    Route::post('/travel-requests/{id}/notifications/resend', ResendTravelRequestNotification::class)->name('travel-requests.notifications.resend');
     
     Route::post('/travel-requests/{id}/service-expense', StoreVehicleExpense::class)->name('travel-requests.service-expense.store');
     Route::put('/travel-requests/{id}/service-expense/{expenseId}', UpdateVehicleExpense::class)->name('travel-requests.service-expense.update');
@@ -111,6 +115,11 @@ Route::middleware(['web', 'signed'])->group(function () {
     Route::get('/vehicle-requests/authorize/{token}', AuthorizeVehicleRequestViaEmail::class)->name('vehicle-requests.authorize.email');
 
 });
+
+
+
+
+
 
 
 

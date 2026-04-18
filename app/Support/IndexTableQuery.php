@@ -3,13 +3,14 @@
 namespace App\Support;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class IndexTableQuery
 {
-    protected Builder $query;
+    protected EloquentBuilder|Builder $query;
 
     protected array $allowedSorts = [];
     protected array $allowedFilters = [];
@@ -21,12 +22,12 @@ class IndexTableQuery
     protected string $defaultSortColumn = 'id';
     protected string $defaultSortDirection = 'desc';
 
-    public function __construct(Builder $baseQuery)
+    public function __construct(EloquentBuilder|Builder $baseQuery)
     {
         $this->query = $baseQuery;
     }
 
-    public static function for(Builder $baseQuery): self
+    public static function for(EloquentBuilder|Builder $baseQuery): self
     {
         return new self($baseQuery);
     }

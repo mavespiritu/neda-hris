@@ -11,7 +11,7 @@ use App\States\VehicleRequest\Approved as VrApproved;
 use App\States\VehicleRequest\Reviewed as VrReviewed;
 use App\States\VehicleRequest\VehicleAuthorized as VrAuthorized;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use App\Traits\AuthorizesVehicleRequests;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -19,12 +19,12 @@ use RuntimeException;
 
 class ResubmitVehicleRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesVehicleRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('vr.resubmit', $id);
+        return $this->canResubmitVehicleRequest($request->user(), $id);
     }
 
     public function rules(): array
@@ -107,3 +107,5 @@ class ResubmitVehicleRequest
         };
     }
 }
+
+

@@ -3,19 +3,20 @@
 namespace App\Actions\TravelRequests;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Traits\AuthorizesTravelRequests;
 use RuntimeException;
 
 class BulkDeleteTravelRequests
 {
-    use AsAction;
+    use AsAction, AuthorizesTravelRequests;
 
     public function authorize(ActionRequest $request): bool
     {
-        return true; // per-id authorization checked in handle()
+        return collect($request->input('ids', []))->every(fn ($id) => $this->canDeleteTravelRequest($request->user(), $id));
     }
 
     public function rules(): array
@@ -36,7 +37,7 @@ class BulkDeleteTravelRequests
             throw new RuntimeException('No travel request IDs provided.');
         }
 
-        $denied = $ids->filter(fn ($id) => ! Gate::forUser($user)->allows('tr.delete', $id))->values();
+        $denied = $ids->filter(fn ($id) => ! $this->canDeleteTravelRequest($user, $id))->values();
         if ($denied->isNotEmpty()) {
             throw new RuntimeException('You are not allowed to delete one or more selected requests.');
         }

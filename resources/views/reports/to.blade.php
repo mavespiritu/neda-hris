@@ -10,7 +10,7 @@
 
     html, body { margin: 0; padding: 0; }
 
-    /* ✅ SINGLE FONT SIZE (12px everywhere) */
+    /* ? SINGLE FONT SIZE (12px everywhere) */
     body {
       font-family: Arial, sans-serif;
       font-size: 12px;
@@ -29,7 +29,7 @@
     .font-semibold { font-weight: 700; }
     .underline { text-decoration: underline; }
 
-    /* ✅ keep utility classes but make them SAME size too */
+    /* ? keep utility classes but make them SAME size too */
     .text-xs, .text-sm { font-size: 12px; }
 
     .boxed-title {
@@ -84,7 +84,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-size: 12px; /* ✅ enforce 12px inside tables too */
+      font-size: 12px; /* ? enforce 12px inside tables too */
     }
 
     /* Purpose can wrap */
@@ -95,7 +95,7 @@
       height: auto;
       padding: 2px 4px;
       line-height: 1.2;
-      font-size: 12px; /* ✅ */
+      font-size: 12px; /* ? */
     }
 
     .sheet, .sheet * { page-break-inside: avoid !important; break-inside: avoid !important; }

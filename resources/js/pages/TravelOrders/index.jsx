@@ -1,27 +1,13 @@
 import PageTitle from "@/components/PageTitle"
-import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
-import { Head, usePage, router, useForm } from "@inertiajs/react"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogClose
-  } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { useState, useMemo } from "react"
+import { Head, usePage } from "@inertiajs/react"
 import { formatDate } from "@/lib/utils.jsx"
-import { AlertCircleIcon, Send, CheckCircle, XCircle, FileCheck, Undo2, Loader2 } from "lucide-react"
 import useCrudTable from "@/hooks/useCrudTable"
 import StatusBadge from '@/components/StatusBadge'
-import { useToast } from "@/hooks/use-toast"
-import { Label } from "@/components/ui/label"
-import RichTextEditor from "@/components/RichTextEditor"
+import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from "@/lib/utils.jsx"
 import { format } from "date-fns"
 import Filter from './Filter'
-import { travelRequestActionMap as actionMap } from "./actions"
 
 const breadcrumbItems = [
     { label: 'Home', href: '/' },
@@ -29,15 +15,11 @@ const breadcrumbItems = [
 ]
 
 const TravelOrders = () => {
-
-    const { toast } = useToast()
-
     const { auth: { user }, data: { travelOrders, filterOptions }, can } = usePage().props
-
     const [filters, setFilters] = useState({
-    employee_id: "",
-    travel_type: "",
-    travel_category_id: "",
+        employee_id: "",
+        travel_type: "",
+        travel_category_id: "",
     })
 
     const employeeLabelMap = useMemo(() => {
@@ -88,60 +70,6 @@ const TravelOrders = () => {
         setPageIndex(0)
     }
 
-    const [confirmAction, setConfirmAction] = useState(null)
-    const confirmForm = useForm({ remarks: "" })
-    const [selectedRow, setSelectedRow] = useState(null)
-
-    const openConfirm = (action) => {
-        setConfirmAction(action)
-        confirmForm.setData("remarks", "")
-        confirmForm.clearErrors()
-    }
-
-    const closeConfirm = () => {
-        setConfirmAction(null)
-        confirmForm.reset()
-        confirmForm.clearErrors()
-    }
-
-    const handleAction = (action, row) => {
-        setConfirmAction(action)
-        setSelectedRow(row)
-        confirmForm.setData("remarks", "")
-        confirmForm.clearErrors()
-    }
-
-    const currentActionConfig = actionMap[confirmAction] ?? {}
-    const dialogTitle = currentActionConfig.title ?? `Confirm ${confirmAction ?? "Action"}`
-    const dialogDescription =
-        currentActionConfig.description ??
-        `Are you sure you want to ${confirmAction ?? "perform this action"} this travel request?`
-    const actionNote = currentActionConfig.note ?? null
-    const needsRemarks = Boolean(currentActionConfig.needsRemarks)
-
-    const performConfirmAction = (e) => {
-
-        e.preventDefault()
-
-        if (!confirmAction || !selectedRow) return
-
-        const id = selectedRow.original.id
-        const cfg = actionMap[confirmAction]
-        if (!cfg) return
-
-        confirmForm.post(route(cfg.route, id), {
-            preserveScroll: true,
-            onSuccess: () => {
-            toast({
-                title: "Success!",
-                description: `${confirmAction} successful!`,
-            })
-            setSelectedRow(null)
-            closeConfirm()
-            },
-        })
-    }
-
     const columns = useMemo(() => [
         {
             header: "Reference No.",
@@ -152,6 +80,20 @@ const TravelOrders = () => {
             header: "Type",
             accessorKey: "travel_type",
             meta: { enableSorting: true },
+        },
+        {
+            header: "Vehicle Request",
+            accessorKey: "isRequestingVehicle",
+            cell: ({ row }) => {
+                const hasVehicleRequest = !!row.original?.isRequestingVehicle
+
+                return (
+                    <Badge variant={hasVehicleRequest ? "default" : "secondary"} className="whitespace-nowrap">
+                        {hasVehicleRequest ? "Yes" : "No"}
+                    </Badge>
+                )
+            },
+            meta: { enableSorting: false },
         },
         {
             header: "Purpose",
@@ -175,19 +117,19 @@ const TravelOrders = () => {
             meta: { enableSorting: true },
         },
         {
-        header: "Request Created",
-        accessorKey: "creator",
-        cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span>{row.original.creator || "-"}</span>
-            <span className="text-xs text-muted-foreground">
-              {row.original.date_created
-                ? format(new Date(row.original.date_created), "MMMM d, yyyy")
-                : "-"}
-            </span>
-          </div>
-        ),
-        meta: { enableSorting: true },
+            header: "Request Created",
+            accessorKey: "creator",
+            cell: ({ row }) => (
+              <div className="flex flex-col">
+                <span>{row.original.creator || "-"}</span>
+                <span className="text-xs text-muted-foreground">
+                  {row.original.date_created
+                    ? format(new Date(row.original.date_created), "MMMM d, yyyy")
+                    : "-"}
+                </span>
+              </div>
+            ),
+            meta: { enableSorting: true },
         },
         {
             header: "Status",
@@ -202,12 +144,12 @@ const TravelOrders = () => {
                 return (
                     <div className="flex flex-col gap-1">
                         <StatusBadge status={status} />
-                        {actedBy && (
+                        {actedBy && actedBy !== user.ipms_id && (
                             <span className="text-xs text-gray-400 mt-1">
-                                By: {actedBy === user.ipms_id ? "You" : actedByName}
+                                By: {actedByName}
                             </span>
                         )}
-                        {dateActed && (
+                        {dateActed && status !== "Draft" && (
                             <span className="text-xs text-gray-400">
                                 Date: {format(new Date(dateActed), "MMMM d, yyyy")}
                             </span>
@@ -220,39 +162,6 @@ const TravelOrders = () => {
                                 />
                             </span>
                         )}
-                    </div>
-                )
-            }
-        },
-        {
-            header: "Actions",
-            cell: ({ row }) => {
-            
-                const can = row.original?.can || {}
-                const actions = []
-
-                if (can.submit) actions.push({ label: "Submit", icon: <Send className="h-2 w-2" /> })
-                if (can.return) actions.push({ label: "Return", icon: <Undo2 className="h-2 w-2" /> })
-                if (can.resubmit) actions.push({ label: "Resubmit", icon: <FileCheck className="h-2 w-2" /> })
-
-
-                if (actions.length === 0) return null
-
-                return (
-                    <div className="flex flex-col gap-2">
-                    {actions.map((action, i) => (
-                        <Button
-                        key={i}
-                        size="xs"
-                        variant="link"
-                        title={action.label}
-                        onClick={() => handleAction(action.label, row)}
-                        className={`text-xs flex justify-start ${action.label === 'Disapprove' && 'text-red-500'}`}
-                        >
-                            {action.icon}
-                            {action.label}
-                        </Button>
-                    ))}
                     </div>
                 )
             }
@@ -331,51 +240,8 @@ const TravelOrders = () => {
                 options={filterOptions}
             />
             )}
-
-            <Dialog open={!!confirmAction} onOpenChange={(open) => (!open ? closeConfirm() : null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{dialogTitle}</DialogTitle>
-                        <DialogDescription>{dialogDescription}</DialogDescription>
-
-                        {actionNote && (
-                            <div className="rounded-md bg-muted p-3 text-xs flex flex-col gap-1 border-l-4 border-muted-foreground/30 mt-2">
-                                Note: {actionNote}
-                            </div>
-                        )}
-                    </DialogHeader>
-                    <form onSubmit={performConfirmAction}>
-                        {needsRemarks && (
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="remarks">Remarks</Label>
-                            <RichTextEditor
-                            name="remarks"
-                            id="remarks"
-                            value={confirmForm.data.remarks}
-                            isInvalid={confirmForm.errors.remarks}
-                            onChange={(value) => confirmForm.setData("remarks", value)}
-                            />
-                            {confirmForm.errors?.remarks && (
-                            <span className="text-red-500 text-xs">{confirmForm.errors.remarks}</span>
-                            )}
-                        </div>
-                        )}
-
-                        <div className="flex justify-end gap-2 mt-4">
-                        <Button variant="ghost" type="button" onClick={closeConfirm}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={confirmForm.processing} className="flex items-center gap-2">
-                            {confirmForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                            Submit
-                        </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }
 
 export default TravelOrders
-

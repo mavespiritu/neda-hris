@@ -88,7 +88,7 @@ const View = () => {
     if (!visible.includes(currentTab)) {
       setCurrentTab("trip")
     }
-  }, [isRequestingVehicle, isApproved])
+  }, [currentTab, isRequestingVehicle, isApproved, tabs, setCurrentTab])
 
   const handleDelete = () => {
     form.delete(route("travel-requests.destroy", travelOrder.id), {
@@ -209,44 +209,38 @@ const View = () => {
 
       <div className="flex-1">
         <ScrollArea className="h-full">
-          <div className="border rounded-lg p-4 h-full">
-            <div className="flex flex-col md:flex-row gap-6 h-full">
-              {/* ✅ Tabs */}
-              <div className="w-full md:w-[20%]">
-                <ResponsiveTabs
-                  tabs={tabs}
-                  value={currentTab}
-                  onChange={setCurrentTab}
-                  syncHash
-                  fallbackKey="trip"
-                  tabClassName="text-sm"
-                  activeTabClassName="text-sm"
+          <div className="border rounded-lg p-4 h-full space-y-4">
+            <ResponsiveTabs
+              tabs={tabs}
+              value={currentTab}
+              onChange={setCurrentTab}
+              syncHash
+              fallbackKey="trip"
+              orientation="horizontal"
+              className="w-full"
+              tabClassName="text-sm"
+              activeTabClassName="text-sm"
+            />
+
+            <div className="border rounded-md p-4 bg-background min-h-0">
+              {currentTab === "trip" && (
+                <TravelRequest travelOrder={travelOrder} can={can} user={user} />
+              )}
+
+              {currentTab === "vehicle" && isRequestingVehicle && (
+                <VehicleRequest
+                  travelOrder={travelOrder}
+                  can={can}
+                  user={user}
+                  vehicles={vehicles}
+                  serviceExpenses={serviceExpenses}
+                  reasons={reasons}
                 />
-              </div>
+              )}
 
-              {/* Content */}
-              <div className="flex-1 border rounded-md p-4 bg-background">
-                {currentTab === "trip" && (
-                  <TravelRequest travelOrder={travelOrder} can={can} user={user} />
-                )}
-
-                {currentTab === "vehicle" && isRequestingVehicle && (
-                  <VehicleRequest
-                    travelOrder={travelOrder}
-                    can={can}
-                    user={user}
-                    vehicles={vehicles}
-                    serviceExpenses={serviceExpenses}
-                    reasons={reasons}
-                  />
-                )}
-
-                {currentTab === "ticket" && isRequestingVehicle && isApproved && (
-                  <TripTicket
-                    travelOrderId={travelOrder.id}
-                  />
-                )}
-              </div>
+              {currentTab === "ticket" && isRequestingVehicle && isApproved && (
+                <TripTicket travelOrderId={travelOrder.id} />
+              )}
             </div>
           </div>
         </ScrollArea>

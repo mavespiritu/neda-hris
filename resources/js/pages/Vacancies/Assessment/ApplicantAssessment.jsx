@@ -38,6 +38,7 @@ import SingleComboBox from "@/components/SingleComboBox"
 import LearningAndDevelopmentForm from "@/pages/MyProfile2/Pds/LearningAndDevelopmentForm"
 import WorkExperienceForm from "@/pages/MyProfile2/Pds/WorkExperienceForm"
 import CivilServiceEligibilityForm from "@/pages/MyProfile2/Pds/CivilServiceEligibilityForm"
+import { useHasPermission } from "@/hooks/useAuth"
 
 const createDefaultForm = () => ({
   remarks: "",
@@ -349,6 +350,13 @@ export default function Assessment() {
     sourceId: null,
     form: {},
   })
+
+  const canConductSecretariatAssessment = useHasPermission("HRIS_recruitment.vacancies.assessment.secretariat.assess")
+  const canViewHRMPSBAssessment = useHasPermission("HRIS_recruitment.vacancies.assessment.hrmpsb.view")
+  const canEditAssessment = canConductSecretariatAssessment
+  const canOpenHrmpsbAssessment =
+    !isSecretariatStage ||
+    (canViewHRMPSBAssessment && Boolean(existingAssessment?.id || existingAssessment?.overall_status))
 
   useEffect(() => {
     if (!applicant?.id) return
@@ -846,15 +854,31 @@ export default function Assessment() {
     return links
   }
 
-  const renderOverrideButton = (qualification, item) => (
-    <button
-      type="button"
-      className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      onClick={() => openOverrideDialog(qualification, item)}
-      title="Override displayed data"
-    >
-      <Pencil className="h-3.5 w-3.5" />
-    </button>
+  const renderOverrideButton = (qualification, item) => {
+    if (!canEditAssessment) return null
+
+    return (
+      <button
+        type="button"
+        className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        onClick={() => openOverrideDialog(qualification, item)}
+        title="Override displayed data"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
+    )
+  }
+
+  const renderReadOnlyValue = (value) => (
+    <div className="whitespace-pre-wrap rounded-md border bg-muted/20 px-3 py-2 text-sm text-foreground">
+      {value || "-"}
+    </div>
+  )
+
+  const renderBooleanValue = (value, trueLabel = "Yes", falseLabel = "No") => (
+    <span className={clsx("text-xs font-semibold", value ? "text-green-600" : "text-red-600")}>
+      {value ? trueLabel : falseLabel}
+    </span>
   )
 
   const renderOverrideFields = () => {
@@ -1108,27 +1132,29 @@ export default function Assessment() {
       case "education":
         return (
           <div className="rounded-md border overflow-hidden">
-            <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("education", true, items.length)}
-                disabled={areAllRelevant("education", items.length)}
-              >
-                Toggle All
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("education", false, items.length)}
-              >
-                Untoggle All
-              </Button>
-            </div>
+            {canEditAssessment && (
+              <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("education", true, items.length)}
+                  disabled={areAllRelevant("education", items.length)}
+                >
+                  Toggle All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("education", false, items.length)}
+                >
+                  Untoggle All
+                </Button>
+              </div>
+            )}
             <Table className="table-fixed w-full">
               <colgroup>
                 <col />
@@ -1161,10 +1187,14 @@ export default function Assessment() {
                     <TableCell className="w-[120px] text-center">
                       <div className="flex items-center justify-center gap-2">
                         {renderOverrideButton("education", edu)}
-                        <Switch
-                          checked={isRelevant("education", i)}
-                          onCheckedChange={(value) => toggleRelevant("education", i, value)}
-                        />
+                        {canEditAssessment ? (
+                          <Switch
+                            checked={isRelevant("education", i)}
+                            onCheckedChange={(value) => toggleRelevant("education", i, value)}
+                          />
+                        ) : (
+                          renderBooleanValue(isRelevant("education", i), "Relevant", "Not relevant")
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1176,27 +1206,29 @@ export default function Assessment() {
       case "training":
         return (
           <div className="rounded-md border overflow-hidden">
-            <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("training", true, items.length)}
-                disabled={areAllRelevant("training", items.length)}
-              >
-                Toggle All
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("training", false, items.length)}
-              >
-                Untoggle All
-              </Button>
-            </div>
+            {canEditAssessment && (
+              <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("training", true, items.length)}
+                  disabled={areAllRelevant("training", items.length)}
+                >
+                  Toggle All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("training", false, items.length)}
+                >
+                  Untoggle All
+                </Button>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow className="text-xs">
@@ -1234,10 +1266,14 @@ export default function Assessment() {
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">
                           {renderOverrideButton("training", training)}
-                        <Switch
-                          checked={isRelevant("training", i)}
-                          onCheckedChange={(value) => toggleRelevant("training", i, value)}
-                        />
+                          {canEditAssessment ? (
+                            <Switch
+                              checked={isRelevant("training", i)}
+                              onCheckedChange={(value) => toggleRelevant("training", i, value)}
+                            />
+                          ) : (
+                            renderBooleanValue(isRelevant("training", i), "Relevant", "Not relevant")
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1259,27 +1295,29 @@ export default function Assessment() {
       case "experience":
         return (
           <div className="rounded-md border overflow-hidden">
-            <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("experience", true, items.length)}
-                disabled={areAllRelevant("experience", items.length)}
-              >
-                Toggle All
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("experience", false, items.length)}
-              >
-                Untoggle All
-              </Button>
-            </div>
+            {canEditAssessment && (
+              <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("experience", true, items.length)}
+                  disabled={areAllRelevant("experience", items.length)}
+                >
+                  Toggle All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("experience", false, items.length)}
+                >
+                  Untoggle All
+                </Button>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow className="text-xs">
@@ -1309,15 +1347,19 @@ export default function Assessment() {
                         ? formatDateRange(experience.from_date, experience.to_date)
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {renderOverrideButton("experience", experience)}
-                      <Switch
-                        checked={isRelevant("experience", i)}
-                        onCheckedChange={(value) => toggleRelevant("experience", i, value)}
-                      />
-                      </div>
-                    </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {renderOverrideButton("experience", experience)}
+                          {canEditAssessment ? (
+                            <Switch
+                              checked={isRelevant("experience", i)}
+                              onCheckedChange={(value) => toggleRelevant("experience", i, value)}
+                            />
+                          ) : (
+                            renderBooleanValue(isRelevant("experience", i), "Relevant", "Not relevant")
+                          )}
+                        </div>
+                      </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1336,27 +1378,29 @@ export default function Assessment() {
       case "eligibility":
         return (
           <div className="rounded-md border overflow-hidden">
-            <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("eligibility", true, items.length)}
-                disabled={areAllRelevant("eligibility", items.length)}
-              >
-                Toggle All
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => setAllRelevant("eligibility", false, items.length)}
-              >
-                Untoggle All
-              </Button>
-            </div>
+            {canEditAssessment && (
+              <div className="flex items-center justify-end gap-2 border-b bg-muted/30 px-3 py-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("eligibility", true, items.length)}
+                  disabled={areAllRelevant("eligibility", items.length)}
+                >
+                  Toggle All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setAllRelevant("eligibility", false, items.length)}
+                >
+                  Untoggle All
+                </Button>
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow className="text-xs">
@@ -1387,10 +1431,14 @@ export default function Assessment() {
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-2">
                         {renderOverrideButton("eligibility", eligibility)}
-                      <Switch
-                        checked={isRelevant("eligibility", i)}
-                        onCheckedChange={(value) => toggleRelevant("eligibility", i, value)}
-                      />
+                        {canEditAssessment ? (
+                          <Switch
+                            checked={isRelevant("eligibility", i)}
+                            onCheckedChange={(value) => toggleRelevant("eligibility", i, value)}
+                          />
+                        ) : (
+                          renderBooleanValue(isRelevant("eligibility", i), "Relevant", "Not relevant")
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1488,12 +1536,14 @@ export default function Assessment() {
                       >
                         {form[sectionName][qualification.key].status ? "Passed" : "Failed"}
                       </span>
-                      <Switch
-                        checked={form[sectionName][qualification.key].status}
-                        onCheckedChange={(value) =>
-                          handleQualificationChange(sectionName, qualification.key, "status", value)
-                        }
-                      />
+                      {canEditAssessment ? (
+                        <Switch
+                          checked={form[sectionName][qualification.key].status}
+                          onCheckedChange={(value) =>
+                            handleQualificationChange(sectionName, qualification.key, "status", value)
+                          }
+                        />
+                      ) : null}
                     </div>
                   </TableCell>
 
@@ -1504,13 +1554,17 @@ export default function Assessment() {
                         <span>{initialAssessment[sectionName][qualification.key].remarks}</span>
                       </div>
                     )}
-                    <Textarea
-                      className="min-h-[120px]"
-                      value={form[sectionName][qualification.key].remarks}
-                      onChange={(e) =>
-                        handleQualificationChange(sectionName, qualification.key, "remarks", e.target.value)
-                      }
-                    />
+                    {canEditAssessment ? (
+                      <Textarea
+                        className="min-h-[120px]"
+                        value={form[sectionName][qualification.key].remarks}
+                        onChange={(e) =>
+                          handleQualificationChange(sectionName, qualification.key, "remarks", e.target.value)
+                        }
+                      />
+                    ) : (
+                      renderReadOnlyValue(form[sectionName][qualification.key].remarks)
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -1544,12 +1598,14 @@ export default function Assessment() {
           >
             {form.screening[key].status ? "Passed" : "Failed"}
           </span>
-          <Switch
-            checked={form.screening[key].status}
-            onCheckedChange={(value) =>
-              handleQualificationChange("screening", key, "status", value)
-            }
-          />
+          {canEditAssessment ? (
+            <Switch
+              checked={form.screening[key].status}
+              onCheckedChange={(value) =>
+                handleQualificationChange("screening", key, "status", value)
+              }
+            />
+          ) : null}
         </div>
       </div>
 
@@ -1567,12 +1623,16 @@ export default function Assessment() {
           <label className="mb-1 block text-xs font-medium text-muted-foreground">
             Remarks
           </label>
-          <Textarea
-            value={form.screening[key].remarks}
-            onChange={(e) =>
-              handleQualificationChange("screening", key, "remarks", e.target.value)
-            }
-          />
+          {canEditAssessment ? (
+            <Textarea
+              value={form.screening[key].remarks}
+              onChange={(e) =>
+                handleQualificationChange("screening", key, "remarks", e.target.value)
+              }
+            />
+          ) : (
+            renderReadOnlyValue(form.screening[key].remarks)
+          )}
         </div>
       </div>
     </div>
@@ -1861,24 +1921,34 @@ export default function Assessment() {
       <div className="flex justify-between gap-2">
         <div>
           {nextStageUrl && (
-            <Link href={nextStageUrl}>
-              <Button type="button" variant="outline">Open HRMPSB Assessment</Button>
-            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canOpenHrmpsbAssessment}
+              onClick={() => {
+                if (canOpenHrmpsbAssessment) {
+                  router.visit(nextStageUrl)
+                }
+              }}
+            >
+              Open HRMPSB Assessment
+            </Button>
           )}
         </div>
         <div className="flex gap-2">
           <Link href={previousStageUrl || backUrl}>
             <Button type="button" variant="ghost">Cancel</Button>
           </Link>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            form="assessment-form"
-            className="gap-2"
-          >
+          {canEditAssessment && (
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              form="assessment-form"
+              className="gap-2"
+            >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {saveButtonLabel}
-          </Button>
+          </Button>)}
         </div>
       </div>
 

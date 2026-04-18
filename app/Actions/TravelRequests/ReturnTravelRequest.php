@@ -6,20 +6,21 @@ use App\Models\TravelRequest;
 use App\States\TravelRequest\Returned;
 use App\States\TravelRequest\Submitted;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Traits\AuthorizesTravelRequests;
 use RuntimeException;
 
 class ReturnTravelRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesTravelRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('tr.return', $id);
+        return $this->canReturnTravelRequest($request->user(), $id);
     }
 
     public function rules(): array

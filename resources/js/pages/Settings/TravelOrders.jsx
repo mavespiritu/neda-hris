@@ -24,6 +24,7 @@ const TravelOrders = () => {
         description: "Add or edit signatories of travels.",
         component: <Signatories />,
       },
+
       {
         key: "vehicles",
         title: "Vehicles",
@@ -52,7 +53,6 @@ const TravelOrders = () => {
     []
   )
 
-  // ✅ default is Signatories
   const [activeKey, setActiveKey] = useState("signatories")
 
   const active = sections.find((s) => s.key === activeKey) ?? sections[0]
@@ -68,7 +68,6 @@ const TravelOrders = () => {
 
       <CardContent className="border-t p-0">
         <div className="grid grid-cols-1 md:grid-cols-12">
-          {/* Sidebar */}
           <aside className="md:col-span-4 lg:col-span-3 border-b md:border-b-0 md:border-r p-4">
             <div className="flex flex-col gap-1">
               {sections.map((item) => {
@@ -88,8 +87,6 @@ const TravelOrders = () => {
                       <div className="text-sm font-semibold leading-snug break-words">
                         {item.title}
                       </div>
-
-                      {/* if line-clamp isn't enabled, this will still wrap now */}
                       <div className="text-xs text-muted-foreground leading-snug break-words">
                         {item.description}
                       </div>
@@ -100,16 +97,13 @@ const TravelOrders = () => {
             </div>
           </aside>
 
-          {/* Content */}
           <section className="md:col-span-8 lg:col-span-9 p-4">
             <div className="mb-4">
               <div className="text-sm font-semibold">{active.title}</div>
               <div className="text-xs text-muted-foreground">{active.description}</div>
             </div>
 
-            <div className="rounded-md border p-4">
-              {active.component}
-            </div>
+            <div className="rounded-md border p-4">{active.component}</div>
           </section>
         </div>
       </CardContent>
@@ -118,3 +112,5 @@ const TravelOrders = () => {
 }
 
 export default TravelOrders
+
+

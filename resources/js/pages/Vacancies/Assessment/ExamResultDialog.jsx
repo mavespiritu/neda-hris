@@ -106,18 +106,18 @@ const ExamResultDialog = ({
               <div className="rounded-md border bg-muted/20 px-3 py-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
+                    <p className="truncate text-xs font-medium">
                       {existingAttachment.name || existingAttachment.filename || "Attachment"}
                     </p>
                     {existingAttachment.size ? (
-                      <p className="text-xs text-muted-foreground">{formatSize(existingAttachment.size)}</p>
+                      <p className="text-xxs text-muted-foreground">{formatSize(existingAttachment.size)}</p>
                     ) : null}
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-auto px-2 py-1 text-red-500 hover:bg-transparent hover:underline"
+                    className="h-auto px-2 py-1 text-red-500 hover:bg-transparent hover:underline text-xs"
                     onClick={() => onRemoveAttachment(existingAttachment.id)}
                   >
                     Remove

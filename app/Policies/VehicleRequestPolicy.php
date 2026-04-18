@@ -4,17 +4,19 @@ namespace App\Policies;
 
 use App\Models\User;
 use App\Models\VehicleRequest;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\DB;
 
 class VehicleRequestPolicy
 {
-    /**
-     * Create a new policy instance.
-     */
     public function __construct()
     {
         //
+    }
+
+    protected function canUsePermission(User $user, string $permission): bool
+    {
+        return method_exists($user, 'can') && $user->can($permission);
     }
 
     public function visibleEmployeeIds(User $user)
@@ -22,7 +24,6 @@ class VehicleRequestPolicy
         $conn3 = DB::connection('mysql3');
 
         $rolePriorities = config('roles.priorities', []);
-
         $userRoles = $user->roles->pluck('name')->toArray();
 
         $highestRole = collect($userRoles)
@@ -76,7 +77,7 @@ class VehicleRequestPolicy
 
         $globalTypes = ['Approver_TT', 'Reviewer_VR'];
 
-        if (!in_array($type, $globalTypes, true) && $division) {
+        if (! in_array($type, $globalTypes, true) && $division) {
             $q->where('division', $division);
         }
 
@@ -89,6 +90,10 @@ class VehicleRequestPolicy
 
     public function submit(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.submit')) {
+            return Response::deny('You are not allowed to submit vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
         if (! $vr) {
             return Response::deny('Vehicle request not found.');
@@ -98,9 +103,7 @@ class VehicleRequestPolicy
             return Response::deny('Only the creator can submit this request.');
         }
 
-        $status = $this->latestStatus($vehicleRequestId);
-
-        if ($status !== 'Draft') {
+        if ($this->latestStatus($vehicleRequestId) !== 'Draft') {
             return Response::deny('Only draft requests can be submitted.');
         }
 
@@ -109,60 +112,68 @@ class VehicleRequestPolicy
 
     public function endorse(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.endorse')) {
+            return Response::deny('You are not allowed to endorse vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
-        if ($this->latestStatus($vehicleRequestId) !== 'Submitted') return Response::deny('Only submitted requests can be endorsed.');
+        if (! $vr) {
+            return Response::deny('Vehicle request not found.');
+        }
+
+        if ($this->latestStatus($vehicleRequestId) !== 'Submitted') {
+            return Response::deny('Only submitted requests can be endorsed.');
+        }
 
         $ids = $this->signatoryIds('Recommending_VR', (string) $vr->division);
         if ($ids->isEmpty()) return Response::deny('Endorser not found.');
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to endorse.');
+        if (! $ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to endorse.');
 
         return Response::allow();
     }
 
     public function review(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.review')) {
+            return Response::deny('You are not allowed to review vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
+        if (! $vr) return Response::deny('Vehicle request not found.');
         if ($this->latestStatus($vehicleRequestId) !== 'Endorsed') return Response::deny('Only endorsed requests can be reviewed.');
 
         $ids = $this->signatoryIds('Reviewer_VR', (string) $vr->division);
         if ($ids->isEmpty()) return Response::deny('Reviewer not found.');
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to review.');
+        if (! $ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to review.');
 
         return Response::allow();
     }
 
     public function approve(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.approve')) {
+            return Response::deny('You are not allowed to approve vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
+        if (! $vr) return Response::deny('Vehicle request not found.');
         if ($this->latestStatus($vehicleRequestId) !== 'Reviewed') return Response::deny('Only reviewed requests can be approved.');
 
         $ids = $this->signatoryIds('Approver_VR', (string) $vr->division);
         if ($ids->isEmpty()) return Response::deny('Approver not found.');
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to approve.');
+        if (! $ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to approve.');
 
         return Response::allow();
     }
 
-    /* public function authorize(User $user, $vehicleRequestId): Response
-    {
-        $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
-        if ($this->latestStatus($vehicleRequestId) !== 'Reviewed') return Response::deny('Only reviewed requests can be authorized.');
-
-        $ids = $this->signatoryIds('Approver_TT', (string) $vr->division);
-        if ($ids->isEmpty()) return Response::deny('Authorizer not found.');
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to authorize.');
-
-        return Response::allow();
-    } */
-
     public function disapprove(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.disapprove')) {
+            return Response::deny('You are not allowed to disapprove vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
+        if (! $vr) return Response::deny('Vehicle request not found.');
 
         $status = $this->latestStatus($vehicleRequestId);
 
@@ -174,19 +185,23 @@ class VehicleRequestPolicy
         ];
 
         $requiredType = $typeByStatus[$status] ?? null;
-        if (!$requiredType) return Response::deny('This request cannot be disapproved at its current status.');
+        if (! $requiredType) return Response::deny('This request cannot be disapproved at its current status.');
 
         $ids = $this->signatoryIds($requiredType, (string) $vr->division);
         if ($ids->isEmpty()) return Response::deny("No signatory found for {$requiredType}.");
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to disapprove.');
+        if (! $ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to disapprove.');
 
         return Response::allow();
     }
 
     public function return(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.return')) {
+            return Response::deny('You are not allowed to return vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
+        if (! $vr) return Response::deny('Vehicle request not found.');
 
         $status = $this->latestStatus($vehicleRequestId);
 
@@ -199,8 +214,6 @@ class VehicleRequestPolicy
             return Response::allow();
         }
 
-        $status = $this->latestStatus($vehicleRequestId);
-
         $typeByStatus = [
             'Submitted' => 'Recommending_VR',
             'Endorsed'  => 'Reviewer_VR',
@@ -209,23 +222,27 @@ class VehicleRequestPolicy
         ];
 
         $requiredType = $typeByStatus[$status] ?? null;
-        if (!$requiredType) return Response::deny('This request cannot be returned at its current status.');
+        if (! $requiredType) return Response::deny('This request cannot be returned at its current status.');
 
-        if (!in_array($requiredType, ['Approver_TT', 'Reviewer_VR'], true) && empty($vr->division)) {
+        if (! in_array($requiredType, ['Approver_TT', 'Reviewer_VR'], true) && empty($vr->division)) {
             return Response::deny('Division not set for this request.');
         }
 
         $ids = $this->signatoryIds($requiredType, (string) $vr->division);
         if ($ids->isEmpty()) return Response::deny("No signatory found for {$requiredType}.");
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to return.');
+        if (! $ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to return.');
 
         return Response::allow();
     }
 
     public function resubmit(User $user, $vehicleRequestId): Response
     {
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.vehicle-request.submit')) {
+            return Response::deny('You are not allowed to resubmit vehicle requests.');
+        }
+
         $vr = $this->requestRow($vehicleRequestId);
-        if (!$vr) return Response::deny('Vehicle request not found.');
+        if (! $vr) return Response::deny('Vehicle request not found.');
 
         $status = $this->latestStatus($vehicleRequestId);
         if ($status !== 'Returned') return Response::deny('Only returned requests can be resubmitted.');

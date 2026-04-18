@@ -6,7 +6,7 @@ use App\Models\VehicleRequest;
 use App\States\VehicleRequest\Endorsed as VrEndorsed;
 use App\States\VehicleRequest\Reviewed as VrReviewed;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use App\Traits\AuthorizesVehicleRequests;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Lorisleiva\Actions\ActionRequest;
@@ -15,12 +15,12 @@ use RuntimeException;
 
 class ReviewVehicleRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesVehicleRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('vr.review', $id);
+        return $this->canReviewVehicleRequest($request->user(), $id);
     }
 
     public function rules(): array
@@ -153,3 +153,5 @@ class ReviewVehicleRequest
         }
     }
 }
+
+

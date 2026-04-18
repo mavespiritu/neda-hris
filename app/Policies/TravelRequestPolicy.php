@@ -9,9 +9,6 @@ use Illuminate\Support\Facades\DB;
 
 class TravelRequestPolicy
 {
-    /**
-     * Create a new policy instance.
-     */
     public function __construct()
     {
         //
@@ -21,6 +18,11 @@ class TravelRequestPolicy
     {
         return method_exists($user, 'hasRole')
             && ! blank($user->ipms_id ?? null);
+    }
+
+    protected function canUsePermission(Authenticatable $user, string $permission): bool
+    {
+        return method_exists($user, 'can') && $user->can($permission);
     }
 
     public function visibleEmployeeIds(Authenticatable $user)
@@ -35,7 +37,6 @@ class TravelRequestPolicy
         }
 
         $rolePriorities = config('roles.priorities', []);
-
         $userRoles = $user->roles->pluck('name')->toArray();
 
         $highestRole = collect($userRoles)
@@ -79,6 +80,7 @@ class TravelRequestPolicy
     {
         return $this->isReviewer($user)
             || $this->isApprover($user)
+            || $this->canUsePermission($user, 'HRIS_travels.travel-requests.view.any')
             || $user->hasRole(['HRIS_RD', 'HRIS_ARD', 'HRIS_PRU', 'HRIS_Administrator']);
     }
 
@@ -115,7 +117,7 @@ class TravelRequestPolicy
 
         $globalTypes = ['Approver_TT', 'Reviewer_VR'];
 
-        if (!in_array($type, $globalTypes, true) && $division) {
+        if (! in_array($type, $globalTypes, true) && $division) {
             $q->where('division', $division);
         }
 
@@ -132,6 +134,10 @@ class TravelRequestPolicy
             return Response::deny('Only DRO1 staff can submit travel requests.');
         }
 
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.submit')) {
+            return Response::deny('You are not allowed to submit travel requests.');
+        }
+
         $tr = $this->requestRow($travelRequestId);
         if (! $tr) {
             return Response::deny('Travel request not found.');
@@ -141,9 +147,7 @@ class TravelRequestPolicy
             return Response::deny('Only the creator can submit this request.');
         }
 
-        $status = $this->latestStatus($travelRequestId);
-
-        if ($status !== 'Draft') {
+        if ($this->latestStatus($travelRequestId) !== 'Draft') {
             return Response::deny('Only draft requests can be submitted.');
         }
 
@@ -152,16 +156,25 @@ class TravelRequestPolicy
 
     public function create(Authenticatable $user): Response
     {
-        return $this->isStaffUser($user) && $user->hasRole('HRIS_Staff')
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can create travel requests.');
+        }
+
+        return $this->canUsePermission($user, 'HRIS_travels.travel-requests.create')
             ? Response::allow()
-            : Response::deny('Only DRO1 staff can create travel requests.');
+            : Response::deny('You are not allowed to create travel requests.');
     }
 
     public function viewAny(Authenticatable $user): Response
     {
-        return $this->isStaffUser($user) && $user->hasRole('HRIS_Staff')
+        if (! $this->isStaffUser($user)) {
+            return Response::deny('Only DRO1 staff can view travel requests.');
+        }
+
+        return ($this->canUsePermission($user, 'HRIS_travels.travel-requests.view.some')
+            || $this->canUsePermission($user, 'HRIS_travels.travel-requests.view.any'))
             ? Response::allow()
-            : Response::deny('Only DRO1 staff can view travel requests.');
+            : Response::deny('You are not allowed to view travel requests.');
     }
 
     public function edit(Authenticatable $user, $travelRequestId): Response
@@ -170,18 +183,16 @@ class TravelRequestPolicy
             return Response::deny('Only DRO1 staff can edit travel requests.');
         }
 
-        $travelRequest = $this->requestRow($travelRequestId);
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.update')) {
+            return Response::deny('You are not allowed to update travel requests.');
+        }
 
-        if (!$travelRequest) {
+        $travelRequest = $this->requestRow($travelRequestId);
+        if (! $travelRequest) {
             return Response::deny('Travel request not found.');
         }
 
-        if ($user->hasRole('HRIS_PRU')) {
-            return Response::allow();
-        }
-
         $status = $this->latestStatus($travelRequestId);
-
         if (! in_array($status, ['Draft', 'Returned'], true)) {
             return Response::deny('Only draft or returned requests can be edited.');
         }
@@ -199,18 +210,16 @@ class TravelRequestPolicy
             return Response::deny('Only DRO1 staff can delete travel requests.');
         }
 
-        $travelRequest = $this->requestRow($travelRequestId);
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.delete')) {
+            return Response::deny('You are not allowed to delete travel requests.');
+        }
 
+        $travelRequest = $this->requestRow($travelRequestId);
         if (! $travelRequest) {
             return Response::deny('Travel request not found.');
         }
 
-        if ($user->hasRole('HRIS_PRU')) {
-            return Response::allow();
-        }
-
         $status = $this->latestStatus($travelRequestId);
-
         if (! in_array($status, ['Draft', 'Returned'], true)) {
             return Response::deny('Only draft or returned requests can be deleted.');
         }
@@ -229,35 +238,35 @@ class TravelRequestPolicy
         }
 
         $conn2 = DB::connection('mysql2');
-
         $travelRequest = $conn2->table('travel_order')
             ->select(['id', 'division', 'created_by'])
             ->where('id', $travelRequestId)
             ->first();
 
-        if (!$travelRequest) {
+        if (! $travelRequest) {
             return Response::deny('Travel request not found.');
         }
 
-        if ($this->canSeeAllTravelRequests($user)) {
+        if ($this->canUsePermission($user, 'HRIS_travels.travel-requests.view.any')) {
             return Response::allow();
         }
 
-        $userRoles = $user->roles->pluck('name')->toArray();
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.view.some')) {
+            return Response::deny('You are not authorized to view this travel request.');
+        }
 
+        $userRoles = $user->roles->pluck('name')->toArray();
         $divisionRoles = ['HRIS_DC', 'HRIS_Staff'];
 
         if (
             count(array_intersect($userRoles, $divisionRoles)) > 0 &&
-            !empty($travelRequest->division) &&
+            ! empty($travelRequest->division) &&
             (string) $user->division === (string) $travelRequest->division
         ) {
             return Response::allow();
         }
 
         $empId = (string) $user->ipms_id;
-
-        // 3) Creator
         if ((string) $travelRequest->created_by === $empId) {
             return Response::allow();
         }
@@ -266,8 +275,8 @@ class TravelRequestPolicy
             ->where('travel_order_id', $travelRequestId)
             ->where(function ($q) use ($empId) {
                 $q->where('emp_id', $empId)
-                ->orWhere('recommender_id', $empId)
-                ->orWhere('approver_id', $empId);
+                    ->orWhere('recommender_id', $empId)
+                    ->orWhere('approver_id', $empId);
             })
             ->exists();
 
@@ -293,11 +302,16 @@ class TravelRequestPolicy
             return Response::deny('Only DRO1 staff can return travel requests.');
         }
 
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.return')) {
+            return Response::deny('You are not allowed to return travel requests.');
+        }
+
         $tr = $this->requestRow($travelRequestId);
-        if (!$tr) return Response::deny('Travel request not found.');
+        if (! $tr) {
+            return Response::deny('Travel request not found.');
+        }
 
         $status = $this->latestStatus($travelRequestId);
-
         if (in_array($status, ['Draft', 'Returned'], true)) {
             return Response::deny("{$status} requests cannot be returned.");
         }
@@ -307,22 +321,27 @@ class TravelRequestPolicy
             return Response::allow();
         }
 
-        $status = $this->latestStatus($travelRequestId);
-
         $typeByStatus = [
             'Submitted' => 'Reviewer_VR',
         ];
 
         $requiredType = $typeByStatus[$status] ?? null;
-        if (!$requiredType) return Response::deny('This request cannot be returned at its current status.');
+        if (! $requiredType) {
+            return Response::deny('This request cannot be returned at its current status.');
+        }
 
-        if (!in_array($requiredType, ['Reviewer_VR'], true) && empty($tr->division)) {
+        if (! in_array($requiredType, ['Reviewer_VR'], true) && empty($tr->division)) {
             return Response::deny('Division not set for this request.');
         }
 
         $ids = $this->signatoryIds($requiredType, (string) $tr->division);
-        if ($ids->isEmpty()) return Response::deny("No signatory found for {$requiredType}.");
-        if (!$ids->contains((string) $user->ipms_id)) return Response::deny('Not allowed to return.');
+        if ($ids->isEmpty()) {
+            return Response::deny("No signatory found for {$requiredType}.");
+        }
+
+        if (! $ids->contains((string) $user->ipms_id)) {
+            return Response::deny('Not allowed to return.');
+        }
 
         return Response::allow();
     }
@@ -333,11 +352,18 @@ class TravelRequestPolicy
             return Response::deny('Only DRO1 staff can resubmit travel requests.');
         }
 
-        $tr = $this->requestRow($travelRequestId);
-        if (!$tr) return Response::deny('Travel request not found.');
+        if (! $this->canUsePermission($user, 'HRIS_travels.travel-requests.update')) {
+            return Response::deny('You are not allowed to resubmit travel requests.');
+        }
 
-        $status = $this->latestStatus($travelRequestId);
-        if ($status !== 'Returned') return Response::deny('Only returned requests can be resubmitted.');
+        $tr = $this->requestRow($travelRequestId);
+        if (! $tr) {
+            return Response::deny('Travel request not found.');
+        }
+
+        if ($this->latestStatus($travelRequestId) !== 'Returned') {
+            return Response::deny('Only returned requests can be resubmitted.');
+        }
 
         if ((string) $tr->created_by !== (string) $user->ipms_id) {
             return Response::deny('Only the creator can resubmit.');
@@ -367,8 +393,7 @@ class TravelRequestPolicy
             return Response::deny('Travel request not found.');
         }
 
-        // Require state-based latest status to be Submitted
-        $status = $this->latestStatus($travelRequestId); // uses state transition label first
+        $status = $this->latestStatus($travelRequestId);
         if ($status !== 'Submitted') {
             return Response::deny('Only submitted travel requests can be generated.');
         }
@@ -378,7 +403,6 @@ class TravelRequestPolicy
         }
 
         $userRoles = $user->roles->pluck('name')->toArray();
-
         $divisionRoles = ['HRIS_DC', 'HRIS_Staff'];
         if (
             count(array_intersect($userRoles, $divisionRoles)) > 0 &&
@@ -389,7 +413,6 @@ class TravelRequestPolicy
         }
 
         $empId = (string) $user->ipms_id;
-
         if ((string) $travelRequest->created_by === $empId) {
             return Response::allow();
         }
@@ -398,8 +421,8 @@ class TravelRequestPolicy
             ->where('travel_order_id', $travelRequestId)
             ->where(function ($q) use ($empId) {
                 $q->where('emp_id', $empId)
-                ->orWhere('recommender_id', $empId)
-                ->orWhere('approver_id', $empId);
+                    ->orWhere('recommender_id', $empId)
+                    ->orWhere('approver_id', $empId);
             })
             ->exists();
 
@@ -410,4 +433,3 @@ class TravelRequestPolicy
         return Response::deny('You are not authorized to view this travel request.');
     }
 }
-

@@ -3,18 +3,19 @@
 namespace App\Actions\TravelRequests;
 
 use App\Services\TravelRequests\TravelRequestFormBuilder;
-use Illuminate\Support\Facades\Gate;
+
 use Inertia\Inertia;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Traits\AuthorizesTravelRequests;
 
 class CreateTravelRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesTravelRequests;
 
     public function authorize(ActionRequest $request): bool
     {
-        return Gate::forUser($request->user())->allows('tr.create');
+        return $this->canCreateTravelRequest($request->user());
     }
 
     public function asController(ActionRequest $request, TravelRequestFormBuilder $builder)

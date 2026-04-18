@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react"
  * - storageKey?: string (optional - if you want localStorage persistence here instead of parent)
  * - syncHash?: boolean (default true)
  * - fallbackKey?: string (default first available)
+ * - orientation?: "vertical" | "horizontal"
  *
  * Notes:
  * - "availableTabs" are those not hidden and not disabled.
@@ -22,12 +23,12 @@ const ResponsiveTabs = ({
   syncHash = true,
   fallbackKey,
   className = "",
-  tabClassName = "",       
-  activeTabClassName = "",   
+  tabClassName = "",
+  activeTabClassName = "",
+  orientation = "vertical",
 }) => {
   const availableTabs = useMemo(() => {
-    return (Array.isArray(tabs) ? tabs : [])
-      .filter((t) => !t?.hidden)
+    return (Array.isArray(tabs) ? tabs : []).filter((t) => !t?.hidden)
   }, [tabs])
 
   const selectableTabs = useMemo(() => {
@@ -142,7 +143,6 @@ const ResponsiveTabs = ({
                   setOpen(false)
                 }}
                 className={`w-full text-left px-4 py-2 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed ${tabClassName}`}
-
               >
                 {t.label}
               </button>
@@ -151,8 +151,14 @@ const ResponsiveTabs = ({
         )}
       </div>
 
-      {/* Desktop sidebar */}
-      <nav className="hidden md:flex flex-col gap-2">
+      {/* Desktop tabs */}
+      <nav
+        className={`hidden md:flex gap-2 ${
+          orientation === "horizontal"
+            ? "flex-row flex-wrap items-center"
+            : "flex-col"
+        }`}
+      >
         {availableTabs.map((t) => (
           <button
             key={t.key}
@@ -160,7 +166,7 @@ const ResponsiveTabs = ({
             disabled={t.disabled}
             onClick={() => handleSelect(t.key)}
             className={`text-left px-4 py-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed ${tabClassName} ${
-            value === t.key
+              value === t.key
                 ? `bg-muted font-semibold ${activeTabClassName}`
                 : "hover:bg-muted"
             }`}

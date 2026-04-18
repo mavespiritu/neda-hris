@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import axios from "axios"
 import { router, usePage } from "@inertiajs/react"
 import { Loader2, Paperclip } from "lucide-react"
@@ -95,6 +95,13 @@ const AssessmentTab = () => {
   }, [vacancy.id])
 
   const rows = sortApplicantsByRank(applicants.data?.data || [])
+  const totalApplicants = rows.length
+  const prescreenedApplicants = rows.filter((applicant) => Boolean(applicant.secretariat_assessment_status))
+  const hrmpsbPassedApplicants = rows.filter((applicant) => applicant.hrmpsb_assessment_status === "Passed")
+  const rankMissingFromPassedApplicants = hrmpsbPassedApplicants.filter((applicant) => !String(applicant.rank ?? "").trim())
+  const incompleteSecretariatCount = totalApplicants - prescreenedApplicants.length
+  const incompleteRankCount = rankMissingFromPassedApplicants.length
+  const needsAssessmentAttention = incompleteSecretariatCount > 0 || incompleteRankCount > 0
 
   const selectedExamAttachment = useMemo(() => {
     if (!examDialog.applicant || !examDialog.testType) return null
@@ -266,12 +273,18 @@ const AssessmentTab = () => {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex items-center gap-3">
         <h2 className="text-lg font-semibold">Assessment</h2>
-        <p className="text-sm text-muted-foreground">
-          Review applicant assessment progress.
-        </p>
+        {needsAssessmentAttention && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700">
+            <span className="h-2 w-2 rounded-full bg-red-600" />
+            Action needed
+          </span>
+        )}
       </div>
+      <p className="text-sm text-muted-foreground">
+        Review applicant assessment progress.
+      </p>
 
       <div className="overflow-hidden rounded-lg border">
         <Table>
@@ -582,3 +595,7 @@ const AssessmentTab = () => {
 }
 
 export default AssessmentTab
+
+
+
+

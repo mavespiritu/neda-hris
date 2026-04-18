@@ -3,7 +3,7 @@
 namespace App\Actions\VehicleRequests;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use App\Traits\AuthorizesVehicleRequests;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -11,12 +11,12 @@ use RuntimeException;
 
 class UpdateVehicleExpense
 {
-    use AsAction;
+    use AsAction, AuthorizesVehicleRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('vr.review', $id);
+        return $this->canReviewVehicleRequest($request->user(), $id);
     }
 
     public function rules(): array
@@ -139,3 +139,5 @@ class UpdateVehicleExpense
         }
     }
 }
+
+

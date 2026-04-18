@@ -3,20 +3,21 @@
 namespace App\Actions\TravelRequests;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
+use App\Traits\AuthorizesTravelRequests;
 use RuntimeException;
 
 class DeleteTravelRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesTravelRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('tr.delete', $id);
+        return $this->canDeleteTravelRequest($request->user(), $id);
     }
 
     public function rules(): array

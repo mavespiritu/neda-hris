@@ -6,7 +6,7 @@ use App\Models\VehicleRequest;
 use App\States\VehicleRequest\Submitted as VrSubmitted;
 use App\States\VehicleRequest\Endorsed as VrEndorsed;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use App\Traits\AuthorizesVehicleRequests;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\ActionRequest;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -14,12 +14,12 @@ use RuntimeException;
 
 class EndorseVehicleRequest
 {
-    use AsAction;
+    use AsAction, AuthorizesVehicleRequests;
 
     public function authorize(ActionRequest $request): bool
     {
         $id = (int) $request->route('id');
-        return Gate::forUser($request->user())->allows('vr.endorse', $id);
+        return $this->canEndorseVehicleRequest($request->user(), $id);
     }
 
     public function rules(): array
@@ -64,3 +64,5 @@ class EndorseVehicleRequest
         }
     }
 }
+
+

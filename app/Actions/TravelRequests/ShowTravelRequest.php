@@ -3,6 +3,9 @@
 namespace App\Actions\TravelRequests;
 
 use App\Traits\BuildsEmployeeNameMap;
+use App\Support\Workflows\TravelRequest\WorkflowDefinition as TravelRequestWorkflowDefinition;
+use App\Support\Workflows\TravelRequest\WorkflowActorResolver;
+use App\Support\Workflows\WorkflowProgressResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +59,8 @@ class ShowTravelRequest
         $reasons = $this->fetchReasons($conn2);
         $serviceExpenses = $this->fetchServiceExpenses($conn2, $id);
         $pruReview = $this->fetchPruReview($conn2, $id);
+        $workflowHistories = $this->fetchSubmissionHistories($conn2, $id);
+
 
         $dispatcherId = $pruReview?->dispatcher;
         $empIds = $this->collectEmployeeIds(
@@ -70,6 +75,8 @@ class ShowTravelRequest
         $employeesById = $this->employeeNamesById($empIds, 'mysql3');
         $staffs = $this->mapStaffs($staffRows, $employeesById);
         $serviceExpenses = $this->mapServiceExpenses($serviceExpenses, $employeesById);
+
+        $workflow = $this->buildWorkflowProgress($order, $workflowHistories, $employeesById);
 
         if ($pruReview) {
             $pruReview->dispatcher_name = $this->employeeName($employeesById, $dispatcherId);
@@ -111,6 +118,7 @@ class ShowTravelRequest
                 'est_departure_time' => $order->est_departure_time,
                 'est_arrival_time' => $order->est_arrival_time,
                 'review' => $pruReview,
+                'workflow' => $workflow,
             ],
             'vehicles' => $vehicles,
             'serviceExpenses' => $serviceExpenses,
@@ -135,6 +143,7 @@ class ShowTravelRequest
                 'other_drivers',
                 'isRequestingVehicle',
                 'created_by',
+                'division',
                 'date_created',
                 'tr_state',
                 'vr_state',
@@ -270,6 +279,43 @@ class ShowTravelRequest
         });
     }
 
+    private function fetchSubmissionHistories($conn2, int $id): Collection
+    {
+        return $conn2->table('submission_history')
+            ->where('model', 'TO')
+            ->where('model_id', $id)
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function buildWorkflowProgress(object $order, Collection $historyRows, Collection $employeesById): array
+    {
+        $currentState = $this->travelRequestStatusFromState($order->tr_state)
+            ?? (string) ($historyRows->last()?->status ?? 'Draft');
+
+        $resolver = new WorkflowProgressResolver();
+        $actorResolver = new WorkflowActorResolver();
+        $creatorName = $this->employeeName($employeesById, $order->created_by);
+
+        return $resolver->resolve(
+            definition: TravelRequestWorkflowDefinition::make(),
+            currentState: $currentState,
+            historyRows: $historyRows,
+            actorNameResolver: fn ($empId) => $this->employeeName($employeesById, $empId),
+            actorResolver: fn ($step, array $context) => $actorResolver->resolveByLabel($step->expectedActorLabel ?? $step->actorLabel, [
+                'creator_id' => (string) $order->created_by,
+                'creator_name' => $creatorName,
+                'creator_division' => (string) ($order->division ?? ''),
+                'current_state' => $currentState,
+            ]),
+            context: [
+                'creator_id' => (string) $order->created_by,
+                'creator_name' => $creatorName,
+                'creator_division' => (string) ($order->division ?? ''),
+                'current_state' => $currentState,
+            ]
+        );
+    }
     private function canMap(int $id): array
     {
         $gate = Gate::forUser(auth()->user());
@@ -329,3 +375,10 @@ class ShowTravelRequest
         return $map[$stateClass] ?? class_basename($stateClass);
     }
 }
+
+
+
+
+
+
+

@@ -6,6 +6,7 @@ use App\Models\AppExamResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -158,6 +159,7 @@ class StoreApplicantExamResult
                 'hash' => $file->hash,
                 'type' => $file->type,
                 'date_upload' => $file->date_upload,
+                'preview_url' => route('files.preview', $file->id),
             ] : null,
         ];
     }

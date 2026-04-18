@@ -19,6 +19,7 @@ class ListVacancy
 
     public function asController(Request $request)
     {
+        $conn = DB::connection('mysql');
         $conn2 = DB::connection('mysql2');
         $conn3 = DB::connection('mysql3');
 
@@ -64,8 +65,44 @@ class ListVacancy
         }
 
         $vacancies = $vacanciesQuery->orderBy('v.id', 'desc')->paginate(20);
-
         $vacancyIds = $vacancies->pluck('id')->toArray();
+
+        $publicationDates = $conn2->table('publication_vacancies as pv')
+            ->join('publication as p', 'p.id', '=', 'pv.publication_id')
+            ->whereIn('pv.vacancy_id', $vacancyIds)
+            ->select('pv.vacancy_id', DB::raw('MAX(p.date_published) as date_published'))
+            ->groupBy('pv.vacancy_id')
+            ->get()
+            ->keyBy('vacancy_id');
+
+        $applicantsCounts = $conn->table('application as a')
+            ->whereIn('a.vacancy_id', $vacancyIds)
+            ->where('a.status', 'Submitted')
+            ->select('a.vacancy_id', DB::raw('COUNT(DISTINCT a.user_id) as applicants_count'))
+            ->groupBy('a.vacancy_id')
+            ->get()
+            ->keyBy('vacancy_id');
+
+        $prescreenedCounts = $conn->table('application as a')
+            ->join('app_assessments as aa', 'aa.application_id', '=', 'a.id')
+            ->whereIn('a.vacancy_id', $vacancyIds)
+            ->where('a.status', 'Submitted')
+            ->where('aa.stage', 'secretariat')
+            ->select('a.vacancy_id', DB::raw('COUNT(DISTINCT a.user_id) as prescreened_count'))
+            ->groupBy('a.vacancy_id')
+            ->get()
+            ->keyBy('vacancy_id');
+
+        $shortlistedCounts = $conn->table('application as a')
+            ->join('app_assessments as aa', 'aa.application_id', '=', 'a.id')
+            ->whereIn('a.vacancy_id', $vacancyIds)
+            ->where('a.status', 'Submitted')
+            ->where('aa.stage', 'hrmpsb')
+            ->where('aa.overall_status', 'Passed')
+            ->select('a.vacancy_id', DB::raw('COUNT(DISTINCT a.user_id) as shortlisted_count'))
+            ->groupBy('a.vacancy_id')
+            ->get()
+            ->keyBy('vacancy_id');
 
         $employees = $conn3->table('tblemployee as e')
             ->select([
@@ -82,7 +119,7 @@ class ListVacancy
             ->get()
             ->groupBy('model_id');
 
-        $vacancies->getCollection()->transform(function ($vacancy) use ($histories, $employees) {
+        $vacancies->getCollection()->transform(function ($vacancy) use ($histories, $employees, $applicantsCounts, $prescreenedCounts, $shortlistedCounts, $publicationDates) {
             $latestHistory = $histories->get($vacancy->id, collect())->first();
             $vacancy->creator = $employees->get($vacancy->created_by)->name ?? null;
             $vacancy->status = $latestHistory->status ?? null;
@@ -90,6 +127,10 @@ class ListVacancy
             $vacancy->acted_by_name = $latestHistory ? $employees->get($latestHistory->acted_by)->name ?? null : null;
             $vacancy->date_acted = $latestHistory->date_acted ?? null;
             $vacancy->remarks = $latestHistory->remarks ?? null;
+            $vacancy->date_published = $publicationDates->get($vacancy->id)->date_published ?? null;
+            $vacancy->applicants_count = (int) ($applicantsCounts->get($vacancy->id)->applicants_count ?? 0);
+            $vacancy->prescreened_count = (int) ($prescreenedCounts->get($vacancy->id)->prescreened_count ?? 0);
+            $vacancy->shortlisted_count = (int) ($shortlistedCounts->get($vacancy->id)->shortlisted_count ?? 0);
             return $vacancy;
         });
 
@@ -126,3 +167,5 @@ class ListVacancy
         ]);
     }
 }
+
+

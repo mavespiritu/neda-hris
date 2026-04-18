@@ -1,6 +1,6 @@
 import PageTitle from "@/components/PageTitle"
 import { useState, useEffect, useMemo } from "react"
-import { useHasRole } from "@/hooks/useAuth"
+import { useHasPermission } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import {
     Dialog,
@@ -33,7 +33,11 @@ const Publications = () => {
 
     const { auth: { user }, data: { publications } } = usePage().props
 
-    const canSelectPublication = useHasRole(["HRIS_HR"])
+    const canViewPublication = useHasPermission("HRIS_recruitment.publications.view")
+    const canCreatePublication = useHasPermission("HRIS_recruitment.publications.create")
+    const canEditPublication = useHasPermission("HRIS_recruitment.publications.update")
+    const canDeletePublication = useHasPermission("HRIS_recruitment.publications.delete")
+    const canPublishPublication = useHasPermission("HRIS_recruitment.publications.publish")
 
     const [confirmAction, setConfirmAction] = useState(null)
     const [selectedRow, setSelectedRow] = useState(null)
@@ -111,29 +115,6 @@ const Publications = () => {
             meta: { enableSorting: true },
         },
         {
-            header: "Created by",
-            accessorKey: "creator",
-            cell: ({ row }) => {
-                const createdBy = row.original.created_by
-                const creator = row.original.creator
-                const dateCreated = row.original.date_created
-
-                return (
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium mt-1">
-                            {createdBy === user.ipms_id ? "You" : creator}
-                        </span>
-                        {dateCreated && (
-                            <span className="text-xs text-gray-400">
-                                Date: {formatDate(dateCreated)}
-                            </span>
-                        )}
-                    </div>
-                )
-            },
-            meta: { enableSorting: true },
-        },
-        {
         header: "Status",
         accessorKey: "status",
         cell: ({ row }) => {
@@ -170,16 +151,14 @@ const Publications = () => {
         {
             header: "Actions",
             cell: ({ row }) => {
-            const { props } = usePage()
-            const roles = props.auth.user?.roles || [] 
             const status = row.original.is_public
 
             let actions = []
 
-            if (status === 0 && roles.includes("HRIS_HR")) {
+            if (status === 0 && canPublishPublication) {
                 actions.push({ label: "Publish", icon: <CheckCircle className="h-2 w-2" /> })
             }
-            if (status === 1 && roles.includes("HRIS_HR")) {
+            if (status === 1 && canPublishPublication) {
                 actions.push({ label: "Unpublish", icon: <XCircle className="h-2 w-2" /> })
             }
 
@@ -203,9 +182,32 @@ const Publications = () => {
                 </div>
             )
             }
-        }
+        },
+        {
+            header: "Created by",
+            accessorKey: "creator",
+            cell: ({ row }) => {
+                const createdBy = row.original.created_by
+                const creator = row.original.creator
+                const dateCreated = row.original.date_created
+
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium mt-1">
+                            {createdBy === user.ipms_id ? "You" : creator}
+                        </span>
+                        {dateCreated && (
+                            <span className="text-xs text-gray-400">
+                                Date: {formatDate(dateCreated)}
+                            </span>
+                        )}
+                    </div>
+                )
+            },
+            meta: { enableSorting: true },
+        },
           
-    ], [])
+    ], [canPublishPublication, canCreatePublication, canEditPublication, canDeletePublication, user.ipms_id])
 
     const [filters, setFilters] = useState({})
 
@@ -224,17 +226,16 @@ const Publications = () => {
         initialData: publications,
         filters,
         options: {
-            enableAdd: true,
-            enableEdit: true,
+            enableAdd: canCreatePublication,
+            enableEdit: (row) => canEditPublication && row.original.is_public === 0,
             enableView: false,
             enableViewAsLink: true,
-            enableDelete: true, 
-            enableBulkDelete: true,
+            enableDelete: (row) => canDeletePublication && row.original.is_public === 0, 
+            enableBulkDelete: canDeletePublication,
             enableSearching: true,
             enableFiltering: true,
-            enableRowSelection: row => !row.original.isLocked || canSelectPublication,
+            enableRowSelection: (row) => canDeletePublication && row.original.is_public === 0, 
             enableGenerateReport: true,
-            canModify: canSelectPublication
         },
         endpoints: {
             viewEndpoint: (id) => route('publications.show', id),

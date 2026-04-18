@@ -53,8 +53,44 @@ class ShowVacancy
             )
             ->count();
 
+        $prescreenedCount = $conn->table('application as a')
+            ->join('app_assessments as aa', 'aa.application_id', '=', 'a.id')
+            ->where('a.vacancy_id', $id)
+            ->where('a.status', 'Submitted')
+            ->where('aa.stage', 'secretariat')
+            ->select('a.user_id')
+            ->distinct()
+            ->count('a.user_id');
+
+        $passedHrmpsbCount = $conn->table('application as a')
+            ->join('app_assessments as aa', 'aa.application_id', '=', 'a.id')
+            ->where('a.vacancy_id', $id)
+            ->where('a.status', 'Submitted')
+            ->where('aa.stage', 'hrmpsb')
+            ->where('aa.overall_status', 'Passed')
+            ->select('a.user_id')
+            ->distinct()
+            ->count('a.user_id');
+
+        $rankedCount = $conn->table('application as a')
+            ->join('app_ranking_results as ar', 'ar.application_id', '=', 'a.id')
+            ->join('app_assessments as aa', function ($join) {
+                $join->on('aa.application_id', '=', 'a.id')
+                    ->where('aa.stage', 'hrmpsb')
+                    ->where('aa.overall_status', 'Passed');
+            })
+            ->where('a.vacancy_id', $id)
+            ->where('a.status', 'Submitted')
+            ->select('a.user_id')
+            ->distinct()
+            ->count('a.user_id');
+
         $vacancy->requirements_count = (int) $requirementsCount;
         $vacancy->applicants_count = (int) $applicantsCount;
+        $vacancy->prescreened_count = (int) $prescreenedCount;
+        $vacancy->passed_hrmpsb_count = (int) $passedHrmpsbCount;
+        $vacancy->ranked_count = (int) $rankedCount;
+        $vacancy->assessment_attention_needed = ($applicantsCount > $prescreenedCount) || ($passedHrmpsbCount > $rankedCount);
 
         $competencies = $conn2->table('vacancy_competencies as vc')
             ->leftJoin('competency as c', 'vc.competency_id', '=', 'c.comp_id')
@@ -134,3 +170,5 @@ class ShowVacancy
         ]);
     }
 }
+
+

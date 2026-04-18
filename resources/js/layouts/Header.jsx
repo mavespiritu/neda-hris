@@ -13,7 +13,7 @@ import {
 } from "../components/ui/dropdown-menu"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useForm } from '@inertiajs/react'
+import { useForm, router } from '@inertiajs/react'
 import { useUser } from "@/providers/UserProvider"
 import MessengerMiniInbox from "@/components/MessengerMiniInbox"
 import { useMessengerShared } from "@/providers/MessengerSharedProvider"
@@ -44,13 +44,15 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
   }) => {
 
   const { user, isApplicant } = useUser() 
+  console.log(user)
   const { post } =  useForm()
   const { onlineUserIds } = useMessengerShared()
 
     const handleLogout = (e) => {
-      post(route('logout'))
-
-      return to_route('login')
+      e.preventDefault()
+      post(route('logout'), {
+        onSuccess: () => router.visit(route('login'))
+      })
     }
 
     const isOnline = user?.id ? onlineUserIds.has(Number(user.id)) : false
@@ -121,3 +123,5 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
   }
   
   export default Header
+
+

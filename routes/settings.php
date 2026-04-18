@@ -40,6 +40,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::delete('/settings/travel-orders/signatories/{id}', [SignatoriesController::class, 'destroy'])->name('settings.travel-orders.signatories.destroy');
     Route::post('/settings/travel-orders/signatories/bulk-destroy', [SignatoriesController::class, 'bulkDestroy'])->name('settings.travel-orders.signatories.bulk-destroy');
 
+
     Route::get('/settings/travel-orders/vehicles', [VehiclesController::class, 'index'])->name('settings.travel-orders.vehicles');
     Route::post('/settings/travel-orders/vehicles', [VehiclesController::class, 'store'])->name('settings.travel-orders.vehicles.store');
     Route::put('/settings/travel-orders/vehicles/{id}', [VehiclesController::class, 'update'])->name('settings.travel-orders.vehicles.update');
@@ -82,3 +83,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::delete('/settings/groups/{id}', [ManageGroups::class, 'destroy'])->name('settings.groups.destroy');
     Route::post('/settings/groups/bulk-destroy', [ManageGroups::class, 'bulkDestroy'])->name('settings.groups.bulk-destroy');
 });
+
+
+
+

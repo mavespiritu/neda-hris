@@ -9,7 +9,6 @@ const getFileUrl = (file) => {
   if (!file) return ""
 
   if (file.preview_url) return file.preview_url
-  if (file.id) return route("files.preview", file.id)
 
   const filePath = file?.path || file?.filepath || ""
 
@@ -117,3 +116,4 @@ const AttachmentPreviewDialog = ({ open, onOpenChange, file, title }) => {
 }
 
 export default AttachmentPreviewDialog
+
