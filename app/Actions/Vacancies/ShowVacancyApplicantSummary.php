@@ -20,20 +20,11 @@ class ShowVacancyApplicantSummary
     {
         $conn = DB::connection('mysql');
 
-        $page = max((int) $request->input('page', 1), 1);
-        $perPage = min(max((int) $request->input('per_page', 20), 1), 50);
-
         $query = $this->buildQuery($conn, $vacancy, $type);
-        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        $applicants = $query->get();
 
         return response()->json([
-            'data' => $paginator->items(),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ],
+            'data' => $applicants,
         ]);
     }
 

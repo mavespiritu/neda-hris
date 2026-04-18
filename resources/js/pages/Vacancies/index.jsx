@@ -1,6 +1,6 @@
 import PageTitle from "@/components/PageTitle"
 import axios from "axios"
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useHasRole, useHasPermission } from "@/hooks/useAuth"
 import { Head, usePage, router, useForm } from "@inertiajs/react"
 import {
@@ -79,12 +79,8 @@ const Vacancies = () => {
         type: null,
         vacancyId: null,
         items: [],
-        page: 1,
-        lastPage: 1,
         loading: false,
-        loadingMore: false,
     })
-    const summaryScrollRef = useRef(null)
     const [selectedSummaryApplicant, setSelectedSummaryApplicant] = useState(null)
     const canViewApplicantsSummary = useHasPermission("HRIS_recruitment.vacancies.applicants.view")
 
@@ -178,16 +174,12 @@ const vacancySummaryTypes = {
             type,
             vacancyId,
             items: [],
-            page: 1,
-            lastPage: 1,
             loading: true,
-            loadingMore: false,
         })
 
         try {
             const { data } = await axios.get(
-                route("vacancies.applicants.summary", { vacancy: vacancyId, type }),
-                { params: { page: 1, per_page: 20 } }
+                route("vacancies.applicants.summary", { vacancy: vacancyId, type })
             )
 
             setSummaryDialog((prev) => ({
@@ -196,16 +188,12 @@ const vacancySummaryTypes = {
                 type,
                 vacancyId,
                 items: data.data || [],
-                page: data.meta?.current_page || 1,
-                lastPage: data.meta?.last_page || 1,
                 loading: false,
-                loadingMore: false,
             }))
         } catch (error) {
             setSummaryDialog((prev) => ({
                 ...prev,
                 loading: false,
-                loadingMore: false,
             }))
             toast({
                 title: "Unable to load applicant list",
@@ -215,54 +203,13 @@ const vacancySummaryTypes = {
         }
     }
 
-    const loadMoreSummaryItems = async () => {
-        if (!summaryDialog.open || summaryDialog.loading || summaryDialog.loadingMore) return
-        if (summaryDialog.page >= summaryDialog.lastPage) return
-
-        const nextPage = summaryDialog.page + 1
-
-        setSummaryDialog((prev) => ({ ...prev, loadingMore: true }))
-
-        try {
-            const { data } = await axios.get(
-                route("vacancies.applicants.summary", { vacancy: summaryDialog.vacancyId, type: summaryDialog.type }),
-                { params: { page: nextPage, per_page: 20 } }
-            )
-
-            setSummaryDialog((prev) => ({
-                ...prev,
-                items: [...prev.items, ...(data.data || [])],
-                page: data.meta?.current_page || nextPage,
-                lastPage: data.meta?.last_page || nextPage,
-                loadingMore: false,
-            }))
-        } catch (error) {
-            setSummaryDialog((prev) => ({ ...prev, loadingMore: false }))
-            toast({
-                title: "Unable to load more applicants",
-                description: error.response?.data?.message || "Please try again.",
-                variant: "destructive",
-            })
-        }
-    }
-
-    const handleSummaryScroll = (event) => {
-        const target = event.currentTarget
-        if (target.scrollTop + target.clientHeight >= target.scrollHeight - 80) {
-            loadMoreSummaryItems()
-        }
-    }
-
     const closeSummaryDialog = () => {
         setSummaryDialog({
             open: false,
             type: null,
             vacancyId: null,
             items: [],
-            page: 1,
-            lastPage: 1,
             loading: false,
-            loadingMore: false,
         })
     }
 
@@ -290,7 +237,7 @@ const vacancySummaryTypes = {
                             {summaryDialog.items.length + " applicants"}
                         </div>
                     </div>
-                    <div ref={summaryScrollRef} onScroll={handleSummaryScroll} className="max-h-64 overflow-y-auto p-2">
+                    <div className="max-h-64 overflow-y-auto p-2">
                         {summaryDialog.loading ? (
                             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -298,7 +245,7 @@ const vacancySummaryTypes = {
                             </div>
                         ) : summaryDialog.items.length ? (
                             <div className="space-y-1">
-                                {summaryDialog.items.map((item) => (
+                                {summaryDialog.items.map((item, index) => (
                                     <Button
                                         key={item.id}
                                         type="button"
@@ -310,7 +257,9 @@ const vacancySummaryTypes = {
                                         }}
                                     >
                                         <div className="flex w-full flex-col items-start">
-                                            <div className="text-sm font-medium leading-tight">{item.name || "-"}</div>
+                                            <div className="text-sm font-medium leading-tight">
+                                                {index + 1}. {item.name || "-"}
+                                            </div>
                                             {item.date_submitted && (
                                                 <div className="text-xs text-muted-foreground">
                                                     Submitted: {formatDate(item.date_submitted)}
@@ -323,13 +272,6 @@ const vacancySummaryTypes = {
                         ) : (
                             <div className="py-8 text-center text-sm text-muted-foreground">
                                 No applicants found.
-                            </div>
-                        )}
-
-                        {summaryDialog.loadingMore && (
-                            <div className="flex items-center justify-center py-3 text-xs text-muted-foreground">
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Loading more...
                             </div>
                         )}
                     </div>
