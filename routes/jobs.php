@@ -11,6 +11,7 @@ Route::middleware(['web', 'auth.any', 'verified'])->group(function () {
     Route::get('/jobs/{hashedId}', [JobsController::class, 'show'])->name('jobs.show');
     Route::get('/jobs/{hashedId}/apply', [JobsController::class, 'apply'])->name('jobs.apply');
     Route::post('/jobs/{hashedId}/submit', [JobsController::class, 'submit'])->name('jobs.submit');
+    Route::post('/applications/{applicationId}/feedback', [JobsController::class, 'storeFeedback'])->name('jobs.feedback.store');
     Route::get('/jobs/{hashedId}/requirements', [JobsController::class, 'getRequirements'])->name('jobs.requirements');
     Route::post('/jobs/{hashedId}/requirements', [JobsController::class, 'storeRequirement'])->name('jobs.requirements.store');
     Route::delete('/jobs/{hashedId}/requirements/{requirementId}/file/{id}', [JobsController::class, 'destroyRequirement'])->name('jobs.requirements.destroy');

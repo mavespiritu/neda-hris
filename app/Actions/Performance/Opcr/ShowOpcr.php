@@ -23,7 +23,7 @@ class ShowOpcr
     public function authorize(Request $request): bool
     {
         return $request->user() !== null
-            && Gate::forUser($request->user())->allows('opcr', 'performance');
+            && $request->user()->can('HRIS_performance.opcr.page.view');      
     }
 
     public function asController(Request $request): Response

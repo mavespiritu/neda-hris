@@ -3,7 +3,9 @@
 namespace App\Actions\Settings;
 
 use App\Models\PerformanceGroup;
+use App\Models\PerformanceGroupMember;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -38,8 +40,8 @@ class ManageGroups
             ->with([
                 'members' => fn ($builder) => $builder->select([
                     'id',
-                    'performance_group_id',
-                    'employee_ipms_id',
+                    'group_id',
+                    'emp_id',
                     'sort_order',
                 ]),
             ])
@@ -73,12 +75,9 @@ class ManageGroups
             ->exists();
 
         if ($exists) {
-            return response()->json([
-                'message' => 'This group already exists.',
-                'errors' => [
-                    'name' => ['This group already exists.'],
-                ],
-            ], 422);
+            return redirect()->back()->withErrors([
+                'name' => 'This group already exists.',
+            ]);
         }
 
         $record = PerformanceGroup::create([
@@ -92,15 +91,10 @@ class ManageGroups
         $this->syncMembers($record, $data['members'] ?? []);
         $record->load('members');
 
-        return response()->json([
+        return redirect()->back()->with([
+            'status' => 'success',
+            'title' => 'Success!',
             'message' => 'Group saved successfully.',
-            'data' => [
-                'id' => $record->id,
-                'name' => $record->name,
-                'description' => $record->description,
-                'sort_order' => $record->sort_order,
-                'members' => $record->members->map(fn ($member) => $member->employee_ipms_id)->values()->all(),
-            ],
         ]);
     }
 
@@ -123,12 +117,9 @@ class ManageGroups
             ->exists();
 
         if ($exists) {
-            return response()->json([
-                'message' => 'This group already exists.',
-                'errors' => [
-                    'name' => ['This group already exists.'],
-                ],
-            ], 422);
+            return redirect()->back()->withErrors([
+                'name' => 'This group already exists.',
+            ]);
         }
 
         $record->update([
@@ -139,7 +130,11 @@ class ManageGroups
 
         $this->syncMembers($record, $data['members'] ?? []);
 
-        return response()->json(['message' => 'Group updated successfully.']);
+        return redirect()->back()->with([
+            'status' => 'success',
+            'title' => 'Success!',
+            'message' => 'Group updated successfully.',
+        ]);
     }
 
     public function destroy(int $id)
@@ -176,17 +171,24 @@ class ManageGroups
             ->unique()
             ->values();
 
-        $group->members()->delete();
+        DB::connection('mysql2')->transaction(function () use ($group, $memberIds) {
+            PerformanceGroupMember::query()
+                ->where('group_id', $group->id)
+                ->delete();
 
-        if ($memberIds->isEmpty()) {
-            return;
-        }
+            if ($memberIds->isEmpty()) {
+                return;
+            }
 
-        $group->members()->createMany(
-            $memberIds->map(fn ($memberId, $index) => [
-                'employee_ipms_id' => $memberId,
-                'sort_order' => $index + 1,
-            ])->all()
-        );
+            PerformanceGroupMember::query()->insert(
+                $memberIds->map(fn ($memberId, $index) => [
+                    'group_id' => $group->id,
+                    'emp_id' => $memberId,
+                    'sort_order' => $index + 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])->all()
+            );
+        });
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -15,15 +15,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
-
-// Debounce utility to delay API calls
-const debounce = (fn, delay) => {
-  let timer
-  return (...args) => {
-    clearTimeout(timer)
-    timer = setTimeout(() => fn(...args), delay)
-  }
-}
+import useDebounce from "@/hooks/useDebounce"
 
 const SearchableComboBox = ({
   name,
@@ -50,57 +42,85 @@ const SearchableComboBox = ({
   const [loading, setLoading] = useState(false)
   const [selectedValue, setSelectedValue] = useState(value)
   const [selectedLabel, setSelectedLabel] = useState("")
-  const excludedValueSet = useMemo(() => new Set((excludeValues || []).filter(Boolean).map((item) => String(item))), [excludeValues])
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
+  const excludedValueKey = useMemo(
+    () => (excludeValues || []).filter(Boolean).map((item) => String(item)).join("\u0001"),
+    [excludeValues]
+  )
+  const excludedValueSet = useMemo(
+    () => new Set(excludedValueKey ? excludedValueKey.split("\u0001") : []),
+    [excludedValueKey]
+  )
 
   useEffect(() => {
-    if (selectedItem) {
+    if (!selectedItem) return
+
+    if (selectedItem.value !== undefined && String(selectedItem.value) !== String(selectedValue)) {
       setSelectedValue(selectedItem.value)
+    }
+
+    if (selectedItem.label !== undefined && selectedItem.label !== selectedLabel) {
       setSelectedLabel(selectedItem.label)
     }
-  }, [selectedItem])
-
-  const fetchItems = useCallback(
-    debounce(async (term) => {
-      if (!term || term.length < minSearchChars) {
-        setItems([])
-        return
-      }
-
-      try {
-        setLoading(true)
-        const response = await fetch(`${apiUrl}?search=${encodeURIComponent(term)}`)
-        const data = await response.json()
-        const rawItems = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
-        setItems(
-          rawItems
-              .map((item) => ({
-                ...item,
-                value: item.value ?? item.id,
-                label:
-                  item.label ??
-                  item.category ??
-                  item.activity ??
-                  item.target ??
-                  item.name ??
-                  item.title ??
-                  String(item.id ?? ""),
-              }))
-            .filter((item) => !excludedValueSet.has(String(item.value)))
-        )
-      } catch (err) {
-        console.error("Error fetching items:", err)
-        setItems([])
-      } finally {
-        setLoading(false)
-      }
-    }, 500),
-    [apiUrl, excludedValueSet, minSearchChars]
-  )
+  }, [selectedItem, selectedLabel, selectedValue])
 
   const handleSearch = (term) => {
     setSearchTerm(term)
-    fetchItems(term)
   }
+
+  useEffect(() => {
+    if (!debouncedSearchTerm || debouncedSearchTerm.length < minSearchChars) {
+      setItems([])
+      setLoading((current) => (current ? false : current))
+      return
+    }
+
+    let active = true
+
+    const fetchItems = async () => {
+      try {
+        setLoading(true)
+        const joiner = apiUrl.includes("?") ? "&" : "?"
+        const response = await fetch(`${apiUrl}${joiner}search=${encodeURIComponent(debouncedSearchTerm)}`)
+        const data = await response.json()
+        const rawItems = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+
+        if (!active) return
+
+        setItems(
+          rawItems
+            .map((item) => ({
+              ...item,
+              value: item.value ?? item.id,
+              label:
+                item.label ??
+                item.category ??
+                item.activity ??
+                item.target ??
+                item.name ??
+                item.title ??
+                String(item.id ?? ""),
+            }))
+            .filter((item) => !excludedValueSet.has(String(item.value)))
+        )
+      } catch (err) {
+        if (active) {
+          console.error("Error fetching items:", err)
+          setItems([])
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchItems()
+
+    return () => {
+      active = false
+    }
+  }, [apiUrl, debouncedSearchTerm, excludedValueSet, minSearchChars])
 
   // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Modified to include full item
   const toggleSelection = (currentValue, currentItem) => {
@@ -141,7 +161,7 @@ const SearchableComboBox = ({
               className={cn(
                 "flex min-w-0 flex-1 items-center gap-2 pr-2 text-left whitespace-normal break-words",
                 labelWidth || "w-full",
-                !selectedValue && "text-gray-700"
+                selectedValue ? "text-slate-900 font-medium" : "text-gray-700"
               )}
             >
               {loading ? (
@@ -191,13 +211,17 @@ const SearchableComboBox = ({
                         key={item.value}
                         value={item.label}
                         onSelect={() => toggleSelection(item.value, item)} // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ include item
-                        className="text-sm"
+                        className={cn(
+                          "text-sm",
+                          selectedValue === item.value &&
+                            "bg-slate-100 font-medium text-slate-900 data-[selected=true]:bg-slate-100 data-[selected=true]:text-slate-900"
+                        )}
                       >
                         <Check
                           className={cn(
-                            "mr-2 h-4 w-4",
+                            "mr-2 h-4 w-4 shrink-0",
                             selectedValue === item.value
-                              ? "opacity-100"
+                              ? "opacity-100 text-slate-700"
                               : "opacity-0"
                           )}
                         />
@@ -208,24 +232,26 @@ const SearchableComboBox = ({
                 ) : searchTerm.length >= minSearchChars ? (
                   <div className="space-y-2 p-2">
                     <CommandEmpty>No results found</CommandEmpty>
-                    {canAdd && onAdd && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-auto w-full px-2 py-2 justify-center text-sm font-medium text-slate-900"
-                        onClick={() => {
-                          onAdd(searchTerm)
-                          setOpen(false)
-                        }}
-                      >
-                        {addLabel}
-                      </Button>
-                    )}
                   </div>
                 ) : (
                   <CommandEmpty>Type at least {minSearchChars} characters...</CommandEmpty>
                 )}
               </CommandList>
+              {canAdd && onAdd && (
+                <div className="border-t p-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-auto w-full justify-center px-2 py-2 text-sm font-medium text-slate-900"
+                    onClick={() => {
+                      onAdd(searchTerm)
+                      setOpen(false)
+                    }}
+                  >
+                    {addLabel}
+                  </Button>
+                </div>
+              )}
             </Command>
           </PopoverContent>
         )}

@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import SearchableComboBox from "@/components/SearchableComboBox"
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { previewHierarchyBadgeStyles } from "../utils/previewHierarchyStyles"
 
 export default function OpcrTreeTable({
   canManage,
@@ -57,10 +59,72 @@ export default function OpcrTreeTable({
   onPreviewOpen,
   autosaveStatus = "idle",
 }) {
+  const showActionsColumn = Boolean(canManage)
+  const getCategoryRowClassName = () =>
+    "border-l-4 border-l-sky-300 bg-sky-100 hover:bg-sky-200/60"
+
+  const getProgramRowClassName = () =>
+    "border-l-4 border-l-amber-300 bg-amber-100 hover:bg-amber-200/60"
+
+  const getPapRowClassName = (level = 1) => {
+    if (level === 1) {
+      return "border-l-4 border-l-emerald-300 bg-emerald-100 hover:bg-emerald-200/60"
+    }
+
+    if (level === 2) {
+      return "border-l-4 border-l-emerald-400 bg-emerald-100 hover:bg-emerald-200/60"
+    }
+
+    return "border-l-4 border-l-emerald-500 bg-emerald-100 hover:bg-emerald-200/60"
+  }
+
+  const getSuccessIndicatorRowClassName = (level = 1) => {
+    if (level === 1) {
+      return "border-l-4 border-l-violet-300 bg-violet-100 hover:bg-violet-200/60"
+    }
+
+    if (level === 2) {
+      return "border-l-4 border-l-violet-400 bg-violet-100 hover:bg-violet-200/60"
+    }
+
+    return "border-l-4 border-l-violet-500 bg-violet-100 hover:bg-violet-200/60"
+  }
+
+  const getCategoryMetricClassName = () => "text-sm font-semibold text-slate-900 tabular-nums"
+
+  const getPapMetricClassName = () => "text-sm font-semibold text-slate-900 tabular-nums"
+
+  const getSuccessIndicatorMetricClassName = () => "text-xs font-normal text-slate-900 tabular-nums"
+
+  const flashRows = (type) => {
+    const nodes = document.querySelectorAll(`[data-preview-row="${type}"]`)
+    if (!nodes.length) return
+
+    nodes.forEach((node) => {
+      node.classList.add("ring-2", "ring-inset", "ring-slate-500/35", "animate-pulse")
+    })
+
+    window.setTimeout(() => {
+      nodes.forEach((node) => {
+        node.classList.remove("ring-2", "ring-inset", "ring-slate-500/35", "animate-pulse")
+      })
+    }, 700)
+  }
+
+  const getProgramGroupKey = (pap = {}) => {
+    const title = String(pap.program_title ?? "").trim().toLowerCase()
+    if (title) {
+      return `title:${title}`
+    }
+
+    const programId = String(pap.program_id ?? "").trim()
+    return programId ? `id:${programId}` : ""
+  }
+
   const renderSuccessIndicatorRows = (category, pap, successIndicators = [], level = 1, pathPrefix = "", parentPapName = "") =>
     (Array.isArray(successIndicators) ? successIndicators : []).map((indicator, indicatorIndex) => {
       const rowNumber = `${pathPrefix}.${indicatorIndex + 1}`
-      const rowClassName = level === 1 ? "bg-slate-100/40" : level === 2 ? "bg-slate-100/60" : "bg-slate-100/75"
+      const rowClassName = getSuccessIndicatorRowClassName(level)
       const indicatorParentLabel = parentPapName || pap.activity || category.category
       const accountabilityLabel = formatAssignments([
         ...(indicator.division_assignments ?? []),
@@ -75,6 +139,7 @@ export default function OpcrTreeTable({
         <TableRow
           key={`${category.id}-${pap.id}-si-${indicator.id ?? rowNumber}`}
           className={rowClassName}
+          data-preview-row="successIndicator"
           draggable={canManage}
           onDragStart={() =>
             handleTreeDragStart({
@@ -128,32 +193,26 @@ export default function OpcrTreeTable({
           onDragEnd={handleTreeDragEnd}
         >
           <TableCell className="align-middle px-3 py-1 text-xs text-slate-400">{rowNumber}</TableCell>
-          <TableCell className="align-middle px-3 py-1 text-sm text-slate-400 whitespace-normal break-words">
+          <TableCell className="align-middle px-3 py-1 text-sm text-slate-400 whitespace-normal break-words" />
+          <TableCell className="align-middle px-3 py-1 text-xs text-slate-500 whitespace-normal break-words">
             <div className="flex items-center gap-2" style={{ paddingLeft: `${(level + 1) * 1.25}rem` }}>
-              <span className="text-slate-300">-</span>
-              <span className="whitespace-normal break-words">{formatText(indicatorParentLabel)}</span>
-            </div>
-          </TableCell>
-          <TableCell className="align-middle px-3 py-1 text-sm text-slate-400 whitespace-normal break-words">
-            <div className="flex items-center gap-2" style={{ paddingLeft: `${(level + 1) * 1.25}rem` }}>
-              <span className="text-slate-300">-</span>
               <span className="whitespace-normal break-words">{formatText(pap.activity)}</span>
             </div>
           </TableCell>
           <TableCell className="align-middle px-3 py-1 text-sm text-slate-900 whitespace-normal break-words">
-            <div className="whitespace-normal break-words">{formatText(indicator.target ?? indicator.title, "-")}</div>
+            <div className="whitespace-normal break-words">{formatText(indicator.target ?? indicator.title)}</div>
           </TableCell>
           <TableCell className="align-middle px-3 py-1 text-xs text-slate-700 whitespace-normal break-words">
             <div className="whitespace-normal break-words">{accountabilityDisplay}</div>
           </TableCell>
-          <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">
+          <TableCell className={`align-middle px-3 py-1 text-right ${getSuccessIndicatorMetricClassName()}`}>
             {`${formatFixedNumber(weightValue)}%`}
           </TableCell>
-          <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">
+          <TableCell className={`align-middle px-3 py-1 text-right ${getSuccessIndicatorMetricClassName()}`}>
             {formatFixedNumber(amountValue)}
           </TableCell>
-          <TableCell className="align-middle px-3 py-1 text-right">
-            {canManage && (
+          {showActionsColumn && (
+            <TableCell className="align-middle px-3 py-1 text-right">
               <div className="ml-auto flex w-full items-center justify-end gap-1.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -169,7 +228,7 @@ export default function OpcrTreeTable({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Edit Success Indicator</p>
+                    <p>{`Edit Success Indicator: ${formatText(indicator.target ?? indicator.title ?? indicator.label)}`}</p>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -186,12 +245,12 @@ export default function OpcrTreeTable({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Remove Success Indicator</p>
+                    <p>{`Remove Success Indicator: ${formatText(indicator.target ?? indicator.title ?? indicator.label)}`}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
-            )}
-          </TableCell>
+            </TableCell>
+          )}
         </TableRow>
       )
     })
@@ -206,14 +265,14 @@ export default function OpcrTreeTable({
       const childLevel = level > 1
       const papTotals = getPapDisplayTotals(pap)
       const rowClassName = level === 1 ? "bg-slate-50/60" : level === 2 ? "bg-slate-100/50" : "bg-slate-100/70"
-      const programKey = String(pap.program_id ?? pap.program_title ?? "")
+      const programKey = getProgramGroupKey(pap)
       const programLabel = formatText(pap.program_title, "")
       const shouldRenderProgramRow = programLabel !== "-" && programKey && programKey !== lastProgramKey
 
       if (shouldRenderProgramRow) {
         lastProgramKey = programKey
         rows.push(
-          <TableRow key={`${category.id}-${pap.id}-${rowNumber}-program`} className="bg-slate-50/40">
+          <TableRow key={`${category.id}-${pap.id}-${rowNumber}-program`} className={getProgramRowClassName()} data-preview-row="program">
             <TableCell className="align-middle px-3 py-1 text-xs text-slate-400" />
             <TableCell className="align-middle px-3 py-1 text-sm text-slate-400 whitespace-normal break-words" />
             <TableCell className="align-middle px-3 py-1 text-sm font-semibold uppercase tracking-wide text-slate-600 whitespace-normal break-words">
@@ -226,7 +285,7 @@ export default function OpcrTreeTable({
             <TableCell className="align-middle px-3 py-1 text-sm text-slate-500">-</TableCell>
             <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-500">-</TableCell>
             <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-500">-</TableCell>
-            <TableCell className="align-middle px-3 py-1 text-right" />
+            {showActionsColumn && <TableCell className="align-middle px-3 py-1 text-right" />}
           </TableRow>
         )
       }
@@ -234,7 +293,8 @@ export default function OpcrTreeTable({
       rows.push(
         <Fragment key={`${category.id}-${pap.id}-${rowNumber}`}>
           <TableRow
-            className={rowClassName}
+            className={getPapRowClassName(level)}
+            data-preview-row="pap"
             draggable={canManage}
             onDragStart={() =>
               handleTreeDragStart({
@@ -294,23 +354,21 @@ export default function OpcrTreeTable({
             }}
           >
             <TableCell className="align-middle px-3 py-1 text-xs text-slate-400">{rowNumber}</TableCell>
-            <TableCell className="align-middle px-3 py-1 text-sm text-slate-400 whitespace-normal break-words min-w-0">
+            <TableCell className="align-middle px-3 py-1 text-xs text-slate-500 whitespace-normal break-words min-w-0">
               <div className="flex min-w-0 items-center gap-2" style={{ paddingLeft: `${level * 1.25}rem` }}>
-                <span className="text-slate-300">-</span>
                 {childLevel ? (
                   <div className="flex min-w-0 flex-col">
-                    <span className="break-words text-sm text-slate-400">{formatText(parentPapName)}</span>
+                    <span className="break-words text-xs text-slate-500">{formatText(parentPapName)}</span>
                   </div>
                 ) : (
                   <span className="whitespace-normal break-words">{formatText(category.category)}</span>
                 )}
               </div>
             </TableCell>
-            <TableCell className="align-middle px-3 py-1 text-sm text-slate-900 whitespace-normal break-words min-w-0">
+            <TableCell className="align-middle px-3 py-1 text-xs text-slate-500 whitespace-normal break-words min-w-0">
               <div className="flex min-w-0 items-center gap-2" style={{ paddingLeft: `${level * 1.25}rem` }}>
-                <span className="text-slate-300">-</span>
                 <div className="min-w-0">
-                  <div className="whitespace-normal break-words">{formatText(pap.activity)}</div>
+                  <div className="whitespace-normal break-words text-sm font-semibold text-slate-700">{formatText(pap.activity)}</div>
                 </div>
               </div>
             </TableCell>
@@ -337,7 +395,7 @@ export default function OpcrTreeTable({
                         </PopoverTrigger>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Add Success Indicator</p>
+                        <p>{`Add Success Indicator: ${formatText(pap.activity ?? pap.title ?? pap.label)}`}</p>
                       </TooltipContent>
                     </Tooltip>
                     <PopoverContent align="start" className="w-[420px] p-3">
@@ -370,28 +428,11 @@ export default function OpcrTreeTable({
               )}
             </TableCell>
             <TableCell className="align-middle px-3 py-1 text-sm text-slate-500">-</TableCell>
-            <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">{`${formatFixedNumber(papTotals.weight)}%`}</TableCell>
-            <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">{formatFixedNumber(papTotals.amount)}</TableCell>
-            <TableCell className="align-middle px-3 py-1 text-right">
-              {canManage && (
+            <TableCell className={`align-middle px-3 py-1 text-right ${getPapMetricClassName()}`}>{`${formatFixedNumber(papTotals.weight)}%`}</TableCell>
+            <TableCell className={`align-middle px-3 py-1 text-right ${getPapMetricClassName()}`}>{formatFixedNumber(papTotals.amount)}</TableCell>
+            {showActionsColumn && (
+              <TableCell className="align-middle px-3 py-1 text-right">
                 <div className="ml-auto flex w-full items-center justify-end gap-1.5">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => openPapPicker(category.id, pap.id)}
-                        aria-label={`Add Child MFO/PAP: ${formatText(pap.activity)}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Add Child MFO/PAP</p>
-                    </TooltipContent>
-                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -406,7 +447,7 @@ export default function OpcrTreeTable({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Edit MFO/PAP</p>
+                      <p>{`Edit MFO/PAP: ${formatText(pap.activity ?? pap.title ?? pap.label)}`}</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -423,12 +464,12 @@ export default function OpcrTreeTable({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Remove MFO/PAP</p>
+                      <p>{`Remove MFO/PAP: ${formatText(pap.activity ?? pap.title ?? pap.label)}`}</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
-              )}
-            </TableCell>
+              </TableCell>
+            )}
           </TableRow>
 
           {renderSuccessIndicatorRows(category, pap, successIndicators, level, rowNumber, parentPapName)}
@@ -468,10 +509,33 @@ export default function OpcrTreeTable({
                       ? "Saved"
                       : autosaveStatus === "dirty"
                         ? "Unsaved changes"
-                        : "Idle"}
+                    : "Idle"}
                 </span>
               </div>
             )}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+              <span className="font-semibold uppercase tracking-wide text-slate-500">Legend</span>
+              <button type="button" onClick={() => flashRows("category")} className="rounded-full">
+                <Badge variant="secondary" className={previewHierarchyBadgeStyles.category}>
+                  Category
+                </Badge>
+              </button>
+              <button type="button" onClick={() => flashRows("program")} className="rounded-full">
+                <Badge variant="secondary" className={previewHierarchyBadgeStyles.program}>
+                  Program
+                </Badge>
+              </button>
+              <button type="button" onClick={() => flashRows("pap")} className="rounded-full">
+                <Badge variant="secondary" className={previewHierarchyBadgeStyles.pap}>
+                  MFO/PAP
+                </Badge>
+              </button>
+              <button type="button" onClick={() => flashRows("successIndicator")} className="rounded-full">
+                <Badge variant="secondary" className={previewHierarchyBadgeStyles.successIndicator}>
+                  Success Indicator
+                </Badge>
+              </button>
+            </div>
             <div className="mt-2 flex items-center gap-2 text-xs">
               <span
                 className={`rounded-full border px-2 py-0.5 font-medium ${
@@ -494,7 +558,7 @@ export default function OpcrTreeTable({
             </div>
           </div>
           <div className="flex items-start md:items-end">
-            {typeof onPreviewOpen === "function" && (
+            {canManage && typeof onPreviewOpen === "function" && (
               <Button type="button" variant="outline" size="sm" className="gap-2" onClick={onPreviewOpen}>
                 <Eye className="h-4 w-4" />
                 Preview OPCR
@@ -511,18 +575,18 @@ export default function OpcrTreeTable({
               <TableHead className="px-3 py-2 text-xs">Category</TableHead>
               <TableHead className="px-3 py-2 text-xs">Major Final Outputs/Programs, Activities, and Projects</TableHead>
               <TableHead className="px-3 py-2 text-xs">Success Indicator</TableHead>
-              <TableHead className="px-3 py-2 text-xs">Division/Group/Staff Accountable</TableHead>
-              <TableHead className="w-[110px] px-3 py-2 text-xs">Weight</TableHead>
-              <TableHead className="w-[140px] px-3 py-2 text-right text-xs">Allocated Budget</TableHead>
-              <TableHead className="w-[120px] px-3 py-2 text-right text-xs">Action</TableHead>
-            </TableRow>
+            <TableHead className="px-3 py-2 text-xs">Division/Group/Staff Accountable</TableHead>
+            <TableHead className="w-[110px] px-3 py-2 text-xs">Weight</TableHead>
+            <TableHead className="w-[140px] px-3 py-2 text-right text-xs">Allocated Budget</TableHead>
+            {showActionsColumn && <TableHead className="w-[120px] px-3 py-2 text-right text-xs">Action</TableHead>}
+          </TableRow>
           </TableHeader>
           <TableBody>
             {categoryRows.length > 0 ? (
               categoryRows.map((category, index) => (
                 <Fragment key={category.id}>
-                  <TableRow
-                    draggable={canManage}
+                    <TableRow
+                      draggable={canManage}
                     onDragStart={() =>
                       handleTreeDragStart({
                         type: "category",
@@ -556,7 +620,9 @@ export default function OpcrTreeTable({
                         handleTreeDragEnd()
                       }
                     }}
-                  >
+                      className={getCategoryRowClassName()}
+                      data-preview-row="category"
+                    >
                     <TableCell className="align-middle px-3 py-1 text-xs text-slate-500">{index + 1}</TableCell>
                     <TableCell className="align-middle px-3 py-1 text-sm font-medium text-slate-900 whitespace-normal break-words">{formatText(category.category)}</TableCell>
                     <TableCell className="align-middle px-3 py-1 text-sm text-slate-900">
@@ -571,17 +637,17 @@ export default function OpcrTreeTable({
                             }
                           }}
                         >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <PopoverTrigger asChild>
-                                <Button type="button" variant="outline" size="sm" className="gap-2 px-2 text-xs">
-                                  <Plus className="h-4 w-4" />
-                                  Add MFO/PAP
-                                </Button>
-                              </PopoverTrigger>
-                            </TooltipTrigger>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <PopoverTrigger asChild>
+                                  <Button type="button" variant="outline" size="sm" className="gap-2 px-2 text-xs">
+                                    <Plus className="h-4 w-4" />
+                                    Add MFO/PAP
+                                  </Button>
+                                </PopoverTrigger>
+                              </TooltipTrigger>
                             <TooltipContent>
-                              <p>Add MFO/PAP</p>
+                              <p>{`Add MFO/PAP: ${formatText(category.category ?? category.label)}`}</p>
                             </TooltipContent>
                           </Tooltip>
                           <PopoverContent align="start" className="w-[420px] p-3">
@@ -612,39 +678,41 @@ export default function OpcrTreeTable({
                     </TableCell>
                     <TableCell className="align-middle px-3 py-1 text-sm text-slate-500">-</TableCell>
                     <TableCell className="align-middle px-3 py-1 text-sm text-slate-500">-</TableCell>
-                    <TableCell className="align-middle px-3 py-1 text-right text-sm font-semibold text-slate-900 tabular-nums">{`${formatFixedNumber(getCategoryDisplayWeight(category))}%`}</TableCell>
-                    <TableCell className="align-middle px-3 py-1 text-right text-sm font-semibold text-slate-900 tabular-nums">{formatFixedNumber(getCategoryDisplayAmount(category))}</TableCell>
-                    <TableCell className="align-middle px-3 py-1 text-right">
-                      <div className="ml-auto flex w-full items-center justify-end gap-1.5">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => openCategoryEdit(category)} aria-label={`Edit Category: ${formatText(category.category)}`}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Edit Category</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => promptRemoveCategory(category)} aria-label={`Remove Category: ${formatText(category.category)}`}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Remove Category</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
+                    <TableCell className={`align-middle px-3 py-1 text-right ${getCategoryMetricClassName()}`}>{`${formatFixedNumber(getCategoryDisplayWeight(category))}%`}</TableCell>
+                    <TableCell className={`align-middle px-3 py-1 text-right ${getCategoryMetricClassName()}`}>{formatFixedNumber(getCategoryDisplayAmount(category))}</TableCell>
+                    {showActionsColumn && (
+                      <TableCell className="align-middle px-3 py-1 text-right">
+                        <div className="ml-auto flex w-full items-center justify-end gap-1.5">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => openCategoryEdit(category)} aria-label={`Edit Category: ${formatText(category.category)}`}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{`Edit Category: ${formatText(category.category ?? category.label)}`}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700" onClick={() => promptRemoveCategory(category)} aria-label={`Remove Category: ${formatText(category.category)}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{`Remove Category: ${formatText(category.category ?? category.label)}`}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                   {renderPapRows(category, category.paps ?? [], 1, null, "", "", String(index + 1))}
                 </Fragment>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="py-4 text-center text-sm text-slate-500">
+                <TableCell colSpan={showActionsColumn ? 8 : 7} className="py-4 text-center text-sm text-slate-500">
                   No categories configured yet.
                 </TableCell>
               </TableRow>
@@ -654,7 +722,7 @@ export default function OpcrTreeTable({
               <TableRow className="border-t border-slate-300 bg-slate-50 font-medium">
                 <TableCell className="px-3 py-2" />
                 <TableCell className="align-middle px-3 py-1 text-sm text-slate-900 whitespace-normal break-words">
-                  {canManage && (
+                  {showActionsColumn && (
                     <Popover open={addCategoryOpen} onOpenChange={setAddCategoryOpen}>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -692,9 +760,9 @@ export default function OpcrTreeTable({
                 <TableCell className="px-3 py-2" />
                 <TableCell className="px-3 py-2" />
                 <TableCell className="text-right px-3 py-1 text-xs text-slate-600 font-semibold">Grand Total</TableCell>
-                <TableCell className="align-middle px-3 py-1 text-right text-sm font-semibold text-slate-900 tabular-nums">{`${formatFixedNumber(categoryWeightTotal)}%`}</TableCell>
-                <TableCell className="align-middle px-3 py-1 text-right text-sm font-semibold text-slate-900 tabular-nums">{formatFixedNumber(categoryRows.reduce((total, row) => total + getCategoryDisplayAmount(row), 0))}</TableCell>
-                <TableCell className="px-3 py-2" />
+                <TableCell className={`align-middle px-3 py-1 text-right ${getCategoryMetricClassName()}`}>{`${formatFixedNumber(categoryWeightTotal)}%`}</TableCell>
+                <TableCell className={`align-middle px-3 py-1 text-right ${getCategoryMetricClassName()}`}>{formatFixedNumber(categoryRows.reduce((total, row) => total + getCategoryDisplayAmount(row), 0))}</TableCell>
+                {showActionsColumn && <TableCell className="px-3 py-2" />}
               </TableRow>
             )}
           </TableBody>

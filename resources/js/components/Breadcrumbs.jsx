@@ -10,9 +10,9 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 
-const Breadcrumbs = ({ items }) => {
+const Breadcrumbs = ({ items, className = "" }) => {
   return (
-    <Breadcrumb className="hidden md:flex">
+    <Breadcrumb className={className}>
         <BreadcrumbList>
             {items?.map((item, i) => (
                 <React.Fragment key={i}>

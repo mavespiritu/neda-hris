@@ -17,6 +17,8 @@ import { useForm, router } from '@inertiajs/react'
 import { useUser } from "@/providers/UserProvider"
 import MessengerMiniInbox from "@/components/MessengerMiniInbox"
 import { useMessengerShared } from "@/providers/MessengerSharedProvider"
+import Breadcrumbs from "@/components/Breadcrumbs"
+import { useBreadcrumbs } from "@/providers/BreadcrumbProvider"
 
   const Logo = ({ hidden = false }) => {
 
@@ -47,6 +49,7 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
   console.log(user)
   const { post } =  useForm()
   const { onlineUserIds } = useMessengerShared()
+  const { breadcrumbItems } = useBreadcrumbs()
 
     const handleLogout = (e) => {
       e.preventDefault()
@@ -65,11 +68,21 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
             : "px-4 sm:px-8 md:px-16 lg:px-32"
         }`}
       >
-        {user?.ipms_id ?
-         <SidebarTrigger className="ml-2" /> : 
-        <span className=" font-semibold text-lg">
-          DRO1 HRIS
-        </span>}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {user?.ipms_id ? (
+            <>
+              <SidebarTrigger className="ml-2 shrink-0" />
+              <Breadcrumbs
+                items={breadcrumbItems}
+                className="hidden min-w-0 md:flex"
+              />
+            </>
+          ) : (
+            <span className=" font-semibold text-lg">
+              DRO1 HRIS
+            </span>
+          )}
+        </div>
         <div className="flex flex-end items-center gap-2">
           {user?.ipms_id ? (
             <MessengerMiniInbox
@@ -123,5 +136,4 @@ import { useMessengerShared } from "@/providers/MessengerSharedProvider"
   }
   
   export default Header
-
 

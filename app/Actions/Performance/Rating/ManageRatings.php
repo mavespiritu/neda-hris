@@ -65,10 +65,11 @@ class ManageRatings
 
         $exists = PerformanceRating::query()
             ->whereRaw('LOWER(TRIM(name)) = ?', [strtolower(trim($data['name']))])
+            ->whereRaw('LOWER(TRIM(COALESCE(category, ?))) = ?', ['Common', strtolower(trim($data['category'] ?? 'Common'))])
             ->exists();
 
         if ($exists) {
-            return $this->errorResponse($request, 'This rating already exists.', 'name');
+            return $this->errorResponse($request, 'This rating already exists in this category.', 'name');
         }
 
         $record = PerformanceRating::create([
@@ -101,10 +102,11 @@ class ManageRatings
         $exists = PerformanceRating::query()
             ->where('id', '!=', $id)
             ->whereRaw('LOWER(TRIM(name)) = ?', [strtolower(trim($data['name']))])
+            ->whereRaw('LOWER(TRIM(COALESCE(category, ?))) = ?', ['Common', strtolower(trim($data['category'] ?? 'Common'))])
             ->exists();
 
         if ($exists) {
-            return $this->errorResponse($request, 'This rating already exists.', 'name');
+            return $this->errorResponse($request, 'This rating already exists in this category.', 'name');
         }
 
         $record->update([

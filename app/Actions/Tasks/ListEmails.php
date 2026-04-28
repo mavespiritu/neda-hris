@@ -17,7 +17,8 @@ class ListEmails
 
     public function authorize(Request $request): bool
     {
-        return $request->user() instanceof User;
+        return $request->user() !== null
+            && $request->user()->can('HRIS_performance.emails.page.view');        
     }
 
     public function asController(Request $request): Response|JsonResponse

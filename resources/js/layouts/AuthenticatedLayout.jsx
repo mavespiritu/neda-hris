@@ -8,6 +8,7 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/toaster"
 import { MessengerPresenceProvider } from "@/providers/MessengerPresenceProvider"
 import { MessengerSharedProvider } from "@/providers/MessengerSharedProvider"
+import { BreadcrumbProvider } from "@/providers/BreadcrumbProvider"
 
 const AuthenticatedLayoutBody = ({
   children,
@@ -159,25 +160,27 @@ const AuthenticatedLayout = ({ children }) => {
   return (
     <MessengerPresenceProvider userId={user?.id}>
       <MessengerSharedProvider>
-        <AuthenticatedLayoutBody
-          children={children}
-          user={user}
-          users={users}
-          messenger_users={messenger_users}
-          isMessengerPage={isMessengerPage}
-          open={open}
-          setOpen={setOpen}
-          messengerPanelOpen={messengerPanelOpen}
-          messengerPanelMode={messengerPanelMode}
-          messengerPanelConversation={messengerPanelConversation}
-          messengerPanelWidth={messengerPanelWidth}
-          messengerPanelGap={messengerPanelGap}
-          handleOpenMessengerConversation={handleOpenMessengerConversation}
-          handleComposeMessengerConversation={handleComposeMessengerConversation}
-          handleCloseMessengerPanel={handleCloseMessengerPanel}
-          handleOpenFullMessenger={handleOpenFullMessenger}
-          handleSelectMessengerPageConversation={handleSelectMessengerPageConversation}
-        />
+        <BreadcrumbProvider>
+          <AuthenticatedLayoutBody
+            children={children}
+            user={user}
+            users={users}
+            messenger_users={messenger_users}
+            isMessengerPage={isMessengerPage}
+            open={open}
+            setOpen={setOpen}
+            messengerPanelOpen={messengerPanelOpen}
+            messengerPanelMode={messengerPanelMode}
+            messengerPanelConversation={messengerPanelConversation}
+            messengerPanelWidth={messengerPanelWidth}
+            messengerPanelGap={messengerPanelGap}
+            handleOpenMessengerConversation={handleOpenMessengerConversation}
+            handleComposeMessengerConversation={handleComposeMessengerConversation}
+            handleCloseMessengerPanel={handleCloseMessengerPanel}
+            handleOpenFullMessenger={handleOpenFullMessenger}
+            handleSelectMessengerPageConversation={handleSelectMessengerPageConversation}
+          />
+        </BreadcrumbProvider>
       </MessengerSharedProvider>
     </MessengerPresenceProvider>
   )

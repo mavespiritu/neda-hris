@@ -1358,7 +1358,13 @@ class JobsController extends Controller
             return redirect()->route('my-applications.index')
                 ->with('status', 'success')
                 ->with('title', 'Success!')
-                ->with('message', 'You have successfully submitted your application');
+                ->with('message', 'You have successfully submitted your application')
+                ->with('feedback_prompt', [
+                    'application_id' => $application->id,
+                    'reference_no' => $vacancy->reference_no ?? null,
+                    'position' => $vacancy->position_description ?? $vacancy->position ?? '',
+                    'item_no' => $vacancy->item_no ?? '',
+                ]);
 
 
         } catch (\Exception $e) {
@@ -1372,6 +1378,69 @@ class JobsController extends Controller
                 'message' => 'An error occurred while submitting application.',
             ]);
         }
+    }
+
+    public function storeFeedback(Request $request, int $applicationId)
+    {
+        $validated = $request->validate([
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'feedback' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $conn = DB::connection('mysql');
+        $user = auth()->user();
+
+        $applicant = $conn->table('applicant')
+            ->when(is_null($user->ipms_id), function ($query) {
+                return $query->where('type', 'Applicant');
+            }, function ($query) {
+                return $query->where('type', 'Staff');
+            })
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $applicant) {
+            abort(404, 'Applicant not found');
+        }
+
+        $application = $conn->table('application as a')
+            ->leftJoin('applicant as ap', 'a.applicant_id', '=', 'ap.id')
+            ->where('a.id', $applicationId)
+            ->where('a.user_id', $user->id)
+            ->when(is_null($user->ipms_id), function ($query) {
+                return $query->where('ap.type', 'Applicant');
+            }, function ($query) {
+                return $query->where('ap.type', 'Staff');
+            })
+            ->select('a.id', 'a.status')
+            ->first();
+
+        if (! $application) {
+            abort(404, 'Application not found');
+        }
+
+        if (strtolower(trim((string) ($application->status ?? ''))) === 'draft') {
+            abort(403, 'Feedback is only available after submitting an application.');
+        }
+
+        $now = now();
+
+        $conn->table('application_feedback')->updateOrInsert(
+            ['application_id' => $application->id],
+            [
+                'user_id' => $user->id,
+                'rating' => (int) $validated['rating'],
+                'feedback' => $validated['feedback'] ?? null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]
+        );
+
+        return back()->with([
+            'status' => 'success',
+            'title' => 'Thank you!',
+            'message' => 'Your feedback was saved successfully.',
+        ]);
     }
 
     public function getRequirements($hashedId, Request $request)

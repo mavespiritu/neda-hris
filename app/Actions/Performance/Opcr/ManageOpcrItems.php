@@ -144,6 +144,8 @@ class ManageOpcrItems
             'nodes.*.paps' => ['nullable', 'array'],
         ]);
 
+        $this->validateTreeCapacityNodes($data['nodes']);
+
         DB::connection('mysql2')->transaction(function () use ($record, $data, $request, $activeDivisionIds) {
             DB::connection('mysql2')
                 ->table('opcr_assignments')
@@ -220,6 +222,89 @@ class ManageOpcrItems
 
             $this->syncTreeSuccessIndicators($record, $categoryNode, $papItem, $papNode['successIndicators'] ?? $papNode['success_indicators'] ?? [], $request, $level + 1, $activeDivisionIds);
         }
+    }
+
+    private function validateTreeCapacityNodes(array $nodes, string $pathPrefix = ''): void
+    {
+        foreach (array_values($nodes) as $index => $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+
+            $path = $pathPrefix === '' ? (string) ($index + 1) : $pathPrefix . '.' . ($index + 1);
+            $this->validateTreeNodeCapacity($node, $path);
+
+            $children = $node['paps'] ?? $node['children'] ?? [];
+            if (is_array($children) && ! empty($children)) {
+                $this->validateTreeCapacityNodes($children, $path);
+            }
+        }
+    }
+
+    private function validateTreeNodeCapacity(array $node, string $path): void
+    {
+        $weightCap = $this->decimalValue($node['weight'] ?? null);
+        $amountCap = $this->decimalValue($node['amount'] ?? $node['allocated_budget'] ?? null);
+
+        if ($weightCap === null && $amountCap === null) {
+            return;
+        }
+
+        $usage = $this->calculateTreeUsageTotals($node);
+        $messages = [];
+
+        if ($weightCap !== null && $usage['weight'] > $weightCap + 0.0001) {
+            $messages[] = "Node {$path} exceeds its weight ceiling.";
+        }
+
+        if ($amountCap !== null && $usage['amount'] > $amountCap + 0.0001) {
+            $messages[] = "Node {$path} exceeds its allocated budget ceiling.";
+        }
+
+        if (! empty($messages)) {
+            throw ValidationException::withMessages([
+                'nodes' => [implode(' ', $messages)],
+            ]);
+        }
+    }
+
+    private function calculateTreeUsageTotals(array $node): array
+    {
+        $weight = 0.0;
+        $amount = 0.0;
+
+        $children = $node['paps'] ?? $node['children'] ?? [];
+        if (is_array($children)) {
+            foreach ($children as $childNode) {
+                if (! is_array($childNode)) {
+                    continue;
+                }
+
+                $childWeight = $this->decimalValue($childNode['weight'] ?? null) ?? 0.0;
+                $childAmount = $this->decimalValue($childNode['amount'] ?? $childNode['allocated_budget'] ?? null) ?? 0.0;
+                $childUsage = $this->calculateTreeUsageTotals($childNode);
+
+                $weight += $childWeight + $childUsage['weight'];
+                $amount += $childAmount + $childUsage['amount'];
+            }
+        }
+
+        $successIndicators = $node['successIndicators'] ?? $node['success_indicators'] ?? [];
+        if (is_array($successIndicators)) {
+            foreach ($successIndicators as $indicatorNode) {
+                if (! is_array($indicatorNode)) {
+                    continue;
+                }
+
+                $weight += $this->decimalValue($indicatorNode['weight'] ?? null) ?? 0.0;
+                $amount += $this->decimalValue($indicatorNode['amount'] ?? $indicatorNode['allocated_budget'] ?? null) ?? 0.0;
+            }
+        }
+
+        return [
+            'weight' => $weight,
+            'amount' => $amount,
+        ];
     }
 
     private function syncTreeSuccessIndicators(
@@ -564,6 +649,13 @@ class ManageOpcrItems
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    private function decimalValue(mixed $value): ?float
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : (float) $value;
     }
 
     private function normalizeAssignmentValues(mixed $values): array

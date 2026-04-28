@@ -279,7 +279,7 @@ export default function useCrudTable({
       },
     ]
 
-    const actionsColumn = [
+  const actionsColumn = [
       {
         id: "actions",
         header: "",
@@ -288,8 +288,17 @@ export default function useCrudTable({
       },
     ]
 
-    return [...selectionColumn, ...rowNumberColumn, ...columns, ...actionsColumn]
-  }, [columns, enableRowSelection, enableDelete, currentPage, perPage, canModify, resolveAbility])
+    const hasRowActions = typeof rowActions === "function"
+    const hasActionColumns =
+      !!enableGenerateReport ||
+      !!enableView ||
+      !!enableViewAsLink ||
+      !!enableEdit ||
+      !!enableDelete ||
+      hasRowActions
+
+    return [...selectionColumn, ...rowNumberColumn, ...columns, ...(hasActionColumns ? actionsColumn : [])]
+  }, [columns, enableRowSelection, enableDelete, enableEdit, enableView, enableViewAsLink, enableGenerateReport, currentPage, perPage, canModify, resolveAbility, rowActions])
 
   const {
     table,

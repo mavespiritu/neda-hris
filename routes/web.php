@@ -106,6 +106,7 @@ require __DIR__ . '/applicants.php';
 require __DIR__ . '/applications.php';
 
 require __DIR__ . '/publications.php';
+require __DIR__ . '/feedbacks.php';
 require __DIR__ . '/vacancies.php';
 require __DIR__ . '/vacancies.requirements.php';
 require __DIR__ . '/vacancies.applicants.php';

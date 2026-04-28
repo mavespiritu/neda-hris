@@ -47,6 +47,7 @@ import { Sheet } from "@/components/ui/sheet"
 import { MoreHorizontal, CircleAlert, TriangleAlert, CircleCheck } from "lucide-react"
 import Welcome from "./Welcome"
 import PaginationControls from "@/components/PaginationControls"
+import ApplicationFeedbackDialog from "../ApplicationFeedbackDialog"
 
 const Applications = () => {
   const { flash, data: { applications } } = usePage().props
@@ -62,6 +63,8 @@ const Applications = () => {
   const { selectedApplication, setSelectedApplication } = store()
 
   const [showFlash, setShowFlash] = useState(!!flash?.status)
+  const [feedbackPrompt, setFeedbackPrompt] = useState(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   useEffect(() => {
     if (flash?.status) {
@@ -70,6 +73,13 @@ const Applications = () => {
       return () => clearTimeout(timer)
     }
   }, [flash])
+
+  useEffect(() => {
+    if (flash?.feedback_prompt) {
+      setFeedbackPrompt(flash.feedback_prompt)
+      setFeedbackOpen(true)
+    }
+  }, [flash?.feedback_prompt])
 
   const activeApps = data.filter(app => app.status !== "No Longer Considered")
   const inactiveApps = data.filter(app => app.status === "No Longer Considered")
@@ -322,6 +332,20 @@ const Applications = () => {
           <Welcome />
         </div>
       </div>
+
+      <ApplicationFeedbackDialog
+        open={feedbackOpen}
+        onOpenChange={(open) => {
+          setFeedbackOpen(open)
+          if (!open) {
+            setFeedbackPrompt(null)
+          }
+        }}
+        prompt={feedbackPrompt}
+        onSubmitted={() => {
+          setFeedbackPrompt(null)
+        }}
+      />
     </div>
   )
 }

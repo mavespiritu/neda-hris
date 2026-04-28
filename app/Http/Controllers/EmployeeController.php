@@ -236,6 +236,10 @@ class EmployeeController extends Controller
             ])
             ->where('work_status', 'active');
 
+        if ($request->filled('division_id') && $request->division_id !== 'null') {
+            $employees->where('division_id', $request->division_id);
+        }
+
         if (!$roles->contains('HRIS_HR')) {
             if ($roles->contains('HRIS_DC')) {
                 $employees->where('division_id', $employee->division_id);

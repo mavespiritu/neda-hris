@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import SearchableComboBox from "@/components/SearchableComboBox"
 import { useToast } from "@/hooks/use-toast"
+import { useHasPermission } from "@/hooks/useAuth"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import useOpcrLookups from "./hooks/useOpcrLookups"
 import CategoryEditorSheet from "./components/CategoryEditorSheet"
@@ -72,10 +73,11 @@ export default function Pnc({
   record,
   libraryOptions = {},
   categories = [],
-  canManage = false,
+  forceReadOnly = false,
   periodLabel = "",
 }) {
   const { toast } = useToast()
+  const canManage = !forceReadOnly && useHasPermission("HRIS_performance.opcr.edit")
   const items = record?.items || []
   const [itemRows, setItemRows] = useState(items)
   const [categoryRows, setCategoryRows] = useState(categories)
@@ -101,6 +103,8 @@ export default function Pnc({
   const [papCreateValue, setPapCreateValue] = useState("")
   const [papCreateWeight, setPapCreateWeight] = useState("")
   const [papCreateAmount, setPapCreateAmount] = useState("")
+  const [papCreateLocked, setPapCreateLocked] = useState(false)
+  const [selectedPapToAdd, setSelectedPapToAdd] = useState(null)
   const [papCreating, setPapCreating] = useState(false)
   const [successIndicatorPickerOpen, setSuccessIndicatorPickerOpen] = useState(false)
   const [successIndicatorPickerCategoryId, setSuccessIndicatorPickerCategoryId] = useState(null)
@@ -118,6 +122,7 @@ export default function Pnc({
   const [successIndicatorCreateMatrixPayload, setSuccessIndicatorCreateMatrixPayload] = useState([createMatrixBlock()])
   const [successIndicatorCreateCategoryId, setSuccessIndicatorCreateCategoryId] = useState(null)
   const [successIndicatorCreatePapId, setSuccessIndicatorCreatePapId] = useState(null)
+  const [selectedSuccessIndicatorToAdd, setSelectedSuccessIndicatorToAdd] = useState(null)
   const [successIndicatorCreating, setSuccessIndicatorCreating] = useState(false)
   const [successIndicatorEditOpen, setSuccessIndicatorEditOpen] = useState(false)
   const [editingSuccessIndicator, setEditingSuccessIndicator] = useState(null)
@@ -472,13 +477,96 @@ export default function Pnc({
   }
 
   function getPapDisplayTotals(papNode) {
-    return getPapBranchTotalsFromNode(papNode)
+    return {
+      weight: hasPositiveNumber(papNode?.weight)
+        ? Number(papNode.weight)
+        : getPapBranchTotalsFromNode(papNode).weight,
+      amount: hasPositiveNumber(papNode?.amount ?? papNode?.budget)
+        ? Number(papNode.amount ?? papNode.budget)
+        : getPapBranchTotalsFromNode(papNode).amount,
+    }
   }
+
+  const getCategoryRowClassName = () =>
+    "border-l-4 border-l-sky-300 bg-sky-50/80 hover:bg-sky-100/70"
+
+  const getProgramRowClassName = () =>
+    "border-l-4 border-l-amber-300 bg-amber-50/70 hover:bg-amber-100/60"
+
+  const getPapRowClassName = (level = 1) => {
+    if (level === 1) {
+      return "border-l-4 border-l-emerald-300 bg-emerald-50/60 hover:bg-emerald-100/50"
+    }
+
+    if (level === 2) {
+      return "border-l-4 border-l-teal-300 bg-teal-50/60 hover:bg-teal-100/50"
+    }
+
+    return "border-l-4 border-l-cyan-300 bg-cyan-50/60 hover:bg-cyan-100/50"
+  }
+
+  const getSuccessIndicatorRowClassName = (level = 1) => {
+    if (level === 1) {
+      return "border-l-4 border-l-rose-300 bg-rose-50/70 hover:bg-rose-100/60"
+    }
+
+    if (level === 2) {
+      return "border-l-4 border-l-fuchsia-300 bg-fuchsia-50/70 hover:bg-fuchsia-100/60"
+    }
+
+    return "border-l-4 border-l-violet-300 bg-violet-50/70 hover:bg-violet-100/60"
+  }
+
+  const getCategoryMetricClassName = () => "text-sm font-semibold text-slate-900 tabular-nums"
+
+  const getPapMetricClassName = () => "text-sm font-semibold text-slate-900 tabular-nums"
+
+  const getSuccessIndicatorMetricClassName = () => "text-xs font-normal text-slate-900 tabular-nums"
 
   const getPapAllocationCap = (papNode) => ({
     weight: hasPositiveNumber(papNode?.weight) ? Number(papNode.weight) : null,
     amount: hasPositiveNumber(papNode?.amount ?? papNode?.budget) ? Number(papNode.amount ?? papNode.budget) : null,
   })
+
+  const getPapUsageTotalsFromNode = (papNode) => {
+    const branchTotals = getPapBranchTotalsFromNode(papNode)
+    const ownWeight = hasPositiveNumber(papNode?.weight) ? Number(papNode.weight) : 0
+    const ownAmount = hasPositiveNumber(papNode?.amount ?? papNode?.budget) ? Number(papNode.amount ?? papNode.budget) : 0
+
+    return {
+      weight: Math.max(branchTotals.weight - ownWeight, 0),
+      amount: Math.max(branchTotals.amount - ownAmount, 0),
+    }
+  }
+
+  const validatePapCapacity = (papNode, candidatePapNode = papNode) => {
+    if (!papNode || !candidatePapNode) {
+      return null
+    }
+
+    const cap = getPapAllocationCap(papNode)
+    if (cap.weight === null && cap.amount === null) {
+      return null
+    }
+
+    const usage = getPapUsageTotalsFromNode(candidatePapNode)
+
+    if (cap.weight !== null && usage.weight > cap.weight + 0.0001) {
+      return {
+        title: "Weight exceeds MFO/PAP ceiling",
+        description: `The success indicators under ${formatText(papNode.activity)} exceed its weight limit of ${formatFixedNumber(cap.weight)}%.`,
+      }
+    }
+
+    if (cap.amount !== null && usage.amount > cap.amount + 0.0001) {
+      return {
+        title: "Allocated budget exceeds MFO/PAP ceiling",
+        description: `The success indicators under ${formatText(papNode.activity)} exceed its allocated budget limit of ${formatFixedNumber(cap.amount)}.`,
+      }
+    }
+
+    return null
+  }
 
   const getCategoryDisplayTotals = (category) => {
     const childTotals = getPapTotals(Array.isArray(category?.paps) ? category.paps : [])
@@ -803,6 +891,7 @@ export default function Pnc({
   }
 
   const handleRemoveCategory = (categoryId) => {
+    if (!canManage) return
     const existingDraft = draftRows.find((item) => String(item.category_id) === String(categoryId))
 
     if (existingDraft) {
@@ -821,6 +910,7 @@ export default function Pnc({
   }
 
   const promptRemoveCategory = (category) => {
+    if (!canManage) return
     setPendingCategoryRemoval(category)
   }
 
@@ -987,9 +1077,9 @@ export default function Pnc({
     setPapPickerOpen(true)
   }
 
-  const closePapPicker = () => {
+  const closePapPicker = (preserveSelection = false) => {
     setPapPickerOpen(false)
-    if (!preservePapCategoryOnClose) {
+    if (!(preservePapCategoryOnClose || preserveSelection)) {
       setPapPickerCategoryId(null)
       setPapPickerParentPapId(null)
     }
@@ -999,11 +1089,20 @@ export default function Pnc({
   const handleSelectPap = (categoryId, pap, parentPapId = null) => {
     if (!categoryId || !pap?.value) return
 
-    addPapToCategoryRow(categoryId, pap, parentPapId)
-    closePapPicker()
+    setPapPickerCategoryId(categoryId)
+    setPapPickerParentPapId(parentPapId)
+    setSelectedPapToAdd(pap)
+    setPapCreateValue(pap.label || pap.activity || pap.title || "")
+    setPapCreateWeight(pap.weight ?? "")
+    setPapCreateAmount(pap.amount ?? pap.budget ?? "")
+    setPapCreateLocked(true)
+    closePapPicker(true)
+    setPapCreateOpen(true)
   }
 
   const handleOpenCreatePap = (term) => {
+    setSelectedPapToAdd(null)
+    setPapCreateLocked(false)
     setPapCreateValue(term || "")
     setPapCreateWeight("")
     setPapCreateAmount("")
@@ -1016,6 +1115,35 @@ export default function Pnc({
 
     const activity = papCreateValue.trim()
     if (!activity) return
+
+    if (selectedPapToAdd) {
+      addPapToCategoryRow(
+        papPickerCategoryId,
+        {
+          ...selectedPapToAdd,
+          label: selectedPapToAdd.label || selectedPapToAdd.activity || selectedPapToAdd.title || activity,
+          activity: selectedPapToAdd.activity || selectedPapToAdd.label || selectedPapToAdd.title || activity,
+          weight: papCreateWeight,
+          amount: papCreateAmount,
+          budget: papCreateAmount,
+          successIndicators: normalizeSuccessIndicatorTree(selectedPapToAdd.successIndicators ?? selectedPapToAdd.success_indicators ?? []),
+        },
+        papPickerParentPapId
+      )
+      setPapCreateOpen(false)
+      setPapCreateValue("")
+      setPapCreateWeight("")
+      setPapCreateAmount("")
+      setSelectedPapToAdd(null)
+      setPapCreateLocked(false)
+      setPreservePapCategoryOnClose(false)
+      closePapPicker()
+      toast({
+        title: "Saved",
+        description: "MFO/PAP added successfully.",
+      })
+      return
+    }
 
     try {
       setPapCreating(true)
@@ -1046,6 +1174,8 @@ export default function Pnc({
       setPapCreateValue("")
       setPapCreateWeight("")
       setPapCreateAmount("")
+      setPapCreateLocked(false)
+      setSelectedPapToAdd(null)
       setPreservePapCategoryOnClose(false)
       closePapPicker()
       toast({
@@ -1173,6 +1303,46 @@ export default function Pnc({
 
     const nextTarget = successIndicatorCreateValue.trim()
     if (!nextTarget) return
+
+    const parentCategory = categoryRows.find((row) => String(row.id) === String(editingSuccessIndicator.categoryId))
+    const currentPapNode = findPapNodeInTree(Array.isArray(parentCategory?.paps) ? parentCategory.paps : [], editingSuccessIndicator.papId)
+    if (!currentPapNode) return
+
+    const nextIndicatorNode = {
+      ...editingSuccessIndicator,
+      target: nextTarget,
+      title: nextTarget,
+      performance_activity_id: successIndicatorCreateActivityId,
+      performance_rating_id: successIndicatorCreateMatrixSource === "default" ? successIndicatorCreatePerformanceRatingId : null,
+      activity_output: activityMap[String(successIndicatorCreateActivityId)] ?? editingSuccessIndicator.activity_output ?? "",
+      weight: successIndicatorCreateWeight,
+      amount: successIndicatorCreateAmount,
+      division_assignments: [...successIndicatorCreateDivisionAssignments],
+      group_assignments: [...successIndicatorCreateGroupAssignments],
+      employee_assignments: [...successIndicatorCreateEmployeeAssignments],
+      rating_rows: flattenMatrixPayload(successIndicatorCreateMatrixPayload),
+    }
+
+    const updatedPaps = updateSuccessIndicatorNodeInTree(
+      Array.isArray(parentCategory.paps) ? parentCategory.paps : [],
+      editingSuccessIndicator.papId,
+      editingSuccessIndicator.id,
+      (indicator) => ({
+        ...indicator,
+        ...nextIndicatorNode,
+      })
+    )
+    const candidatePapNode = findPapNodeInTree(updatedPaps, editingSuccessIndicator.papId)
+    const capacityError = validatePapCapacity(currentPapNode, candidatePapNode)
+
+    if (capacityError) {
+      toast({
+        title: capacityError.title,
+        description: capacityError.description,
+        variant: "destructive",
+      })
+      return
+    }
 
     setCategoryRows((currentRows) =>
       currentRows.map((row) => {
@@ -1448,11 +1618,35 @@ export default function Pnc({
   const handleSelectSuccessIndicator = (categoryId, papId, successIndicator) => {
     if (!categoryId || !papId || !successIndicator?.value) return
 
-    addSuccessIndicatorToPapRow(categoryId, papId, successIndicator)
+    setSelectedSuccessIndicatorToAdd({
+      ...successIndicator,
+      value: String(successIndicator.value ?? successIndicator.id),
+    })
+    setSuccessIndicatorCreateCategoryId(categoryId)
+    setSuccessIndicatorCreatePapId(papId)
+    setSuccessIndicatorCreateValue(successIndicator.target ?? successIndicator.title ?? successIndicator.label ?? "")
+    setSuccessIndicatorCreateActivityId(successIndicator.performance_activity_id ?? successIndicator.activity?.id ?? null)
+    setSuccessIndicatorCreateWeight(successIndicator.weight ?? "")
+    setSuccessIndicatorCreateAmount(successIndicator.amount ?? successIndicator.budget ?? "")
+    const nextMatrixSource = successIndicator.performance_rating_id ? "default" : "custom"
+    setSuccessIndicatorCreateMatrixSource(nextMatrixSource)
+    setSuccessIndicatorCreatePerformanceRatingId(successIndicator.performance_rating_id ?? null)
+    setSuccessIndicatorCreateMatrixPayload(buildMatrixPayloadFromRows(successIndicator.rating_rows ?? []))
+    setSuccessIndicatorCreateDivisionAssignments(
+      normalizeSuccessIndicatorDivisionAssignments(successIndicator.division_assignments ?? [], activeDivisionIds)
+    )
+    setSuccessIndicatorCreateGroupAssignments(
+      Array.isArray(successIndicator.group_assignments) ? successIndicator.group_assignments.map((item) => String(item)) : []
+    )
+    setSuccessIndicatorCreateEmployeeAssignments(
+      Array.isArray(successIndicator.employee_assignments) ? successIndicator.employee_assignments.map((item) => String(item)) : []
+    )
+    setSuccessIndicatorCreateOpen(true)
     closeSuccessIndicatorPicker()
   }
 
   const handleOpenCreateSuccessIndicator = (term) => {
+    setSelectedSuccessIndicatorToAdd(null)
     setSuccessIndicatorCreateValue(term || "")
     setSuccessIndicatorCreateActivityId(null)
     setSuccessIndicatorCreateWeight("")
@@ -1474,8 +1668,92 @@ export default function Pnc({
     const target = successIndicatorCreateValue.trim()
     if (!target) return
 
+    const parentCategory = categoryRows.find((row) => String(row.id) === String(successIndicatorCreateCategoryId))
+    const currentPapNode = findPapNodeInTree(Array.isArray(parentCategory?.paps) ? parentCategory.paps : [], successIndicatorCreatePapId)
+    if (!currentPapNode) return
+
+    const nextIndicatorNode = {
+      value: "__pending__",
+      label: target,
+      target,
+      title: target,
+      performance_activity_id: successIndicatorCreateActivityId,
+      performance_rating_id: successIndicatorCreateMatrixSource === "default" ? successIndicatorCreatePerformanceRatingId : null,
+      weight: successIndicatorCreateWeight,
+      amount: successIndicatorCreateAmount,
+      division_assignments: [...successIndicatorCreateDivisionAssignments],
+      group_assignments: [...successIndicatorCreateGroupAssignments],
+      employee_assignments: [...successIndicatorCreateEmployeeAssignments],
+      rating_rows: flattenMatrixPayload(successIndicatorCreateMatrixPayload),
+    }
+
+    const candidatePaps = insertSuccessIndicatorIntoTree(
+      Array.isArray(parentCategory.paps) ? parentCategory.paps : [],
+      successIndicatorCreatePapId,
+      nextIndicatorNode
+    )
+    const candidatePapNode = findPapNodeInTree(candidatePaps, successIndicatorCreatePapId)
+    const capacityError = validatePapCapacity(currentPapNode, candidatePapNode)
+
+    if (capacityError) {
+      toast({
+        title: capacityError.title,
+        description: capacityError.description,
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setSuccessIndicatorCreating(true)
+
+      if (selectedSuccessIndicatorToAdd?.value) {
+        const selectedIndicator = {
+          ...selectedSuccessIndicatorToAdd,
+          value: String(selectedSuccessIndicatorToAdd.value ?? selectedSuccessIndicatorToAdd.id),
+          label: target,
+          target,
+          title: target,
+          performance_activity_id: successIndicatorCreateActivityId,
+          activity_output:
+            activityMap[String(successIndicatorCreateActivityId)] ??
+            selectedSuccessIndicatorToAdd.activity_output ??
+            "",
+          performance_rating_id:
+            successIndicatorCreateMatrixSource === "default"
+              ? successIndicatorCreatePerformanceRatingId
+              : selectedSuccessIndicatorToAdd.performance_rating_id ?? null,
+          weight: successIndicatorCreateWeight,
+          amount: successIndicatorCreateAmount,
+          budget: successIndicatorCreateAmount,
+          division_assignments: [...successIndicatorCreateDivisionAssignments],
+          group_assignments: [...successIndicatorCreateGroupAssignments],
+          employee_assignments: [...successIndicatorCreateEmployeeAssignments],
+          rating_rows: flattenMatrixPayload(successIndicatorCreateMatrixPayload),
+        }
+
+        const candidatePaps = insertSuccessIndicatorIntoTree(
+          Array.isArray(parentCategory.paps) ? parentCategory.paps : [],
+          successIndicatorCreatePapId,
+          {
+            ...selectedIndicator,
+            value: String(selectedIndicator.value ?? selectedIndicator.id),
+          }
+        )
+        const candidatePapNode = findPapNodeInTree(candidatePaps, successIndicatorCreatePapId)
+        const capacityError = validatePapCapacity(currentPapNode, candidatePapNode)
+
+        if (capacityError) {
+          toast({
+            title: capacityError.title,
+            description: capacityError.description,
+            variant: "destructive",
+          })
+          return
+        }
+
+        addSuccessIndicatorToPapRow(successIndicatorCreateCategoryId, successIndicatorCreatePapId, selectedIndicator)
+      } else {
         const response = await axios.post(route("performance.success-indicators.store"), {
           level: "OPCR",
           performance_activity_id: successIndicatorCreateActivityId,
@@ -1485,34 +1763,35 @@ export default function Pnc({
           group_assignments: successIndicatorCreateGroupAssignments,
           employee_assignments: successIndicatorCreateEmployeeAssignments,
           matrix_payload: successIndicatorCreateMatrixPayload,
-      })
-
-      const createdIndicator =
-        response?.data?.data?.record ||
-        response?.data?.record ||
-        response?.data?.data?.indicator ||
-        response?.data?.indicator ||
-        response?.data?.data ||
-        response?.data
-      if (!createdIndicator?.id) {
-        throw new Error("Unable to create success indicator.")
-      }
-
-      if (successIndicatorCreateCategoryId && successIndicatorCreatePapId) {
-        addSuccessIndicatorToPapRow(successIndicatorCreateCategoryId, successIndicatorCreatePapId, {
-          value: String(createdIndicator.id),
-          label: createdIndicator.label || createdIndicator.target || target,
-          target: createdIndicator.target || target,
-          performance_activity_id: createdIndicator.performance_activity_id ?? successIndicatorCreateActivityId,
-          activity_output: createdIndicator.activity_output ?? activityMap[String(createdIndicator.performance_activity_id ?? successIndicatorCreateActivityId)] ?? "",
-          performance_rating_id: createdIndicator.performance_rating_id ?? (successIndicatorCreateMatrixSource === "default" ? successIndicatorCreatePerformanceRatingId : null),
-          weight: createdIndicator.weight ?? successIndicatorCreateWeight,
-          amount: createdIndicator.budget ?? successIndicatorCreateAmount,
-          division_assignments: createdIndicator.division_assignments ?? successIndicatorCreateDivisionAssignments,
-          group_assignments: createdIndicator.group_assignments ?? successIndicatorCreateGroupAssignments,
-          employee_assignments: createdIndicator.employee_assignments ?? successIndicatorCreateEmployeeAssignments,
-          rating_rows: flattenMatrixPayload(successIndicatorCreateMatrixPayload),
         })
+
+        const createdIndicator =
+          response?.data?.data?.record ||
+          response?.data?.record ||
+          response?.data?.data?.indicator ||
+          response?.data?.indicator ||
+          response?.data?.data ||
+          response?.data
+        if (!createdIndicator?.id) {
+          throw new Error("Unable to create success indicator.")
+        }
+
+        if (successIndicatorCreateCategoryId && successIndicatorCreatePapId) {
+          addSuccessIndicatorToPapRow(successIndicatorCreateCategoryId, successIndicatorCreatePapId, {
+            value: String(createdIndicator.id),
+            label: createdIndicator.label || createdIndicator.target || target,
+            target: createdIndicator.target || target,
+            performance_activity_id: createdIndicator.performance_activity_id ?? successIndicatorCreateActivityId,
+            activity_output: createdIndicator.activity_output ?? activityMap[String(createdIndicator.performance_activity_id ?? successIndicatorCreateActivityId)] ?? "",
+            performance_rating_id: createdIndicator.performance_rating_id ?? (successIndicatorCreateMatrixSource === "default" ? successIndicatorCreatePerformanceRatingId : null),
+            weight: createdIndicator.weight ?? successIndicatorCreateWeight,
+            amount: createdIndicator.budget ?? successIndicatorCreateAmount,
+            division_assignments: createdIndicator.division_assignments ?? successIndicatorCreateDivisionAssignments,
+            group_assignments: createdIndicator.group_assignments ?? successIndicatorCreateGroupAssignments,
+            employee_assignments: createdIndicator.employee_assignments ?? successIndicatorCreateEmployeeAssignments,
+            rating_rows: flattenMatrixPayload(successIndicatorCreateMatrixPayload),
+          })
+        }
       }
 
       setSuccessIndicatorCreateOpen(false)
@@ -1528,6 +1807,7 @@ export default function Pnc({
       setSuccessIndicatorCreateEmployeeAssignments([])
       setSuccessIndicatorCreateCategoryId(null)
       setSuccessIndicatorCreatePapId(null)
+      setSelectedSuccessIndicatorToAdd(null)
       closeSuccessIndicatorPicker()
       toast({
         title: "Saved",
@@ -1575,6 +1855,7 @@ export default function Pnc({
   }
 
   const openCategoryEdit = (category) => {
+    if (!canManage) return
     setEditingCategory(category)
     setEditingPap(null)
     setCategoryDraft({
@@ -1606,6 +1887,7 @@ export default function Pnc({
   }
 
   const handleSaveCategory = () => {
+    if (!canManage) return
     if (!editingCategory && !editingPap) return
 
     if (editingPap) {
@@ -1776,8 +2058,7 @@ export default function Pnc({
     (Array.isArray(successIndicators) ? successIndicators : []).map((indicator, indicatorIndex) => {
       const rowNumber = `${pathPrefix}.${indicatorIndex + 1}`
       const indicatorTotals = getSuccessIndicatorTotalsFromNode(indicator)
-      const rowClassName =
-        level === 1 ? "bg-slate-100/40" : level === 2 ? "bg-slate-100/60" : "bg-slate-100/75"
+      const rowClassName = getSuccessIndicatorRowClassName(level)
       const indicatorParentLabel = parentPapName || pap.activity || category.category
       const accountabilityLabel = formatAssignments([
         ...(indicator.division_assignments ?? []),
@@ -1861,10 +2142,10 @@ export default function Pnc({
           <TableCell className="align-middle px-3 py-1 text-xs text-slate-700 whitespace-normal break-words">
             <div className="whitespace-normal break-words">{accountabilityDisplay}</div>
           </TableCell>
-          <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">
+          <TableCell className={`align-middle px-3 py-1 text-right ${getSuccessIndicatorMetricClassName()}`}>
             {`${formatFixedNumber(indicatorTotals.weight)}%`}
           </TableCell>
-          <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">
+          <TableCell className={`align-middle px-3 py-1 text-right ${getSuccessIndicatorMetricClassName()}`}>
             {formatFixedNumber(indicatorTotals.amount)}
           </TableCell>
           <TableCell className="align-middle px-3 py-1 text-right">
@@ -1884,7 +2165,7 @@ export default function Pnc({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Edit Success Indicator</p>
+                    <p>{`Edit Success Indicator: ${formatText(indicator.target ?? indicator.title ?? indicator.label)}`}</p>
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
@@ -1901,7 +2182,7 @@ export default function Pnc({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Remove Success Indicator</p>
+                    <p>{`Remove Success Indicator: ${formatText(indicator.target ?? indicator.title ?? indicator.label)}`}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -1925,8 +2206,7 @@ export default function Pnc({
       const successIndicators = Array.isArray(pap.successIndicators) ? pap.successIndicators : []
       const childLevel = level > 1
       const papTotals = getPapDisplayTotals(pap)
-      const rowClassName =
-        level === 1 ? "bg-slate-50/60" : level === 2 ? "bg-slate-100/50" : "bg-slate-100/70"
+      const rowClassName = getPapRowClassName(level)
 
       return (
         <Fragment key={`${category.id}-${pap.id}-${rowNumber}`}>
@@ -2034,7 +2314,7 @@ export default function Pnc({
                         </PopoverTrigger>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Add Success Indicator</p>
+                        <p>{`Add Success Indicator: ${formatText(pap.activity ?? pap.title ?? pap.label)}`}</p>
                       </TooltipContent>
                     </Tooltip>
                     <PopoverContent align="start" className="w-[420px] p-3">
@@ -2068,32 +2348,15 @@ export default function Pnc({
               )}
             </TableCell>
             <TableCell className="align-middle px-3 py-1 text-sm text-slate-500">-</TableCell>
-            <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">
+            <TableCell className={`align-middle px-3 py-1 text-right ${getPapMetricClassName()}`}>
               {`${formatFixedNumber(papTotals.weight)}%`}
             </TableCell>
-            <TableCell className="align-middle px-3 py-1 text-right text-xs text-slate-900 tabular-nums">
+            <TableCell className={`align-middle px-3 py-1 text-right ${getPapMetricClassName()}`}>
               {formatFixedNumber(papTotals.amount)}
             </TableCell>
             <TableCell className="align-middle px-3 py-1 text-right">
               {canManage && (
                 <div className="ml-auto flex w-full items-center justify-end gap-1.5">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => openPapPicker(category.id, pap.id)}
-                        aria-label={`Add Child MFO/PAP: ${formatText(pap.activity)}`}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Add Child MFO/PAP</p>
-                    </TooltipContent>
-                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -2107,10 +2370,10 @@ export default function Pnc({
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Edit MFO/PAP</p>
-                    </TooltipContent>
-                  </Tooltip>
+                      <TooltipContent>
+                        <p>{`Edit MFO/PAP: ${formatText(pap.activity ?? pap.title ?? pap.label)}`}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -2124,10 +2387,10 @@ export default function Pnc({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Remove MFO/PAP</p>
-                    </TooltipContent>
-                  </Tooltip>
+                      <TooltipContent>
+                        <p>{`Remove MFO/PAP: ${formatText(pap.activity ?? pap.title ?? pap.label)}`}</p>
+                      </TooltipContent>
+                    </Tooltip>
                 </div>
               )}
             </TableCell>
@@ -2379,12 +2642,15 @@ export default function Pnc({
             setPapCreateValue("")
             setPapCreateWeight("")
             setPapCreateAmount("")
+            setPapCreateLocked(false)
+            setSelectedPapToAdd(null)
             setPreservePapCategoryOnClose(false)
           }
         }}
         categoryName={formatText(categoryRows.find((row) => String(row.id) === String(papPickerCategoryId))?.category, "this category")}
         value={papCreateValue}
         onValueChange={setPapCreateValue}
+        valueDisabled={papCreateLocked}
         weight={papCreateWeight}
         amount={papCreateAmount}
         onWeightChange={setPapCreateWeight}
@@ -2394,6 +2660,8 @@ export default function Pnc({
           setPapCreateValue("")
           setPapCreateWeight("")
           setPapCreateAmount("")
+          setPapCreateLocked(false)
+          setSelectedPapToAdd(null)
           setPreservePapCategoryOnClose(false)
           setPapPickerCategoryId(null)
         }}
@@ -2404,20 +2672,21 @@ export default function Pnc({
       <SuccessIndicatorCreateDialog
         open={successIndicatorCreateOpen}
         onOpenChange={(open) => {
-        setSuccessIndicatorCreateOpen(open)
-        if (!open) {
-          setSuccessIndicatorCreateValue("")
-          setSuccessIndicatorCreateActivityId(null)
-          setSuccessIndicatorCreateWeight("")
-          setSuccessIndicatorCreateAmount("")
-          setSuccessIndicatorCreateMatrixSource("custom")
-          setSuccessIndicatorCreatePerformanceRatingId(null)
-          setSuccessIndicatorCreateMatrixPayload([createMatrixBlock()])
-          setSuccessIndicatorCreateCategoryId(null)
+          setSuccessIndicatorCreateOpen(open)
+          if (!open) {
+            setSelectedSuccessIndicatorToAdd(null)
+            setSuccessIndicatorCreateValue("")
+            setSuccessIndicatorCreateActivityId(null)
+            setSuccessIndicatorCreateWeight("")
+            setSuccessIndicatorCreateAmount("")
+            setSuccessIndicatorCreateMatrixSource("custom")
+            setSuccessIndicatorCreatePerformanceRatingId(null)
+            setSuccessIndicatorCreateMatrixPayload([createMatrixBlock()])
+            setSuccessIndicatorCreateCategoryId(null)
             setSuccessIndicatorCreatePapId(null)
           }
         }}
-        title="Add Success Indicator"
+        title={selectedSuccessIndicatorToAdd?.value ? "Add Selected Success Indicator" : "Add Success Indicator"}
         description="Type the success indicator details for this MFO/PAP row."
         activityId={successIndicatorCreateActivityId}
         target={successIndicatorCreateValue}
@@ -2440,6 +2709,7 @@ export default function Pnc({
         }}
         onCancel={() => {
           setSuccessIndicatorCreateOpen(false)
+          setSelectedSuccessIndicatorToAdd(null)
           setSuccessIndicatorCreateValue("")
           setSuccessIndicatorCreateActivityId(null)
           setSuccessIndicatorCreateMatrixSource("custom")

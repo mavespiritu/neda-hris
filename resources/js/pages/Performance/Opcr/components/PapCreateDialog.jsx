@@ -10,6 +10,7 @@ export default function PapCreateDialog({
   categoryName,
   value,
   onValueChange,
+  valueDisabled = false,
   weight,
   amount,
   onWeightChange,
@@ -29,7 +30,12 @@ export default function PapCreateDialog({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>MFO/PAP</Label>
-            <Input value={value} onChange={(event) => onValueChange(event.target.value)} placeholder="Type a new MFO/PAP" />
+            <Input
+              value={value}
+              onChange={(event) => onValueChange(event.target.value)}
+              placeholder="Type a new MFO/PAP"
+              disabled={valueDisabled}
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

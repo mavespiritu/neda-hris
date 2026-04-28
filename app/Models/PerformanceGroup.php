@@ -20,6 +20,6 @@ class PerformanceGroup extends Model
 
     public function members()
     {
-        return $this->hasMany(PerformanceGroupMember::class, 'performance_group_id')->orderBy('sort_order')->orderBy('id');
+        return $this->hasMany(PerformanceGroupMember::class, 'group_id')->orderBy('sort_order')->orderBy('id');
     }
 }

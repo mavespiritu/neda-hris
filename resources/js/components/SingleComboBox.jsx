@@ -97,7 +97,11 @@ const SingleComboBox = ({
         </PopoverTrigger>
 
         {!disabled && !loading && (
-        <PopoverContent side={side} align={align} className={cn("p-0 w-[420px]", width, contentClassName)}>
+        <PopoverContent
+          side={side}
+          align={align}
+          className={cn("p-0 w-[420px]", width, contentClassName)}
+        >
           <Command>
               <CommandInput
                 placeholder="Type to search..."
@@ -119,7 +123,7 @@ const SingleComboBox = ({
                     {items.map((item) => (
                       <CommandItem
                         key={`${item.value}`}
-                        value={String(item.label ?? item.value)}
+                        value={String(item.searchValue ?? item.label ?? item.value)}
                         onSelect={() => toggleSelection(item.value)}
                         className="text-sm"
                       >

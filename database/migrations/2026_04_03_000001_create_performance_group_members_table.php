@@ -10,15 +10,15 @@ return new class extends Migration
     {
         Schema::connection('mysql2')->create('group_members', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('performance_group_id');
+            $table->unsignedBigInteger('group_id');
             $table->string('employee_ipms_id', 10);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 
             $table->index('sort_order');
             $table->index('employee_ipms_id');
-            $table->unique(['performance_group_id', 'employee_ipms_id']);
-            $table->foreign('performance_group_id')
+            $table->unique(['group_id', 'employee_ipms_id']);
+            $table->foreign('group_id')
                 ->references('id')
                 ->on('groups')
                 ->cascadeOnDelete();

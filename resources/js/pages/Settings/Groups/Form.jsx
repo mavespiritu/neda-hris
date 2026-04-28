@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios"
 import { useForm } from "@inertiajs/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
@@ -12,13 +12,16 @@ import { useToast } from "@/hooks/use-toast"
 
 const normalizeMemberIds = (members) =>
   Array.isArray(members)
-    ? members.map((member) => String(member?.employee_ipms_id ?? member?.value ?? member)).filter(Boolean)
+    ? members
+        .map((member) => String(member?.emp_id ?? member?.employee_ipms_id ?? member?.value ?? member))
+        .filter(Boolean)
     : []
 
 const Form = ({ mode, data, onClose, open }) => {
   const isEdit = mode === "edit"
   const { toast } = useToast()
   const [employees, setEmployees] = useState([])
+  const lastInitKeyRef = useRef(null)
 
   const {
     data: formData,
@@ -35,6 +38,16 @@ const Form = ({ mode, data, onClose, open }) => {
   })
 
   useEffect(() => {
+    if (!open) {
+      lastInitKeyRef.current = null
+      return
+    }
+
+    const initKey = isEdit ? `edit:${data?.id ?? "unknown"}` : "create"
+    if (lastInitKeyRef.current === initKey) return
+
+    lastInitKeyRef.current = initKey
+
     if (isEdit && data) {
       setData({
         id: data.id || null,
@@ -46,7 +59,7 @@ const Form = ({ mode, data, onClose, open }) => {
     }
 
     reset()
-  }, [isEdit, data, reset, setData])
+  }, [open, isEdit, data?.id, data, reset, setData])
 
   useEffect(() => {
     let mounted = true

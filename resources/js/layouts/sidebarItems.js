@@ -10,6 +10,7 @@ import {
   History,
   Building,
   Pin,
+  Star,
   FolderArchive,
   Brain,
   Send,
@@ -54,9 +55,9 @@ export const sidebarItems = [
     icon: ChartNoAxesCombined,
     roles: ["HRIS_Staff", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD", "HRIS_HR", "HRIS_Administrator"],
     submenu: [
-      { title: "Emails", url: "/emails", roles: ["HRIS_Staff", "HRIS_DC", "HRIS_ADC", "HRIS_RD", "HRIS_ARD", "HRIS_HR", "HRIS_Administrator"], icon: Mails },
-      { title: "OPCR", url: "/opcrs", roles: ["HRIS_DC", "HRIS_RD", "HRIS_ARD"], icon: Building },
-      { title: "DPCR", url: "/dpcrs", roles: ["HRIS_DC", "HRIS_ADC"], icon: UsersRound },
+      { title: "Emails", url: "/emails", permissions: ["HRIS_performance.emails.page.view"], icon: Mails },
+      { title: "OPCR", url: "/opcrs", permissions: ["HRIS_performance.opcr.page.view"], icon: Building },
+      { title: "DPCR", url: "/dpcrs", permissions: ["HRIS_performance.dpcr.page.view"], icon: UsersRound },
       { title: "IPCR", url: "/ipcrs", roles: ["HRIS_Staff"], icon: UserRound },
       { title: "Libraries", url: "/performance/libraries", roles: ["HRIS_HR", "HRIS_Administrator"], icon: FolderArchive },
     ],
@@ -71,6 +72,7 @@ export const sidebarItems = [
       { title: "Applications", url: "/applications", permissions: ["HRIS_recruitment.applicants.page.view"], icon: Briefcase },
       { title: "Vacancies", url: "/vacancies", permissions: ["HRIS_recruitment.vacancies.page.view"], icon: ClipboardList },
       { title: "Publications", url: "/publications", permissions: ["HRIS_recruitment.publications.page.view"], icon: Pin },
+      { title: "Feedbacks", url: "/feedbacks", permissions: ["HRIS_recruitment.feedbacks.page.view"], icon: Star },
     ],
   },
   {

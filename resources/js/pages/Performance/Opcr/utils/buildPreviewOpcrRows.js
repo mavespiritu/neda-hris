@@ -16,6 +16,16 @@ const getSuccessIndicatorTotals = (indicator = {}) => ({
   amount: toNumber(getAmountValue(indicator)),
 })
 
+const getProgramGroupKey = (pap = {}) => {
+  const title = String(pap.program_title ?? "").trim().toLowerCase()
+  if (title) {
+    return `title:${title}`
+  }
+
+  const programId = String(pap.program_id ?? "").trim()
+  return programId ? `id:${programId}` : ""
+}
+
 const getPapBranchTotals = (pap = {}) => {
   const childPaps = Array.isArray(pap.children) ? pap.children : []
   const successIndicators = Array.isArray(pap.successIndicators) ? pap.successIndicators : []
@@ -73,53 +83,77 @@ const buildPapPreviewRows = ({
   showCategory = false,
   path = "",
   depth = 0,
+  programState = { lastProgramKey: null },
 }) => {
   const childPaps = Array.isArray(pap.children) ? pap.children : []
   const successIndicators = Array.isArray(pap.successIndicators) ? pap.successIndicators : []
-  const firstSuccessIndicator = successIndicators[0] ?? null
-  const firstSuccessIndicatorTotals = firstSuccessIndicator ? getSuccessIndicatorTotals(firstSuccessIndicator) : null
-  const baseRow = {
-    key: `${category.id}-${pap.id}-${path || "root"}`,
-    rowNumber: showCategory ? String(categoryIndex + 1) : path || String(categoryIndex + 1),
-    showCategory,
+  const programKey = getProgramGroupKey(pap)
+  const programLabel = pap.program_title ?? ""
+  const shouldRenderProgramRow = Boolean(programLabel) && programKey && programKey !== programState.lastProgramKey
+  const papTotals = getPapBranchTotals(pap)
+  const rows = []
+
+  if (shouldRenderProgramRow) {
+    programState.lastProgramKey = programKey
+    rows.push({
+      key: `${category.id}-${pap.id}-${path || "root"}-program`,
+      rowNumber: path || String(categoryIndex + 1),
+      type: "program",
+      showCategory: false,
+      categoryLabel: "",
+      papLabel: programLabel,
+      papDepth: depth,
+      indicatorLabel: "-",
+      indicatorDepth: depth,
+      weight: null,
+      amount: null,
+      assignments: [],
+      categoryWeight: null,
+      categoryAmount: null,
+    })
+  }
+
+  if (programKey) {
+    programState.lastProgramKey = programKey
+  }
+
+    rows.push({
+      key: `${category.id}-${pap.id}-${path || "root"}`,
+      rowNumber: showCategory ? String(categoryIndex + 1) : path || String(categoryIndex + 1),
+      type: "pap",
+      showCategory,
     categoryLabel: showCategory ? category.category ?? category.label ?? "" : "",
     papLabel: pap.activity ?? pap.title ?? pap.label ?? "",
     papDepth: depth,
-    indicatorLabel: firstSuccessIndicator ? firstSuccessIndicator.target ?? firstSuccessIndicator.title ?? firstSuccessIndicator.label ?? "" : "-",
+    indicatorLabel: "",
     indicatorDepth: depth,
-    weight: firstSuccessIndicatorTotals?.weight ?? null,
-    amount: firstSuccessIndicatorTotals?.amount ?? null,
-    assignments: firstSuccessIndicator
-      ? [
-          ...(Array.isArray(firstSuccessIndicator.division_assignments) ? firstSuccessIndicator.division_assignments : []),
-          ...(Array.isArray(firstSuccessIndicator.group_assignments) ? firstSuccessIndicator.group_assignments : []),
-          ...(Array.isArray(firstSuccessIndicator.employee_assignments) ? firstSuccessIndicator.employee_assignments : []),
-        ]
-      : [],
+    weight: papTotals.weight,
+    amount: papTotals.amount,
+    assignments: [],
     categoryWeight: null,
-    categoryAmount: null,
-  }
+      categoryAmount: null,
+    })
 
-  const rows = [baseRow]
-
-  successIndicators.slice(1).forEach((indicator, indicatorIndex) => {
-    const indicatorTotals = getSuccessIndicatorTotals(indicator)
+    successIndicators.forEach((indicator, indicatorIndex) => {
+      const indicatorTotals = getSuccessIndicatorTotals(indicator)
     rows.push({
-      key: `${category.id}-${pap.id}-${path || "root"}-si-${indicator.id ?? indicatorIndex + 2}`,
-      rowNumber: `${path || categoryIndex + 1}.si${indicatorIndex + 2}`,
+      key: `${category.id}-${pap.id}-${path || "root"}-si-${indicator.id ?? indicatorIndex + 1}`,
+      rowNumber: `${path || categoryIndex + 1}.${indicatorIndex + 1}`,
+      type: "successIndicator",
       showCategory: false,
       categoryLabel: "",
       papLabel: "",
       papDepth: depth,
       indicatorLabel: indicator.target ?? indicator.title ?? indicator.label ?? "",
       indicatorDepth: depth,
-      weight: indicatorTotals.weight,
-      amount: indicatorTotals.amount,
-      assignments: [
-        ...(Array.isArray(indicator.division_assignments) ? indicator.division_assignments : []),
-        ...(Array.isArray(indicator.group_assignments) ? indicator.group_assignments : []),
-        ...(Array.isArray(indicator.employee_assignments) ? indicator.employee_assignments : []),
-      ],
+        weight: indicatorTotals.weight,
+        amount: indicatorTotals.amount,
+        sourceItem: indicator,
+        assignments: [
+          ...(Array.isArray(indicator.division_assignments) ? indicator.division_assignments : []),
+          ...(Array.isArray(indicator.group_assignments) ? indicator.group_assignments : []),
+          ...(Array.isArray(indicator.employee_assignments) ? indicator.employee_assignments : []),
+        ],
       categoryWeight: null,
       categoryAmount: null,
     })
@@ -134,6 +168,7 @@ const buildPapPreviewRows = ({
         showCategory: false,
         path: `${path || categoryIndex + 1}.${childIndex + 1}`,
         depth: depth + 1,
+        programState,
       })
     )
   })
@@ -147,11 +182,13 @@ export const buildPreviewOpcrRows = (categoryRows = []) => {
   ;(Array.isArray(categoryRows) ? categoryRows : []).forEach((category, categoryIndex) => {
     const paps = Array.isArray(category.paps) ? category.paps : []
     const categoryTotals = getPreviewCategoryTotals(category)
+    const programState = { lastProgramKey: null }
 
     if (paps.length === 0) {
       rows.push({
         key: `${category.id}-category-${categoryIndex}`,
         rowNumber: String(categoryIndex + 1),
+        type: "category",
         showCategory: true,
         categoryLabel: category.category ?? category.label ?? "",
         papLabel: "-",
@@ -160,6 +197,7 @@ export const buildPreviewOpcrRows = (categoryRows = []) => {
         indicatorDepth: 0,
         weight: null,
         amount: null,
+        sourceItem: null,
         assignments: [],
         categoryWeight: categoryTotals.weight,
         categoryAmount: categoryTotals.amount,
@@ -167,21 +205,36 @@ export const buildPreviewOpcrRows = (categoryRows = []) => {
       return
     }
 
+    rows.push({
+      key: `${category.id}-category-${categoryIndex}`,
+      rowNumber: String(categoryIndex + 1),
+      type: "category",
+      showCategory: true,
+      categoryLabel: category.category ?? category.label ?? "",
+      papLabel: "-",
+      papDepth: 0,
+      indicatorLabel: "-",
+      indicatorDepth: 0,
+      weight: null,
+      amount: null,
+      sourceItem: null,
+      assignments: [],
+      categoryWeight: categoryTotals.weight,
+      categoryAmount: categoryTotals.amount,
+    })
+
     paps.forEach((pap, papIndex) => {
       const papRows = buildPapPreviewRows({
         category,
         pap,
         categoryIndex,
-        showCategory: papIndex === 0,
+        showCategory: false,
         path: `${categoryIndex + 1}.${papIndex + 1}`,
         depth: 0,
+        programState,
       })
 
       if (papRows.length > 0) {
-        if (papRows[0].showCategory) {
-          papRows[0].categoryWeight = categoryTotals.weight
-          papRows[0].categoryAmount = categoryTotals.amount
-        }
         rows.push(...papRows)
       }
     })
