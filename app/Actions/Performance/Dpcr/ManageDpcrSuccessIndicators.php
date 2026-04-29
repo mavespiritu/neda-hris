@@ -90,49 +90,7 @@ class ManageDpcrSuccessIndicators
             ]);
 
             $this->syncMatrixRows($item, $data['matrix_payload'] ?? [], $rating);
-
-            $assignmentValues = collect($data['assignment_values'] ?? [])
-                ->map(fn ($value) => trim((string) $value))
-                ->filter()
-                ->unique()
-                ->values();
-
-            $assignmentRows = [[
-                'dpcr_record_id' => $record->id,
-                'dpcr_item_id' => $item->id,
-                'division_id' => $record->division_id,
-                'group_id' => null,
-                'emp_id' => null,
-            ]];
-
-            foreach ($assignmentValues as $assignmentValue) {
-                [$kind, $rawId] = array_pad(explode(':', $assignmentValue, 2), 2, null);
-                if (! $rawId) {
-                    continue;
-                }
-
-                if ($kind === 'group') {
-                    $assignmentRows[] = [
-                        'dpcr_record_id' => $record->id,
-                        'dpcr_item_id' => $item->id,
-                        'division_id' => $record->division_id,
-                        'group_id' => (int) $rawId,
-                        'emp_id' => null,
-                    ];
-                } elseif ($kind === 'employee') {
-                    $assignmentRows[] = [
-                        'dpcr_record_id' => $record->id,
-                        'dpcr_item_id' => $item->id,
-                        'division_id' => $record->division_id,
-                        'group_id' => null,
-                        'emp_id' => (int) $rawId,
-                    ];
-                }
-            }
-
-            DB::connection('mysql2')
-                ->table('dpcr_assignments')
-                ->insert($assignmentRows);
+            $this->syncAssignments($record, $item, $data['assignment_values'] ?? []);
 
             return $item->loadMissing(['activity:id,title', 'subActivity:id,title', 'assignments', 'rating:id,name,category']);
         });
@@ -143,10 +101,158 @@ class ManageDpcrSuccessIndicators
         ]);
     }
 
+    public function update(Request $request, int $recordId, int $itemId)
+    {
+        abort_unless($request->user()?->can('HRIS_performance.dpcr.edit'), 403);
+
+        $record = DpcrRecord::query()->findOrFail($recordId);
+        $item = DpcrItem::query()
+            ->where('id', $itemId)
+            ->where('dpcr_record_id', $record->id)
+            ->where('item_type', 'success_indicator')
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'source_opcr_item_id' => ['nullable', 'integer', 'exists:mysql2.opcr_items,id'],
+            'activity_id' => ['required', 'integer', 'exists:mysql5.ppmp_activity,id'],
+            'sub_activity_id' => ['required', 'integer', 'exists:mysql5.ppmp_sub_activity,id'],
+            'performance_rating_id' => ['nullable', 'integer', 'exists:mysql2.performance_ratings,id'],
+            'success_indicator_title' => ['required', 'string', 'max:2000'],
+            'weight' => ['nullable', 'numeric'],
+            'allocated_budget' => ['nullable', 'numeric'],
+            'assignment_values' => ['nullable', 'array'],
+            'assignment_values.*' => ['string'],
+            'matrix_payload' => ['nullable', 'array'],
+        ]);
+
+        $subActivityMatches = SubActivity::query()
+            ->where('id', $data['sub_activity_id'])
+            ->where('activity_id', $data['activity_id'])
+            ->exists();
+
+        if (! $subActivityMatches) {
+            throw ValidationException::withMessages([
+                'sub_activity_id' => ['The selected sub-activity does not belong to the selected activity.'],
+            ]);
+        }
+
+        $activity = Activity::query()->findOrFail($data['activity_id']);
+        $subActivity = SubActivity::query()->findOrFail($data['sub_activity_id']);
+        $rating = !empty($data['performance_rating_id'])
+            ? PerformanceRating::query()->findOrFail((int) $data['performance_rating_id'])
+            : null;
+
+        $updatedItem = DB::connection('mysql2')->transaction(function () use ($record, $item, $data, $activity, $subActivity, $rating, $request) {
+            $item->fill([
+                'source_opcr_item_id' => $data['source_opcr_item_id'] ?? $item->source_opcr_item_id,
+                'activity_id' => $activity->id,
+                'sub_activity_id' => $subActivity->id,
+                'performance_rating_id' => $rating?->id,
+                'success_indicator_title' => trim((string) $data['success_indicator_title']),
+                'weight' => $this->nullableDecimal($data['weight'] ?? null),
+                'allocated_budget' => $this->nullableDecimal($data['allocated_budget'] ?? null),
+                'updated_by' => $request->user()?->ipms_id,
+            ]);
+            $item->save();
+
+            $this->syncMatrixRows($item, $data['matrix_payload'] ?? [], $rating);
+            $this->syncAssignments($record, $item, $data['assignment_values'] ?? []);
+
+            return $item->loadMissing(['activity:id,title', 'subActivity:id,title', 'assignments', 'rating:id,name,category']);
+        });
+
+        return response()->json([
+            'message' => 'Success indicator updated successfully.',
+            'record' => $this->formatItem($updatedItem),
+        ]);
+    }
+
+    public function destroy(Request $request, int $recordId, int $itemId)
+    {
+        abort_unless($request->user()?->can('HRIS_performance.dpcr.edit'), 403);
+
+        $record = DpcrRecord::query()->findOrFail($recordId);
+        $item = DpcrItem::query()
+            ->where('id', $itemId)
+            ->where('dpcr_record_id', $record->id)
+            ->where('item_type', 'success_indicator')
+            ->firstOrFail();
+
+        DB::connection('mysql2')->transaction(function () use ($item) {
+            $itemIds = $this->collectDescendantItemIds($item->id);
+            $itemIds[] = $item->id;
+            $itemIds = array_values(array_unique($itemIds));
+
+            DB::connection('mysql2')
+                ->table('dpcr_assignments')
+                ->whereIn('dpcr_item_id', $itemIds)
+                ->delete();
+
+            DpcrItem::query()
+                ->whereIn('id', $itemIds)
+                ->delete();
+        });
+
+        return response()->json([
+            'message' => 'Success indicator removed successfully.',
+        ]);
+    }
+
     private function nullableDecimal($value): ?string
     {
         $text = trim((string) $value);
         return $text === '' ? null : $text;
+    }
+
+    private function syncAssignments(DpcrRecord $record, DpcrItem $item, array $assignmentValues): void
+    {
+        DB::connection('mysql2')
+            ->table('dpcr_assignments')
+            ->where('dpcr_item_id', $item->id)
+            ->delete();
+
+        $normalizedValues = collect($assignmentValues)
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $assignmentRows = [[
+            'dpcr_record_id' => $record->id,
+            'dpcr_item_id' => $item->id,
+            'division_id' => $record->division_id,
+            'group_id' => null,
+            'emp_id' => null,
+        ]];
+
+        foreach ($normalizedValues as $assignmentValue) {
+            [$kind, $rawId] = array_pad(explode(':', $assignmentValue, 2), 2, null);
+            if (! $rawId) {
+                continue;
+            }
+
+            if ($kind === 'group') {
+                $assignmentRows[] = [
+                    'dpcr_record_id' => $record->id,
+                    'dpcr_item_id' => $item->id,
+                    'division_id' => $record->division_id,
+                    'group_id' => (int) $rawId,
+                    'emp_id' => null,
+                ];
+            } elseif ($kind === 'employee') {
+                $assignmentRows[] = [
+                    'dpcr_record_id' => $record->id,
+                    'dpcr_item_id' => $item->id,
+                    'division_id' => $record->division_id,
+                    'group_id' => null,
+                    'emp_id' => (int) $rawId,
+                ];
+            }
+        }
+
+        DB::connection('mysql2')
+            ->table('dpcr_assignments')
+            ->insert($assignmentRows);
     }
 
     private function syncMatrixRows(DpcrItem $item, array $payload, ?PerformanceRating $rating): void
@@ -185,6 +291,28 @@ class ManageDpcrSuccessIndicators
         }
     }
 
+    private function collectDescendantItemIds(int $itemId): array
+    {
+        $descendants = [];
+        $queue = [$itemId];
+
+        while ($queue !== []) {
+            $currentId = array_shift($queue);
+            $childIds = DpcrItem::query()
+                ->where('parent_item_id', $currentId)
+                ->pluck('id')
+                ->map(fn ($value) => (int) $value)
+                ->all();
+
+            foreach ($childIds as $childId) {
+                $descendants[] = $childId;
+                $queue[] = $childId;
+            }
+        }
+
+        return array_values(array_unique($descendants));
+    }
+
     private function flattenMatrixPayload(array $payload): array
     {
         $matrix = $payload[0] ?? null;
@@ -221,6 +349,7 @@ class ManageDpcrSuccessIndicators
         return [
             'id' => $item->id,
             'dpcr_record_id' => $item->dpcr_record_id,
+            'source_opcr_item_id' => $item->source_opcr_item_id,
             'item_type' => $item->item_type,
             'activity_id' => $item->activity_id,
             'activity_title' => $item->activity?->title,

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { buildPreviewOpcrRows } from "../utils/buildPreviewOpcrRows"
@@ -18,6 +17,7 @@ export default function PreviewOpcrDialog({
   const previewRows = useMemo(() => buildPreviewOpcrRows(categoryRows), [categoryRows])
   const [flashType, setFlashType] = useState(null)
   const flashTimerRef = useRef(null)
+  const legendInteractiveClassName = "rounded-full transition-transform duration-150 hover:scale-[1.02] active:scale-95"
 
   useEffect(() => {
     return () => {
@@ -48,25 +48,25 @@ export default function PreviewOpcrDialog({
 
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600">
           <span className="font-semibold uppercase tracking-wide text-slate-500">Legend</span>
-          <button type="button" onClick={() => triggerFlash("category")} className="rounded-full">
-            <Badge variant="secondary" className={previewHierarchyBadgeStyles.category}>
+          <button type="button" onClick={() => triggerFlash("category")} className={legendInteractiveClassName}>
+            <span className={previewHierarchyBadgeStyles.category}>
               Category
-            </Badge>
+            </span>
           </button>
-          <button type="button" onClick={() => triggerFlash("program")} className="rounded-full">
-            <Badge variant="secondary" className={previewHierarchyBadgeStyles.program}>
+          <button type="button" onClick={() => triggerFlash("program")} className={legendInteractiveClassName}>
+            <span className={previewHierarchyBadgeStyles.program}>
               Program
-            </Badge>
+            </span>
           </button>
-          <button type="button" onClick={() => triggerFlash("pap")} className="rounded-full">
-            <Badge variant="secondary" className={previewHierarchyBadgeStyles.pap}>
+          <button type="button" onClick={() => triggerFlash("pap")} className={legendInteractiveClassName}>
+            <span className={previewHierarchyBadgeStyles.pap}>
               MFO/PAP
-            </Badge>
+            </span>
           </button>
-          <button type="button" onClick={() => triggerFlash("successIndicator")} className="rounded-full">
-            <Badge variant="secondary" className={previewHierarchyBadgeStyles.successIndicator}>
+          <button type="button" onClick={() => triggerFlash("successIndicator")} className={legendInteractiveClassName}>
+            <span className={previewHierarchyBadgeStyles.successIndicator}>
               Success Indicator
-            </Badge>
+            </span>
           </button>
         </div>
 
@@ -84,18 +84,18 @@ export default function PreviewOpcrDialog({
             <TableBody>
               {previewRows.length > 0 ? (
                 previewRows.map((row) => {
-                    const rowClassName =
-                      row.type === "category"
-                        ? previewHierarchyStyles.category
-                        : row.type === "program"
-                          ? previewHierarchyStyles.program
-                          : row.type === "pap"
-                            ? previewHierarchyStyles.pap
-                            : row.type === "successIndicator"
-                              ? previewHierarchyStyles.successIndicator
-                              : previewHierarchyStyles.category
-                    const flashClassName =
-                      flashType === row.type ? "ring-2 ring-inset ring-slate-500/35 animate-pulse" : ""
+                  const rowClassName =
+                    row.type === "category"
+                      ? previewHierarchyStyles.category
+                      : row.type === "program"
+                        ? previewHierarchyStyles.program
+                        : row.type === "pap"
+                          ? previewHierarchyStyles.pap
+                          : row.type === "successIndicator"
+                            ? previewHierarchyStyles.successIndicator
+                            : previewHierarchyStyles.category
+                  const flashClassName =
+                    flashType === row.type ? "ring-2 ring-inset ring-slate-500/35 animate-pulse" : ""
                   const metricClassName =
                     row.type === "successIndicator"
                       ? "text-xs font-normal text-slate-900 tabular-nums"
@@ -109,7 +109,11 @@ export default function PreviewOpcrDialog({
                   const assignments = row.assignments?.length ? formatAssignments(row.assignments) : ""
 
                   return (
-                    <TableRow key={row.key} className={`${rowClassName} ${flashClassName}`} data-preview-row={row.type}>
+                    <TableRow
+                      key={row.key}
+                      className={`${rowClassName} ${flashClassName}`}
+                      data-preview-row={row.type}
+                    >
                       <TableCell className="align-middle px-3 py-1 text-xs text-slate-500">{row.rowNumber}</TableCell>
                       <TableCell className="align-middle px-3 py-1 text-sm font-medium text-slate-900 whitespace-normal break-words">
                         {row.type === "category" ? (
@@ -144,15 +148,15 @@ export default function PreviewOpcrDialog({
                     </TableRow>
                   )
                 })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500">
-                    No saved OPCR tree available for preview.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500">
+                      No saved OPCR tree available for preview.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
         </ScrollArea>
       </DialogContent>
     </Dialog>

@@ -1,12 +1,12 @@
-﻿import { Fragment } from "react"
+import { Fragment, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import SearchableComboBox from "@/components/SearchableComboBox"
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Eye, Pencil, Plus, Star, Trash2 } from "lucide-react"
+import SuccessIndicatorMatrixSheet from "../../Libraries/SuccessIndicators/SuccessIndicatorMatrixSheet"
 import { previewHierarchyBadgeStyles } from "../utils/previewHierarchyStyles"
 
 export default function OpcrTreeTable({
@@ -60,6 +60,7 @@ export default function OpcrTreeTable({
   autosaveStatus = "idle",
 }) {
   const showActionsColumn = Boolean(canManage)
+  const legendInteractiveClassName = "rounded-full transition-transform duration-150 hover:scale-[1.02] active:scale-95"
   const getCategoryRowClassName = () =>
     "border-l-4 border-l-sky-300 bg-sky-100 hover:bg-sky-200/60"
 
@@ -95,6 +96,14 @@ export default function OpcrTreeTable({
   const getPapMetricClassName = () => "text-sm font-semibold text-slate-900 tabular-nums"
 
   const getSuccessIndicatorMetricClassName = () => "text-xs font-normal text-slate-900 tabular-nums"
+
+  const [matrixSheetOpen, setMatrixSheetOpen] = useState(false)
+  const [selectedMatrixIndicator, setSelectedMatrixIndicator] = useState(null)
+
+  const openMatrixSheet = (indicator) => {
+    setSelectedMatrixIndicator(indicator ?? null)
+    setMatrixSheetOpen(true)
+  }
 
   const flashRows = (type) => {
     const nodes = document.querySelectorAll(`[data-preview-row="${type}"]`)
@@ -214,6 +223,23 @@ export default function OpcrTreeTable({
           {showActionsColumn && (
             <TableCell className="align-middle px-3 py-1 text-right">
               <div className="ml-auto flex w-full items-center justify-end gap-1.5">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => openMatrixSheet(indicator)}
+                      aria-label={`View Rating Matrix: ${formatText(indicator.target ?? indicator.title)}`}
+                    >
+                      <Star className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{`View Rating Matrix: ${formatText(indicator.target ?? indicator.title ?? indicator.label)}`}</p>
+                  </TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -515,25 +541,25 @@ export default function OpcrTreeTable({
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
               <span className="font-semibold uppercase tracking-wide text-slate-500">Legend</span>
-              <button type="button" onClick={() => flashRows("category")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.category}>
+              <button type="button" onClick={() => flashRows("category")} className={legendInteractiveClassName}>
+                <span className={previewHierarchyBadgeStyles.category}>
                   Category
-                </Badge>
+                </span>
               </button>
-              <button type="button" onClick={() => flashRows("program")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.program}>
+              <button type="button" onClick={() => flashRows("program")} className={legendInteractiveClassName}>
+                <span className={previewHierarchyBadgeStyles.program}>
                   Program
-                </Badge>
+                </span>
               </button>
-              <button type="button" onClick={() => flashRows("pap")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.pap}>
+              <button type="button" onClick={() => flashRows("pap")} className={legendInteractiveClassName}>
+                <span className={previewHierarchyBadgeStyles.pap}>
                   MFO/PAP
-                </Badge>
+                </span>
               </button>
-              <button type="button" onClick={() => flashRows("successIndicator")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.successIndicator}>
+              <button type="button" onClick={() => flashRows("successIndicator")} className={legendInteractiveClassName}>
+                <span className={previewHierarchyBadgeStyles.successIndicator}>
                   Success Indicator
-                </Badge>
+                </span>
               </button>
             </div>
             <div className="mt-2 flex items-center gap-2 text-xs">
@@ -768,6 +794,18 @@ export default function OpcrTreeTable({
           </TableBody>
         </Table>
       </CardContent>
+      <SuccessIndicatorMatrixSheet
+        open={matrixSheetOpen}
+        onOpenChange={(open) => {
+          setMatrixSheetOpen(open)
+          if (!open) {
+            setSelectedMatrixIndicator(null)
+          }
+        }}
+        title={`Rating Matrix: ${formatText(selectedMatrixIndicator?.target ?? selectedMatrixIndicator?.title ?? selectedMatrixIndicator?.label ?? "Success Indicator")}`}
+        description="Read-only preview of the rating matrix for this success indicator."
+        ratingRows={selectedMatrixIndicator?.rating_rows ?? []}
+      />
     </Card>
   )
 }

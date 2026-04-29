@@ -524,6 +524,8 @@ class ShowDpcr
                     'sub_activity_id' => $item->sub_activity_id,
                     'sub_activity_title' => $item->subActivity?->title,
                     'specific_activity_output' => $item->specific_activity_output,
+                    'unit_of_measure' => $item->unit_of_measure,
+                    'target_plan' => $item->target_plan,
                     'target_jan' => $item->target_jan,
                     'target_feb' => $item->target_feb,
                     'target_mar' => $item->target_mar,

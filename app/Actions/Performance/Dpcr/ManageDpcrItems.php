@@ -16,6 +16,21 @@ class ManageDpcrItems
 {
     use AsAction;
 
+    private const MONTH_ORDER = [
+        'jan' => 0,
+        'feb' => 1,
+        'mar' => 2,
+        'apr' => 3,
+        'may' => 4,
+        'jun' => 5,
+        'jul' => 6,
+        'aug' => 7,
+        'sep' => 8,
+        'oct' => 9,
+        'nov' => 10,
+        'dec' => 11,
+    ];
+
     public function authorize(Request $request): bool
     {
         return $request->user()?->can('HRIS_performance.dpcr.edit') ?? false;
@@ -36,21 +51,50 @@ class ManageDpcrItems
             'activity_id' => ['required', 'integer', 'exists:mysql5.ppmp_activity,id'],
             'sub_activity_id' => ['required', 'integer', 'exists:mysql5.ppmp_sub_activity,id'],
             'specific_activity_output' => ['required', 'string', 'max:2000'],
+            'target_plan' => ['required', 'array', 'min:1'],
+            'target_plan.*.months' => ['required', 'array', 'min:1'],
+            'target_plan.*.months.*' => ['string', 'in:jan,feb,mar,apr,may,jun,jul,aug,sep,oct,nov,dec'],
+            'target_plan.*.target_mode' => ['required', 'string', 'in:group,individual'],
+            'target_plan.*.target_value' => ['nullable', 'string', 'max:2000'],
+            'target_plan.*.target_frequency' => ['nullable', 'string', 'in:every_minute,every_hour,daily,weekly,bi_monthly,monthly,semestral'],
+            'target_plan.*.unit_of_measure' => ['nullable', 'string', 'max:255'],
+            'target_plan.*.as_need_arises' => ['sometimes', 'boolean'],
             'assignment_values' => ['nullable', 'array'],
             'assignment_values.*' => ['string'],
-            'target_jan' => ['nullable', 'numeric'],
-            'target_feb' => ['nullable', 'numeric'],
-            'target_mar' => ['nullable', 'numeric'],
-            'target_apr' => ['nullable', 'numeric'],
-            'target_may' => ['nullable', 'numeric'],
-            'target_jun' => ['nullable', 'numeric'],
-            'target_jul' => ['nullable', 'numeric'],
-            'target_aug' => ['nullable', 'numeric'],
-            'target_sep' => ['nullable', 'numeric'],
-            'target_oct' => ['nullable', 'numeric'],
-            'target_nov' => ['nullable', 'numeric'],
-            'target_dec' => ['nullable', 'numeric'],
         ]);
+
+        foreach (($data['target_plan'] ?? []) as $index => $row) {
+            $months = $this->normalizeMonths($row['months'] ?? []);
+            $startIndex = $this->monthIndex($months[0] ?? null);
+            $endIndex = $this->monthIndex($months[count($months) - 1] ?? null);
+            $targetMode = (string) ($row['target_mode'] ?? 'group');
+
+            if (! $months || $startIndex === null || $endIndex === null || $endIndex < $startIndex) {
+                throw ValidationException::withMessages([
+                    "target_plan.$index.months" => ['The month range must be contiguous and ordered from left to right.'],
+                ]);
+            }
+
+            if ($targetMode === 'group' && ! $this->isContiguousMonths($months)) {
+                throw ValidationException::withMessages([
+                    "target_plan.$index.months" => ['The month range must be contiguous and ordered from left to right.'],
+                ]);
+            }
+
+            if (! (bool) ($row['as_need_arises'] ?? false)) {
+                if (trim((string) ($row['target_value'] ?? '')) === '') {
+                    throw ValidationException::withMessages([
+                        "target_plan.$index.target_value" => ['The target value is required when the target is not marked as need arises.'],
+                    ]);
+                }
+
+                if (trim((string) ($row['unit_of_measure'] ?? '')) === '') {
+                    throw ValidationException::withMessages([
+                        "target_plan.$index.unit_of_measure" => ['The unit of measure is required when the target is not marked as need arises.'],
+                    ]);
+                }
+            }
+        }
 
         $subActivityMatches = SubActivity::query()
             ->where('id', $data['sub_activity_id'])
@@ -82,24 +126,29 @@ class ManageDpcrItems
                 'activity_id' => $activity->id,
                 'sub_activity_id' => $subActivity->id,
                 'specific_activity_output' => trim((string) $data['specific_activity_output']),
+                'target_plan' => array_values(array_map(function (array $row) {
+                    $months = $this->normalizeMonths($row['months'] ?? []);
+                    $startMonth = $months[0] ?? null;
+                    $endMonth = $months[count($months) - 1] ?? null;
+                    $rowTargetMode = (string) ($row['target_mode'] ?? 'group');
+
+                    return [
+                        'months' => $months,
+                        'start_month' => $startMonth,
+                        'end_month' => $endMonth,
+                        'target_mode' => $rowTargetMode === 'individual' ? 'individual' : 'group',
+                        'target_value' => trim((string) $row['target_value']),
+                        'target_frequency' => trim((string) ($row['target_frequency'] ?? '')),
+                        'unit_of_measure' => trim((string) $row['unit_of_measure']),
+                        'as_need_arises' => (bool) ($row['as_need_arises'] ?? false),
+                    ];
+                }, $data['target_plan'] ?? [])),
                 'pap_id' => $parentItem->pap_id,
                 'pap_sort_order' => $parentItem->pap_sort_order,
                 'success_indicator_id' => $parentItem->success_indicator_id,
                 'success_indicator_sort_order' => $parentItem->success_indicator_sort_order,
                 'pap_title' => $parentItem->pap_title,
                 'success_indicator_title' => $parentItem->success_indicator_title,
-                'target_jan' => $this->nullableDecimal($data['target_jan'] ?? null),
-                'target_feb' => $this->nullableDecimal($data['target_feb'] ?? null),
-                'target_mar' => $this->nullableDecimal($data['target_mar'] ?? null),
-                'target_apr' => $this->nullableDecimal($data['target_apr'] ?? null),
-                'target_may' => $this->nullableDecimal($data['target_may'] ?? null),
-                'target_jun' => $this->nullableDecimal($data['target_jun'] ?? null),
-                'target_jul' => $this->nullableDecimal($data['target_jul'] ?? null),
-                'target_aug' => $this->nullableDecimal($data['target_aug'] ?? null),
-                'target_sep' => $this->nullableDecimal($data['target_sep'] ?? null),
-                'target_oct' => $this->nullableDecimal($data['target_oct'] ?? null),
-                'target_nov' => $this->nullableDecimal($data['target_nov'] ?? null),
-                'target_dec' => $this->nullableDecimal($data['target_dec'] ?? null),
                 'weight' => null,
                 'allocated_budget' => null,
                 'remarks' => null,
@@ -177,22 +226,41 @@ class ManageDpcrItems
             'sub_activity_id' => $item->sub_activity_id,
             'sub_activity_title' => $item->subActivity?->title,
             'specific_activity_output' => $item->specific_activity_output,
-            'target_jan' => $item->target_jan,
-            'target_feb' => $item->target_feb,
-            'target_mar' => $item->target_mar,
-            'target_apr' => $item->target_apr,
-            'target_may' => $item->target_may,
-            'target_jun' => $item->target_jun,
-            'target_jul' => $item->target_jul,
-            'target_aug' => $item->target_aug,
-            'target_sep' => $item->target_sep,
-            'target_oct' => $item->target_oct,
-            'target_nov' => $item->target_nov,
-            'target_dec' => $item->target_dec,
+            'target_plan' => $item->target_plan,
             'group_assignments' => $item->assignments->pluck('group_id')->filter()->map(fn ($value) => (string) $value)->values()->all(),
             'employee_assignments' => $item->assignments->pluck('emp_id')->filter()->map(fn ($value) => (string) $value)->values()->all(),
             'division_assignments' => $item->assignments->pluck('division_id')->filter()->map(fn ($value) => (string) $value)->values()->all(),
             'sort_order' => $item->sort_order,
         ];
+    }
+
+    private function monthIndex($value): ?int
+    {
+        $month = strtolower(trim((string) $value));
+        return self::MONTH_ORDER[$month] ?? null;
+    }
+
+    private function normalizeMonths(array $months): array
+    {
+        return collect($months)
+            ->map(fn ($value) => strtolower(trim((string) $value)))
+            ->filter(fn ($value) => array_key_exists($value, self::MONTH_ORDER))
+            ->unique()
+            ->sortBy(fn ($value) => self::MONTH_ORDER[$value])
+            ->values()
+            ->all();
+    }
+
+    private function isContiguousMonths(array $months): bool
+    {
+        $normalized = $this->normalizeMonths($months);
+
+        for ($index = 1; $index < count($normalized); $index += 1) {
+            if (($this->monthIndex($normalized[$index]) ?? -1) !== (($this->monthIndex($normalized[$index - 1]) ?? -2) + 1)) {
+                return false;
+            }
+        }
+
+        return ! empty($normalized);
     }
 }

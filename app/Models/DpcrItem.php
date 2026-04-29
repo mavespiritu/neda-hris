@@ -26,6 +26,8 @@ class DpcrItem extends Model
         'activity_id',
         'sub_activity_id',
         'specific_activity_output',
+        'unit_of_measure',
+        'target_plan',
         'performance_rating_id',
         'pap_id',
         'pap_sort_order',
@@ -51,6 +53,10 @@ class DpcrItem extends Model
         'sort_order',
         'created_by',
         'updated_by',
+    ];
+
+    protected $casts = [
+        'target_plan' => 'array',
     ];
 
     public function record(): BelongsTo

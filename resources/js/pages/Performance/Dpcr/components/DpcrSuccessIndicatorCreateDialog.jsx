@@ -144,6 +144,7 @@ export default function DpcrSuccessIndicatorCreateDialog({
   ratingItems = [],
   initialSuccessIndicatorTitle = "",
   initialTemplateItem = null,
+  mode = "create",
   onCancel,
   onCreate,
   creating = false,
@@ -216,6 +217,7 @@ export default function DpcrSuccessIndicatorCreateDialog({
   const { activityItems, subActivityMap } = useMemo(() => flattenActivities(ppmpHierarchy), [ppmpHierarchy])
   const subActivityItems = activityId ? subActivityMap[String(activityId)] ?? [] : []
   const divisionKey = String(selectedDivisionValue ?? selectedDivisionLabel ?? "").trim()
+  const isEditing = mode === "edit"
 
   useEffect(() => {
     let mounted = true
@@ -315,9 +317,9 @@ export default function DpcrSuccessIndicatorCreateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-[96vw] max-h-[92vh] overflow-hidden p-0">
         <div className="flex max-h-[92vh] flex-col">
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
             <DialogHeader>
-              <DialogTitle>Add Success Indicator</DialogTitle>
+              <DialogTitle>{`${isEditing ? "Edit" : "Add"} Success Indicator`}</DialogTitle>
               <DialogDescription>
                 Encode a DPCR success indicator for {selectedDivisionLabel || "the selected division"}.
               </DialogDescription>
@@ -478,7 +480,7 @@ export default function DpcrSuccessIndicatorCreateDialog({
               onClick={handleSubmit}
               disabled={creating || !activityId || !subActivityId || !successIndicatorTitle.trim()}
             >
-              {creating ? "Saving..." : "Add Success Indicator"}
+              {creating ? "Saving..." : isEditing ? "Save Changes" : "Add Success Indicator"}
             </Button>
           </div>
         </div>

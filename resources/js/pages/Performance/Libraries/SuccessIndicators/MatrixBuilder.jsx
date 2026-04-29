@@ -295,7 +295,7 @@ const MatrixCopyDialog = ({
   )
 }
 
-const MatrixBuilder = ({ value, onChange, disabled = false }) => {
+const MatrixBuilder = ({ value, onChange, disabled = false, showControls = true }) => {
   const [editingTarget, setEditingTarget] = useState(null)
   const [copyTarget, setCopyTarget] = useState(null)
   const [copySourceDimension, setCopySourceDimension] = useState("")
@@ -404,28 +404,32 @@ const MatrixBuilder = ({ value, onChange, disabled = false }) => {
                     <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${summary.enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                       {summary.enabled ? "Enabled" : "Disabled"}
                     </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setCopyTarget({ sectionIndex })
-                        setCopySourceDimension("")
-                      }}
-                      disabled={disabled || section.enabled === false}
-                    >
-                      Copy
-                    </Button>
-                    <Switch
-                      checked={section.enabled !== false}
-                      onCheckedChange={(checked) =>
-                        updateSection(sectionIndex, (current) => ({
-                          ...current,
-                          enabled: Boolean(checked),
-                        }))
-                      }
-                      disabled={disabled}
-                    />
+                    {showControls && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCopyTarget({ sectionIndex })
+                            setCopySourceDimension("")
+                          }}
+                          disabled={disabled || section.enabled === false}
+                        >
+                          Copy
+                        </Button>
+                        <Switch
+                          checked={section.enabled !== false}
+                          onCheckedChange={(checked) =>
+                            updateSection(sectionIndex, (current) => ({
+                              ...current,
+                              enabled: Boolean(checked),
+                            }))
+                          }
+                          disabled={disabled}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -440,7 +444,7 @@ const MatrixBuilder = ({ value, onChange, disabled = false }) => {
                         <th className="px-4 py-3 text-left font-semibold">To</th>
                         <th className="px-4 py-3 text-left font-semibold">Unit</th>
                         <th className="px-4 py-3 text-left font-semibold">Timing</th>
-                        <th className="px-4 py-3 text-left font-semibold">Action</th>
+                        {showControls && <th className="px-4 py-3 text-left font-semibold">Action</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -468,22 +472,24 @@ const MatrixBuilder = ({ value, onChange, disabled = false }) => {
                             <td className="px-4 py-3 text-slate-700">
                               {timingOptions.find((item) => item.value === row.timing)?.label ?? row.timing ?? "-"}
                             </td>
-                            <td className="px-4 py-3">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  setEditingTarget({
-                                    sectionIndex,
-                                    rowIndex,
-                                  })
-                                }
-                                disabled={disabled || section.enabled === false}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </td>
+                            {showControls && (
+                              <td className="px-4 py-3">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    setEditingTarget({
+                                      sectionIndex,
+                                      rowIndex,
+                                    })
+                                  }
+                                  disabled={disabled || section.enabled === false}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         )
                       })}
@@ -496,40 +502,44 @@ const MatrixBuilder = ({ value, onChange, disabled = false }) => {
         </div>
       </div>
 
-      <MatrixRowEditorDialog
-        open={editingTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditingTarget(null)
-        }}
-        section={currentSection}
-        row={currentRow}
-        onChange={(nextRow) => {
-          if (editingTarget === null) return
-          updateRow(editingTarget.sectionIndex, editingTarget.rowIndex, () => nextRow)
-        }}
-        disabled={disabled}
-      />
+      {showControls && (
+        <>
+          <MatrixRowEditorDialog
+            open={editingTarget !== null}
+            onOpenChange={(open) => {
+              if (!open) setEditingTarget(null)
+            }}
+            section={currentSection}
+            row={currentRow}
+            onChange={(nextRow) => {
+              if (editingTarget === null) return
+              updateRow(editingTarget.sectionIndex, editingTarget.rowIndex, () => nextRow)
+            }}
+            disabled={disabled}
+          />
 
-      <MatrixCopyDialog
-        open={copyTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCopyTarget(null)
-            setCopySourceDimension("")
-          }
-        }}
-        targetSection={copyTargetSection}
-        sourceDimension={copySourceDimension}
-        sourceOptions={copySourceOptions}
-        onSourceDimensionChange={setCopySourceDimension}
-        onCopy={() => {
-          if (copyTarget === null || !copySourceDimension) return
-          copySectionFromDimension(copyTarget.sectionIndex, copySourceDimension)
-          setCopyTarget(null)
-          setCopySourceDimension("")
-        }}
-        disabled={disabled}
-      />
+          <MatrixCopyDialog
+            open={copyTarget !== null}
+            onOpenChange={(open) => {
+              if (!open) {
+                setCopyTarget(null)
+                setCopySourceDimension("")
+              }
+            }}
+            targetSection={copyTargetSection}
+            sourceDimension={copySourceDimension}
+            sourceOptions={copySourceOptions}
+            onSourceDimensionChange={setCopySourceDimension}
+            onCopy={() => {
+              if (copyTarget === null || !copySourceDimension) return
+              copySectionFromDimension(copyTarget.sectionIndex, copySourceDimension)
+              setCopyTarget(null)
+              setCopySourceDimension("")
+            }}
+            disabled={disabled}
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, Plus } from "lucide-react"
+import { Loader2, Pencil, Plus, Star, Trash2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -7,12 +7,12 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
 import SearchableComboBox from "@/components/SearchableComboBox"
 import { useHasPermission } from "@/hooks/useAuth"
 import { hydrateOpcrTree } from "../Opcr/utils/hydrateOpcrTree"
 import { buildPreviewOpcrRows } from "../Opcr/utils/buildPreviewOpcrRows"
 import { previewHierarchyBadgeStyles, previewHierarchyStyles } from "../Opcr/utils/previewHierarchyStyles"
+import SuccessIndicatorMatrixSheet from "../Libraries/SuccessIndicators/SuccessIndicatorMatrixSheet"
 
 const monthFields = [
   { key: "jan", label: "J" },
@@ -80,6 +80,22 @@ const formatAssignments = (values = [], groupMap = {}, employeeMap = {}, divisio
 
 const rowVisibilityStorageKey = "performance.dpcr.pnc.rowVisibility"
 
+const dpcrPreviewHierarchyBadgeStyles = {
+  ...previewHierarchyBadgeStyles,
+  prexcActivity: "inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800",
+  prexcSubActivity: "inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800",
+  dpcrSuccessIndicator: "inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-800",
+}
+
+const dpcrPreviewHierarchyStyles = {
+  ...previewHierarchyStyles,
+  prexcActivity: "border-l-4 border-l-blue-300 bg-blue-100 hover:bg-blue-200/70",
+  prexcSubActivity: "border-l-4 border-l-orange-300 bg-orange-100 hover:bg-orange-200/70",
+  dpcrSuccessIndicator: "border-l-4 border-l-rose-300 bg-rose-100 hover:bg-rose-200/70",
+}
+
+const dpcrLegendInteractiveClassName = "rounded-full transition-transform duration-150 hover:scale-[1.02] active:scale-95"
+
 export default function Pnc({
   record = null,
   sourceRecord = null,
@@ -87,6 +103,8 @@ export default function Pnc({
   viewMode = "dpcr",
   onAddSuccessIndicator,
   onAddSpecificAO,
+  onEditSuccessIndicator,
+  onRemoveSuccessIndicator,
   groupMap = {},
   employeeMap = {},
   divisionMap = {},
@@ -104,6 +122,8 @@ export default function Pnc({
     prexcActivity: true,
     prexcSubActivity: true,
   }))
+  const [matrixSheetOpen, setMatrixSheetOpen] = useState(false)
+  const [selectedMatrixIndicator, setSelectedMatrixIndicator] = useState(null)
   const [isTableLoading, setIsTableLoading] = useState(false)
   const [flashType, setFlashType] = useState(null)
   const flashTimerRef = useRef(null)
@@ -156,6 +176,11 @@ export default function Pnc({
       ...current,
       [type]: checked === true,
     }))
+  }
+
+  const openMatrixSheet = (indicator) => {
+    setSelectedMatrixIndicator(indicator ?? null)
+    setMatrixSheetOpen(true)
   }
 
   const flashRows = (type) => {
@@ -349,40 +374,50 @@ export default function Pnc({
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold uppercase tracking-wide text-slate-500">Legend</span>
-              <button type="button" onClick={() => triggerFlash("category")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.category}>
-                  Category
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("program")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.program}>
-                  Program
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("pap")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.pap}>
-                  MFO/PAP
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("successIndicator")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.successIndicator}>
+              {rowVisibility.category && (
+                <button type="button" onClick={() => triggerFlash("category")} className={dpcrLegendInteractiveClassName}>
+                  <span className={previewHierarchyBadgeStyles.category}>
+                    Category
+                  </span>
+                </button>
+              )}
+              {rowVisibility.program && (
+                <button type="button" onClick={() => triggerFlash("program")} className={dpcrLegendInteractiveClassName}>
+                  <span className={previewHierarchyBadgeStyles.program}>
+                    Program
+                  </span>
+                </button>
+              )}
+              {rowVisibility.pap && (
+                <button type="button" onClick={() => triggerFlash("pap")} className={dpcrLegendInteractiveClassName}>
+                  <span className={previewHierarchyBadgeStyles.pap}>
+                    MFO/PAP
+                  </span>
+                </button>
+              )}
+              <button type="button" onClick={() => triggerFlash("successIndicator")} className={dpcrLegendInteractiveClassName}>
+                <span className={previewHierarchyBadgeStyles.successIndicator}>
                   Success Indicator (OPCR Level)
-                </Badge>
+                </span>
               </button>
-              <button type="button" onClick={() => triggerFlash("prexcActivity")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.prexcActivity}>
-                  PREXC Activity
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("prexcSubActivity")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.prexcSubActivity}>
-                  PREXC Sub-activity
-                </Badge>
-              </button>
+              {rowVisibility.prexcActivity && (
+                <button type="button" onClick={() => triggerFlash("prexcActivity")} className={dpcrLegendInteractiveClassName}>
+                  <span className={previewHierarchyBadgeStyles.prexcActivity}>
+                    PREXC Activity
+                  </span>
+                </button>
+              )}
+              {rowVisibility.prexcSubActivity && (
+                <button type="button" onClick={() => triggerFlash("prexcSubActivity")} className={dpcrLegendInteractiveClassName}>
+                  <span className={previewHierarchyBadgeStyles.prexcSubActivity}>
+                    PREXC Sub-activity
+                  </span>
+                </button>
+              )}
               <button type="button" onClick={() => triggerFlash("dpcrSuccessIndicator")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.dpcrSuccessIndicator}>
+                <span className={previewHierarchyBadgeStyles.dpcrSuccessIndicator}>
                   Success Indicator (DPCR Level)
-                </Badge>
+                </span>
               </button>
             </div>
           </div>
@@ -509,40 +544,50 @@ export default function Pnc({
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-semibold uppercase tracking-wide text-slate-500">Legend</span>
-              <button type="button" onClick={() => triggerFlash("category")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.category}>
-                  Category
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("program")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.program}>
-                  Program
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("pap")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.pap}>
-                  MFO/PAP
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("successIndicator")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.successIndicator}>
+              {rowVisibility.category && (
+                <button type="button" onClick={() => triggerFlash("category")} className={dpcrLegendInteractiveClassName}>
+                  <span className={dpcrPreviewHierarchyBadgeStyles.category}>
+                    Category
+                  </span>
+                </button>
+              )}
+              {rowVisibility.program && (
+                <button type="button" onClick={() => triggerFlash("program")} className={dpcrLegendInteractiveClassName}>
+                  <span className={dpcrPreviewHierarchyBadgeStyles.program}>
+                    Program
+                  </span>
+                </button>
+              )}
+              {rowVisibility.pap && (
+                <button type="button" onClick={() => triggerFlash("pap")} className={dpcrLegendInteractiveClassName}>
+                  <span className={dpcrPreviewHierarchyBadgeStyles.pap}>
+                    MFO/PAP
+                  </span>
+                </button>
+              )}
+              <button type="button" onClick={() => triggerFlash("successIndicator")} className={dpcrLegendInteractiveClassName}>
+                <span className={dpcrPreviewHierarchyBadgeStyles.successIndicator}>
                   Success Indicator (OPCR Level)
-                </Badge>
+                </span>
               </button>
-              <button type="button" onClick={() => triggerFlash("prexcActivity")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.prexcActivity}>
-                  PREXC Activity
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("prexcSubActivity")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.prexcSubActivity}>
-                  PREXC Sub-activity
-                </Badge>
-              </button>
-              <button type="button" onClick={() => triggerFlash("dpcrSuccessIndicator")} className="rounded-full">
-                <Badge variant="secondary" className={previewHierarchyBadgeStyles.dpcrSuccessIndicator}>
+              {rowVisibility.prexcActivity && (
+                <button type="button" onClick={() => triggerFlash("prexcActivity")} className={dpcrLegendInteractiveClassName}>
+                  <span className={dpcrPreviewHierarchyBadgeStyles.prexcActivity}>
+                    PREXC Activity
+                  </span>
+                </button>
+              )}
+              {rowVisibility.prexcSubActivity && (
+                <button type="button" onClick={() => triggerFlash("prexcSubActivity")} className={dpcrLegendInteractiveClassName}>
+                  <span className={dpcrPreviewHierarchyBadgeStyles.prexcSubActivity}>
+                    PREXC Sub-activity
+                  </span>
+                </button>
+              )}
+              <button type="button" onClick={() => triggerFlash("dpcrSuccessIndicator")} className={dpcrLegendInteractiveClassName}>
+                <span className={dpcrPreviewHierarchyBadgeStyles.dpcrSuccessIndicator}>
                   Success Indicator (DPCR Level)
-                </Badge>
+                </span>
               </button>
             </div>
 
@@ -601,7 +646,7 @@ export default function Pnc({
                   <TableHead colSpan={12} className="px-3 py-2 text-center text-xs align-middle">
                     Monthly Targets
                   </TableHead>
-                  <TableHead rowSpan={2} className="px-3 py-2 text-xs align-middle">
+                  <TableHead rowSpan={2} className="px-3 py-2 text-xs align-right">
                     Group/Staff Accountable
                   </TableHead>
                   <TableHead rowSpan={2} className="w-[110px] px-3 py-2 text-right text-xs align-middle">
@@ -609,6 +654,9 @@ export default function Pnc({
                   </TableHead>
                   <TableHead rowSpan={2} className="w-[140px] px-3 py-2 text-right text-xs align-middle">
                     Allocated Budget
+                  </TableHead>
+                  <TableHead rowSpan={2} className="w-[112px] px-3 py-2 text-right text-xs align-middle">
+                    Actions
                   </TableHead>
                 </TableRow>
                 <TableRow>
@@ -627,16 +675,16 @@ export default function Pnc({
                   visiblePreviewRows.map((row) => {
                     const rowClassName =
                       row.type === "category"
-                        ? previewHierarchyStyles.category
+                        ? dpcrPreviewHierarchyStyles.category
                         : row.type === "program"
-                          ? previewHierarchyStyles.program
+                          ? dpcrPreviewHierarchyStyles.program
                           : row.type === "pap"
-                            ? previewHierarchyStyles.pap
+                            ? dpcrPreviewHierarchyStyles.pap
                             : row.type === "successIndicator"
                               ? row.sourceItem?.dpcr_level
-                                ? previewHierarchyStyles.dpcrSuccessIndicator
-                                : previewHierarchyStyles.successIndicator
-                              : previewHierarchyStyles.category
+                                ? dpcrPreviewHierarchyStyles.dpcrSuccessIndicator
+                                : dpcrPreviewHierarchyStyles.successIndicator
+                              : dpcrPreviewHierarchyStyles.category
 
                     const metricClassName =
                       row.type === "successIndicator"
@@ -682,6 +730,18 @@ export default function Pnc({
                             const childSubActivityCode = prexcCodeMaps.subActivityCodeMap.get(String(indicator.sub_activity_id ?? "")) ?? ""
                             const childActivityLabel = formatText(indicator.activity_title, "Activity")
                             const childSubActivityLabel = formatText(indicator.sub_activity_title, "Sub-activity")
+                            const childActivityFlashClassName =
+                              flashType === "prexcActivity"
+                                ? "ring-4 ring-inset ring-slate-700/45 bg-white/70 shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.18)] animate-pulse"
+                                : ""
+                            const childSubActivityFlashClassName =
+                              flashType === "prexcSubActivity"
+                                ? "ring-4 ring-inset ring-slate-700/45 bg-white/70 shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.18)] animate-pulse"
+                                : ""
+                            const childDpcrFlashClassName =
+                              flashType === "dpcrSuccessIndicator"
+                                ? "ring-4 ring-inset ring-slate-700/45 bg-white/70 shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.18)] animate-pulse"
+                                : ""
 
                             const childRows = []
 
@@ -689,7 +749,7 @@ export default function Pnc({
                               childRows.push(
                                 <TableRow
                                   key={`${indicator.id}-activity`}
-                                  className={previewHierarchyStyles.prexcActivity}
+                                  className={`${dpcrPreviewHierarchyStyles.prexcActivity} ${childActivityFlashClassName}`}
                                   data-preview-row="prexcActivity"
                                 >
                                   <TableCell className="align-middle px-3 py-1 text-xs text-slate-500">{activityRowNumber}</TableCell>
@@ -700,6 +760,7 @@ export default function Pnc({
                                       <span className="font-medium text-slate-900">{childActivityLabel}</span>
                                     </div>
                                   </TableCell>
+                                  <TableCell className="align-middle px-3 py-1" />
                                 </TableRow>
                               )
                             }
@@ -708,7 +769,7 @@ export default function Pnc({
                               childRows.push(
                                 <TableRow
                                   key={`${indicator.id}-sub-activity`}
-                                  className={previewHierarchyStyles.prexcSubActivity}
+                                  className={`${dpcrPreviewHierarchyStyles.prexcSubActivity} ${childSubActivityFlashClassName}`}
                                   data-preview-row="prexcSubActivity"
                                 >
                                   <TableCell className="align-middle px-3 py-1 text-xs text-slate-500">{subActivityRowNumber}</TableCell>
@@ -719,6 +780,7 @@ export default function Pnc({
                                       <span className="font-medium text-slate-900">{childSubActivityLabel}</span>
                                     </div>
                                   </TableCell>
+                                  <TableCell className="align-middle px-3 py-1" />
                                 </TableRow>
                               )
                             }
@@ -726,17 +788,38 @@ export default function Pnc({
                             childRows.push(
                               <TableRow
                                 key={indicator.id}
-                                className="border-violet-200 bg-violet-50/80 hover:bg-violet-100/70"
+                                className={`${dpcrPreviewHierarchyStyles.dpcrSuccessIndicator} ${childDpcrFlashClassName}`}
                                 data-preview-row="dpcrSuccessIndicator"
                               >
                                 <TableCell className="align-middle px-3 py-1 text-xs text-slate-500">{childRowNumber}</TableCell>
                                 <TableCell colSpan={14} className="align-middle px-3 py-2 text-sm text-slate-900 whitespace-normal break-words">
-                                  <div className="space-y-1 pl-8">
-                                    <div className="break-words font-medium text-slate-900">{formatText(indicator.success_indicator_title)}</div>
-                                    <div className="text-xs text-slate-500">{[indicator.activity_title, indicator.sub_activity_title].filter(Boolean).join(" - ") || "DPCR success indicator"}</div>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="pl-8">
+                                      <div className="break-words font-medium text-slate-900">{formatText(indicator.success_indicator_title)}</div>
+                                    </div>
+                                    {canEdit && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 gap-2 px-3 text-xs"
+                                            onClick={() => onAddSpecificAO?.(indicator)}
+                                            aria-label={`Add Specific Activity/Output: ${formatText(indicator.success_indicator_title)}`}
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                            Add Specific Activity/Output
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{`Add Specific Activity/Output: ${formatText(indicator.success_indicator_title)}`}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
                                   </div>
                                 </TableCell>
-                                <TableCell className="align-middle px-3 py-1 text-xs text-slate-700 whitespace-normal break-words">
+                                <TableCell className="align-right px-3 py-1 text-xs text-slate-700 whitespace-normal break-words">
                                   {childAssignments || "-"}
                                 </TableCell>
                                 <TableCell className="align-middle px-3 py-1 text-right text-xs font-normal text-slate-900 tabular-nums">
@@ -744,6 +827,63 @@ export default function Pnc({
                                 </TableCell>
                                 <TableCell className="align-middle px-3 py-1 text-right text-xs font-normal text-slate-900 tabular-nums">
                                   {childBudget}
+                                </TableCell>
+                                <TableCell className="align-middle px-3 py-1 text-right">
+                                  {canEdit ? (
+                                    <div className="ml-auto flex w-full items-center justify-end gap-1.5">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => onEditSuccessIndicator?.(indicator)}
+                                            aria-label={`Edit Success Indicator: ${formatText(indicator.success_indicator_title)}`}
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{`Edit Success Indicator: ${formatText(indicator.success_indicator_title)}`}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-red-600 hover:text-red-700"
+                                            onClick={() => onRemoveSuccessIndicator?.(indicator)}
+                                            aria-label={`Remove Success Indicator: ${formatText(indicator.success_indicator_title)}`}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{`Remove Success Indicator: ${formatText(indicator.success_indicator_title)}`}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => openMatrixSheet(indicator)}
+                                            aria-label={`View Rating Matrix: ${formatText(indicator.success_indicator_title)}`}
+                                          >
+                                            <Star className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{`View Rating Matrix: ${formatText(indicator.success_indicator_title ?? indicator.title ?? indicator.label)}`}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  ) : null}
                                 </TableCell>
                               </TableRow>
                             )
@@ -784,7 +924,10 @@ export default function Pnc({
                               </div>
                             ) : row.type === "successIndicator" ? (
                               <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2" style={{ paddingLeft: `${(row.indicatorDepth + 1) * 1.25}rem` }}>
+                                <div
+                                  className="flex items-center gap-2"
+                                  style={row.sourceItem?.dpcr_level ? { paddingLeft: `${(row.indicatorDepth + 1) * 1.25}rem` } : undefined}
+                                >
                                   <span className="whitespace-normal break-words font-semibold text-slate-900">{formatText(row.indicatorLabel)}</span>
                                 </div>
                                 {canEdit && (
@@ -858,6 +1001,29 @@ export default function Pnc({
                           <TableCell className={`align-middle px-3 py-1 text-right ${metricClassName}`}>
                             {row.showCategory ? categoryAmount : indicatorAmount}
                           </TableCell>
+                          <TableCell className="align-middle px-3 py-1 text-right">
+                            {row.type === "successIndicator" && canEdit ? (
+                              <div className="ml-auto flex w-full items-center justify-end gap-1.5">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => openMatrixSheet(row.sourceItem)}
+                                      aria-label={`View Rating Matrix: ${formatText(row.indicatorLabel)}`}
+                                    >
+                                      <Star className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{`View Rating Matrix: ${formatText(row.indicatorLabel)}`}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            ) : null}
+                          </TableCell>
                         </TableRow>
                         {childDpcrRows}
                       </Fragment>
@@ -865,7 +1031,7 @@ export default function Pnc({
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={18} className="py-4 text-center text-sm text-slate-500">
+                    <TableCell colSpan={19} className="py-4 text-center text-sm text-slate-500">
                       No success indicators assigned for this scope.
                     </TableCell>
                   </TableRow>
@@ -873,6 +1039,20 @@ export default function Pnc({
               </TableBody>
             </Table>
             </ScrollArea>
+            <SuccessIndicatorMatrixSheet
+              open={matrixSheetOpen}
+              onOpenChange={(open) => {
+                setMatrixSheetOpen(open)
+                if (!open) {
+                  setSelectedMatrixIndicator(null)
+                }
+              }}
+              title={`Rating Matrix: ${formatText(
+                selectedMatrixIndicator?.success_indicator_title ?? selectedMatrixIndicator?.title ?? selectedMatrixIndicator?.label ?? "Success Indicator"
+              )}`}
+              description="Read-only preview of the rating matrix for this success indicator."
+              ratingRows={selectedMatrixIndicator?.rating_rows ?? []}
+            />
             {isTableLoading && (
               <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-b-lg bg-white/35">
                 <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">

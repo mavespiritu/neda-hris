@@ -50,6 +50,7 @@ export default function Index({
   const [successIndicatorSourceItem, setSuccessIndicatorSourceItem] = useState(null)
   const [successIndicatorTemplateItem, setSuccessIndicatorTemplateItem] = useState(null)
   const [successIndicatorInitialTitle, setSuccessIndicatorInitialTitle] = useState("")
+  const [successIndicatorEditingItem, setSuccessIndicatorEditingItem] = useState(null)
   const [successIndicatorCreating, setSuccessIndicatorCreating] = useState(false)
   const { ppmpHierarchy, groups, employees, groupMap, employeeMap } = useOpcrLookups()
   const dpcrRatingItems = useMemo(
@@ -153,7 +154,17 @@ export default function Index({
   const handleOpenSuccessIndicatorDialog = (sourceItem, templateItem = null, draftTitle = "") => {
     setSuccessIndicatorSourceItem(sourceItem ?? null)
     setSuccessIndicatorTemplateItem(templateItem ?? null)
+    setSuccessIndicatorEditingItem(null)
     setSuccessIndicatorInitialTitle(draftTitle || "")
+    setSuccessIndicatorOpen(true)
+  }
+
+  const handleOpenEditSuccessIndicatorDialog = (indicator) => {
+    if (!indicator?.id) return
+    setSuccessIndicatorSourceItem(null)
+    setSuccessIndicatorTemplateItem(indicator)
+    setSuccessIndicatorEditingItem(indicator)
+    setSuccessIndicatorInitialTitle(indicator.success_indicator_title || "")
     setSuccessIndicatorOpen(true)
   }
 
@@ -162,26 +173,38 @@ export default function Index({
 
     try {
       setSuccessIndicatorCreating(true)
-        await axios.post(
-          route("dpcrs.success-indicators.store", { recordId: selectedRecord.id }),
-          {
+      const isEditing = Boolean(successIndicatorEditingItem?.id)
+      const endpoint = isEditing
+        ? route("dpcrs.success-indicators.update", {
+            recordId: selectedRecord.id,
+            itemId: successIndicatorEditingItem.id,
+          })
+        : route("dpcrs.success-indicators.store", { recordId: selectedRecord.id })
+      const requestPayload = isEditing
+        ? {
+            ...payload,
+            source_opcr_item_id: successIndicatorEditingItem?.source_opcr_item_id ?? null,
+          }
+        : {
             ...payload,
             source_opcr_item_id: successIndicatorSourceItem?.opcr_item_id ?? successIndicatorSourceItem?.id ?? null,
           }
-      )
+
+      await axios[isEditing ? "put" : "post"](endpoint, requestPayload)
 
       setSuccessIndicatorOpen(false)
       setSuccessIndicatorSourceItem(null)
       setSuccessIndicatorTemplateItem(null)
       setSuccessIndicatorInitialTitle("")
+      setSuccessIndicatorEditingItem(null)
       router.reload({ preserveScroll: true, preserveState: true })
       toast({
         title: "Saved",
-        description: "Success indicator added successfully.",
+        description: isEditing ? "Success indicator updated successfully." : "Success indicator added successfully.",
       })
     } catch (error) {
       toast({
-        title: "Unable to add success indicator",
+        title: "Unable to save success indicator",
         description:
           error?.response?.data?.errors?.performance_rating_id?.[0] ||
           error?.response?.data?.errors?.matrix_payload?.[0] ||
@@ -194,6 +217,35 @@ export default function Index({
       })
     } finally {
       setSuccessIndicatorCreating(false)
+    }
+  }
+
+  const handleRemoveSuccessIndicator = async (indicator) => {
+    if (!selectedRecord?.id || !indicator?.id) return
+
+    const title = indicator.success_indicator_title || indicator.title || "Success Indicator"
+    const confirmed = window.confirm(`Remove success indicator "${title}"? This will also remove its specific activities/output.`)
+    if (!confirmed) return
+
+    try {
+      await axios.delete(
+        route("dpcrs.success-indicators.destroy", {
+          recordId: selectedRecord.id,
+          itemId: indicator.id,
+        })
+      )
+
+      router.reload({ preserveScroll: true, preserveState: true })
+      toast({
+        title: "Removed",
+        description: "Success indicator removed successfully.",
+      })
+    } catch (error) {
+      toast({
+        title: "Unable to remove success indicator",
+        description: error?.response?.data?.message || error?.message || "Failed to remove the success indicator.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -220,11 +272,20 @@ export default function Index({
     } catch (error) {
       toast({
         title: "Unable to add specific activity/output",
-        description:
-          error?.response?.data?.errors?.sub_activity_id?.[0] ||
-          error?.response?.data?.message ||
-          error?.message ||
-          "Failed to save the specific activity/output.",
+        description: (() => {
+          const errors = error?.response?.data?.errors || {}
+          const firstTargetPlanError = Object.entries(errors).find(([key]) => key.startsWith("target_plan."))
+
+          return (
+            errors.sub_activity_id?.[0] ||
+            errors.target_plan?.[0] ||
+            firstTargetPlanError?.[1]?.[0] ||
+            errors.unit_of_measure?.[0] ||
+            error?.response?.data?.message ||
+            error?.message ||
+            "Failed to save the specific activity/output."
+          )
+        })(),
         variant: "destructive",
       })
     } finally {
@@ -341,11 +402,13 @@ export default function Index({
                     periodLabel={periodLabel}
                     selectedDivisionLabel={selectedDivisionLabel}
                     ppmpHierarchy={ppmpHierarchy}
-                    onAddSuccessIndicator={handleOpenSuccessIndicatorDialog}
-                    onAddSpecificAO={handleOpenSpecificActivityDialog}
-                    groupMap={groupMap}
-                    employeeMap={employeeMap}
-                    divisionMap={divisionMap}
+        onAddSuccessIndicator={handleOpenSuccessIndicatorDialog}
+        onAddSpecificAO={handleOpenSpecificActivityDialog}
+        onEditSuccessIndicator={handleOpenEditSuccessIndicatorDialog}
+        onRemoveSuccessIndicator={handleRemoveSuccessIndicator}
+        groupMap={groupMap}
+        employeeMap={employeeMap}
+        divisionMap={divisionMap}
                     categories={categories}
                     sourceRecord={sourceRecord}
                     dpcrRecord={selectedRecord}
@@ -449,9 +512,9 @@ export default function Index({
         }}
         successIndicatorTitle={specificActivityParent?.success_indicator_title ?? specificActivityParent?.title ?? ""}
         successIndicatorLabel={specificActivityParent?.success_indicator_title ?? specificActivityParent?.title ?? ""}
+        activityId={specificActivityParent?.activity_id ?? ""}
+        subActivityId={specificActivityParent?.sub_activity_id ?? ""}
         selectedDivisionLabel={selectedDivisionLabel}
-        selectedDivisionValue={selectedDivision?.value ?? ""}
-        ppmpHierarchy={ppmpHierarchy}
         groups={groups}
         employees={employees}
         onCancel={() => {
@@ -470,6 +533,7 @@ export default function Index({
             setSuccessIndicatorSourceItem(null)
             setSuccessIndicatorTemplateItem(null)
             setSuccessIndicatorInitialTitle("")
+            setSuccessIndicatorEditingItem(null)
             setSuccessIndicatorCreating(false)
           }
         }}
@@ -481,11 +545,13 @@ export default function Index({
         ratingItems={dpcrRatingItems}
         initialSuccessIndicatorTitle={successIndicatorInitialTitle}
         initialTemplateItem={successIndicatorTemplateItem}
+        mode={successIndicatorEditingItem ? "edit" : "create"}
         onCancel={() => {
           setSuccessIndicatorOpen(false)
           setSuccessIndicatorSourceItem(null)
           setSuccessIndicatorTemplateItem(null)
           setSuccessIndicatorInitialTitle("")
+          setSuccessIndicatorEditingItem(null)
         }}
         onCreate={handleCreateSuccessIndicator}
         creating={successIndicatorCreating}
